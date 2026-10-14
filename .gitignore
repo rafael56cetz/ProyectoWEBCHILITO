@@ -1,0 +1,28 @@
+# Configuración y secretos locales
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Entornos y archivos generados de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.sqlite3
+
+# Herramientas y archivos temporales
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+node_modules/
+
+# Revisión y evidencias locales: no forman parte de esta entrega
+/revision/
+/referencia/
+/output/

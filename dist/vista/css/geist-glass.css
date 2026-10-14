@@ -1,0 +1,1783 @@
+/* El Chilito · Propuesta Geist + vidrio · 11 octubre 2026.
+   Refinamiento visual: conserva rutas y funciones del prototipo. */
+
+
+html {
+  scroll-behavior: smooth;
+}
+html,body{overflow-x:hidden}
+body,button,input,select,textarea,code{font-family:var(--body)}
+body{font-size:16px;line-height:1.6}
+h1,h2,h3{font-weight:500;text-wrap:balance}
+p{overflow-wrap:break-word}
+.eyebrow{font-size:13px!important;font-weight:500;letter-spacing:.065em;line-height:1.5}
+.home h2{font-family:var(--body);font-weight:500;font-size:clamp(32px,3.4vw,49px);line-height:1.12;letter-spacing:-.035em}
+.small-copy,.hero-note,.hero-caption,.badge,.reading-note,.measurement-note,.panel-footnote{font-size:13px;line-height:1.6}
+[tabindex="-1"]:focus{outline:none}
+.text-action,.back-link,.forgot-link,.auth-switch a{color:var(--sage);font-weight:500;text-decoration-color:currentColor}
+.text-action:hover,.text-action:active{color:var(--text)}
+.badge{font-size:13px!important;letter-spacing:0;border-radius:6px;font-weight:500}
+.badge.neutral{color:var(--muted);background:#e9e5dc55;border-color:var(--line)}
+.badge.positive{color:#31543d;background:#e2ecdf;border-color:#87987f}
+.badge.warning{color:#77500e;background:#f7ebd1;border-color:#b5935b}
+.badge.error{color:#9c3027;background:#fce3dd;border-color:#bc7c71}
+.hero,.auth-visual,.functions-section{
+  --bg:#172218;--surface:#223123;--text:#f2efe9;--muted:#d1d4c5;--sage:#d1dcc0;--line:#6b765d;
+  --focus:#fffdf6;
+  color:var(--text)
+}
+/* 1. Asegurar que la sección Hero tenga 100vh exactos y centre verticalmente su contenido sin empujarlo al fondo */
+.hero,
+.hero-section,
+main > section:first-of-type {
+  min-height: 100vh !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important; /* Sube el bloque de texto al centro vertical en lugar de hundirlo abajo */
+  padding-top: 88px !important; /* Espacio limpio para librar el Header fijo */
+  padding-bottom: 8vh !important; /* Margen inferior para elevar visualmente el título y el subtítulo */
+  box-sizing: border-box !important;
+  background: #172218;
+}
+
+.hero-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  /* Iluminación continua y natural: sin corte vertical ni oscurecimiento inferior */
+  background:
+    /* Sutil penumbra en la zona del Header fijo para contraste limpio */
+    linear-gradient(
+      180deg,
+      rgba(10, 20, 14, 0.40) 0%,
+      rgba(10, 20, 14, 0.10) 18%,
+      transparent 38%
+    ),
+    /* Sombreado radial suave y difuso exclusivamente detrás del texto para contraste, sin bordes duros ni líneas verticales */
+    radial-gradient(
+      ellipse 65% 55% at 20% 45%,
+      rgba(10, 20, 14, 0.38) 0%,
+      rgba(10, 20, 14, 0.14) 50%,
+      transparent 80%
+    ) !important;
+}
+
+/* 2. Quitar cualquier margin-top: auto o padding-top excesivo que esté empujando el texto hacia abajo */
+.hero-content,
+.hero-text,
+.hero-copy,
+.hero > div,
+.hero-section > div {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 2rem !important;
+  max-width: 680px;
+}
+
+.hero-content {
+  width: calc(100% - 112px) !important;
+  max-width: 1232px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+}
+
+.hero-text {
+  max-width: 680px !important;
+  width: 100% !important;
+}
+
+.hero-text h1 {
+  font-family: var(--body);
+  font-weight: 400;
+  font-size: clamp(48px, 5.8vw, 92px) !important;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+  margin-top: 0 !important;
+  margin-bottom: 0.5rem !important;
+  max-width: 100%;
+  text-wrap: balance;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.65), 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.hero-text h1 span {
+  display: block;
+}
+
+/* 3. Garantizar que el párrafo debajo del eslogan sea 100% visible y tenga separación limpia */
+.hero p,
+.hero-section p,
+.hero-content p,
+.hero-description {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 0.94 !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0 !important;
+  font-size: clamp(1rem, 1.25vw, 1.18rem) !important;
+  line-height: 1.6 !important;
+  color: rgba(255, 255, 255, 0.94) !important;
+  max-width: 58ch !important;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65), 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+/* ==========================================================================
+   LANDING PAGE BENTO GRID & LIQUID GLASS SECTIONS
+   ========================================================================== */
+
+/* Badges */
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(46, 125, 75, 0.1);
+  color: #2e7d4b;
+  border: 1px solid rgba(46, 125, 75, 0.2);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+  width: fit-content;
+}
+.section-badge-dark {
+  background: rgba(142, 212, 163, 0.12) !important;
+  color: #a3e3b7 !important;
+  border-color: rgba(142, 212, 163, 0.25) !important;
+}
+
+/* --------------------------------------------------------------------------
+   SECCIÓN 1: EL PROYECTO ("Un pequeño huerto. Una nueva conexión.")
+   -------------------------------------------------------------------------- */
+.project-section {
+  display: block !important;
+  width: 100% !important;
+  background: radial-gradient(circle at 88% 12%, rgba(46, 125, 75, 0.07) 0%, transparent 48%), linear-gradient(180deg, #f6f9f6 0%, #ebf1ec 100%) !important;
+  padding: 6rem 1.5rem !important;
+  box-sizing: border-box !important;
+}
+.project-header-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1.25fr;
+  gap: 3.5rem;
+  align-items: flex-start;
+}
+.project-header-left h2 {
+  font-size: clamp(32px, 3.8vw, 48px);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: #1f3524;
+  margin: 0;
+}
+.project-header-right h3 {
+  font-size: clamp(19px, 2vw, 22px);
+  font-weight: 500;
+  color: #1f3524;
+  line-height: 1.4;
+  margin: 0 0 1.15rem;
+}
+.project-header-right p {
+  font-size: 15.5px;
+  line-height: 1.75;
+  color: #4a5d4e;
+  margin: 0 0 1rem;
+}
+.project-header-right p:last-child {
+  margin-bottom: 0;
+}
+.bento-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-top: 3.5rem;
+}
+.bento-stat-card {
+  background: rgba(255, 255, 255, 0.75);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(46, 125, 75, 0.12);
+  border-radius: 20px;
+  padding: 2rem 1.75rem;
+  box-shadow: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95), 0 10px 28px -8px rgba(20, 42, 27, 0.06);
+  transition: transform .24s cubic-bezier(.22, 1, .36, 1), box-shadow .24s ease, border-color .24s ease;
+  display: flex;
+  flex-direction: column;
+}
+@media (hover: hover) {
+  .bento-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: inset 0 1.5px 0 0 #ffffff, 0 16px 36px -10px rgba(20, 42, 27, 0.12);
+    border-color: rgba(46, 125, 75, 0.28);
+  }
+}
+.bento-stat-number {
+  font-size: clamp(48px, 4.5vw, 64px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #2e7d4b;
+  margin-bottom: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.bento-stat-card h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f3524;
+  margin: 0 0 0.5rem;
+  line-height: 1.3;
+}
+.bento-stat-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #556858;
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   SECCIÓN 2: VITRINA DEL PROTOTIPO
+   -------------------------------------------------------------------------- */
+.prototype-section {
+  display: block !important;
+  width: 100% !important;
+  background: linear-gradient(180deg, #ebf1ec 0%, #f6f9f6 50%, #ebf1ec 100%) !important;
+  padding: 6rem 1.5rem !important;
+  box-sizing: border-box !important;
+}
+.prototype-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+  margin-bottom: 3.5rem;
+}
+.prototype-section-heading h2 {
+  font-size: clamp(32px, 3.8vw, 46px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: #1f3524;
+  margin: 0;
+  line-height: 1.15;
+}
+.prototype-subtitle {
+  font-size: 16px;
+  color: #556858;
+  max-width: 380px;
+  margin: 0;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.prototype-bento-showcase {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 2rem;
+  align-items: stretch;
+}
+.prototype-visual-wrap {
+  position: relative;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.9) 0%, rgba(234, 242, 235, 0.6) 100%);
+  border: 1px solid rgba(46, 125, 75, 0.12);
+  border-radius: 24px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95), 0 12px 32px -10px rgba(20, 42, 27, 0.07);
+  overflow: hidden;
+  min-height: 520px;
+}
+#prototipo img,
+.prototype-visual-wrap img,
+.prototype-media img,
+.prototype-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 560px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 18px;
+  transition: transform .4s cubic-bezier(.22, 1, .36, 1);
+}
+@media (hover: hover) {
+  .prototype-visual-wrap:hover img {
+    transform: scale(1.02);
+  }
+}
+.anatomy-cards-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: space-between;
+}
+.anatomy-glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(46, 125, 75, 0.12);
+  border-radius: 18px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.9), 0 6px 18px -4px rgba(20, 42, 27, 0.05);
+  transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+@media (hover: hover) {
+  .anatomy-glass-card:hover {
+    transform: translateX(4px);
+    background: rgba(255, 255, 255, 0.88);
+    border-color: rgba(46, 125, 75, 0.25);
+    box-shadow: inset 0 1.5px 0 0 #ffffff, 0 10px 24px -6px rgba(20, 42, 27, 0.09);
+  }
+}
+.anatomy-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0.4rem;
+}
+.anatomy-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(46, 125, 75, 0.12);
+  color: #2e7d4b;
+  border: 1px solid rgba(46, 125, 75, 0.2);
+  flex-shrink: 0;
+}
+.anatomy-glass-card h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f3524;
+  margin: 0;
+  line-height: 1.3;
+}
+.anatomy-glass-card p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #4a5d4e;
+  margin: 0;
+  padding-left: 40px;
+}
+
+/* --------------------------------------------------------------------------
+   SECCIÓN 3: VIDA REAL + ECOSISTEMA INTELIGENTE
+   -------------------------------------------------------------------------- */
+.functions-section {
+  display: block !important;
+  width: 100% !important;
+  background: radial-gradient(circle at 85% 15%, rgba(62, 138, 86, 0.16) 0%, transparent 45%), linear-gradient(180deg, #111e15 0%, #0b140e 100%) !important;
+  color: #ffffff !important;
+  padding: 6rem 1.5rem !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border: none !important;
+  box-sizing: border-box !important;
+}
+.lifestyle-bento-banner {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 26px;
+  padding: 3rem;
+  margin-bottom: 2.5rem;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 20px 48px -12px rgba(0, 0, 0, 0.4);
+}
+.lifestyle-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.lifestyle-content h2 {
+  font-size: clamp(28px, 3.4vw, 42px);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: #f5f8f5;
+  margin: 0 0 1.25rem;
+}
+.lifestyle-content p {
+  font-size: 16px;
+  line-height: 1.7;
+  color: #bacbbd;
+  margin: 0 0 2rem;
+  max-width: 520px;
+}
+.lifestyle-image-wrap {
+  border-radius: 20px;
+  overflow: hidden;
+  aspect-ratio: 16/9;
+  width: 100%;
+  max-height: 440px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+.care-section img,
+.lifestyle-card img,
+.convivir-media img,
+.lifestyle-image-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 440px;
+  object-fit: cover;
+  object-position: center center;
+  border-radius: 18px;
+}
+.dark-glass-features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.dark-glass-feature-card {
+  background: rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.3);
+  transition: transform .24s cubic-bezier(.22, 1, .36, 1), box-shadow .24s ease, border-color .24s ease, background .24s ease;
+}
+@media (hover: hover) {
+  .dark-glass-feature-card:hover {
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(142, 212, 163, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 16px 36px -8px rgba(0, 0, 0, 0.45);
+  }
+}
+.dark-feature-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(62, 138, 86, 0.28) 0%, rgba(62, 138, 86, 0.1) 100%);
+  border: 1px solid rgba(142, 212, 163, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  color: #a3e3b7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  flex-shrink: 0;
+}
+.dark-feature-icon-wrap .icon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+}
+.dark-glass-feature-card h4 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #f5f8f5;
+  margin: 0 0 0.65rem;
+  line-height: 1.3;
+}
+.dark-glass-feature-card p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #9eb1a2;
+  margin: 0;
+}
+.dashboard-preview{background:var(--surface);border-color:var(--line);border-radius:16px;padding:28px}
+.preview-plants>div{background:#e9eadd;border-color:#aaa992;border-radius:8px;padding:16px 12px}
+.preview-plants strong{color:#355a44;font-weight:500}
+.preview-plants span:last-child,.dashboard-preview>p{font-size:13px;color:var(--muted)}
+.preview-alert{font-size:14px;color:#77500e}
+/* --------------------------------------------------------------------------
+   FOOTER PROFESIONAL (BENTO + LIQUID GLASS)
+   -------------------------------------------------------------------------- */
+.site-footer {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(180deg, #0b140e 0%, #070d09 100%);
+  color: rgba(255, 255, 255, 0.86);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  padding: 4.5rem 1.5rem 2.25rem;
+}
+
+.site-footer__container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.site-footer__grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 3rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.site-footer__brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.85rem;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.site-footer__desc {
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.68);
+  max-width: 42ch;
+  margin-bottom: 1.25rem;
+}
+
+.site-footer__tech-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.site-footer__tech-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.site-footer__heading {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 1.1rem;
+}
+
+.site-footer__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.site-footer__link {
+  color: rgba(255, 255, 255, 0.68);
+  text-decoration: none;
+  font-size: 0.92rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.site-footer__link:hover {
+  color: #ffffff;
+  transform: translateX(2px);
+}
+
+.site-footer__bottom {
+  padding-top: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.site-footer__legal-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.public-footer>span,.public-footer p{font-size:13px;color:var(--muted)}
+.data-notice{background:#dee7d6;color:#2b452f;border-bottom:1px solid #a5b59b;font-size:14px}
+.data-notice.subtle{background:#e9e5dc;color:#514b43}
+/* Dashboard Apple Home / Bento Grid elevated atmosphere */
+.page-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:28px}
+.page-heading h1{font-weight:500;letter-spacing:-.04em;font-size:39px;line-height:1.15;margin:0 0 6px}
+.page-heading p:not(.eyebrow){font-size:16px;color:var(--muted);margin:0}
+
+/* Paso 2: Bento Telemetry Module */
+.connection-strip{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;padding:1.15rem 1.5rem;border-radius:18px;
+  background:rgba(255,255,255,.68);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid rgba(28,49,34,.09);
+  box-shadow:inset 0 1.5px 0 0 rgba(255,255,255,.95),0 10px 30px -10px rgba(20,42,27,.07);
+  margin-bottom:32px;align-items:center;
+  transition:transform .24s cubic-bezier(.22,1,.36,1),box-shadow .24s ease,border-color .24s ease,background .24s ease;
+}
+.connection-strip .telemetry-cell{display:flex;align-items:center;gap:14px;min-width:0}
+.connection-strip .telemetry-cell-second{border-left:1px solid rgba(28,49,34,.08);padding-left:1.5rem}
+.connection-strip .telemetry-cell>span{display:flex;flex-direction:column;font-size:15px;font-weight:500;color:var(--text);line-height:1.35}
+.connection-strip small{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:2px}
+
+/* Medallion for telemetry, climate, water and alert icons */
+.icon-medallion,.metric-symbol{
+  width:42px;height:42px;min-width:42px;border-radius:13px;
+  background:linear-gradient(135deg,rgba(62,118,78,.16) 0%,rgba(62,118,78,.06) 100%);
+  border:1px solid rgba(47,89,60,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 4px 10px -2px rgba(28,49,34,.08);
+  color:#264d32;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.icon-medallion .icon,.metric-symbol .icon{width:20px;height:20px;color:#264d32}
+
+.state-notice{background:#e5ebdf;border-color:#a9b49d;border-radius:16px}
+.notice-symbol,.empty-symbol{background:#d4ddcb;color:#355a44}
+.state-notice p{color:#514e44;font-size:15px}
+.state-notice h2{font-weight:500}
+.state-notice.warning{background:#f7ecd6;border-color:#b59d72}
+.state-notice.warning h2,.state-notice.warning .notice-symbol{color:#77500e}
+.state-notice.warning .notice-symbol{background:#e8d6ad}
+.state-notice.warning p{color:#665238}
+.panel-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 18px}
+.panel-heading h2{font-size:25px;font-weight:500;letter-spacing:-.2px}
+.panel-heading p{font-size:14px;color:var(--muted)}
+
+/* Paso 3: Elevate Bento Cards */
+.plant-card,.metric,.water-panel,.notice-panel{
+  background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);
+  border:1px solid rgba(28,49,34,.09);border-radius:22px;padding:1.5rem;
+  box-shadow:inset 0 1.5px 0 0 rgba(255,255,255,.95),0 12px 32px -10px rgba(20,42,27,.07),0 2px 6px -1px rgba(20,42,27,.04);
+  transition:transform .24s cubic-bezier(.22,1,.36,1),box-shadow .24s ease,border-color .24s ease,background .24s ease;
+}
+.alert-item,.account-panel,.empty-page{border-radius:16px;padding:24px}
+
+@media(hover:hover){
+  .plant-card:hover,.metric:hover,.water-panel:hover,.notice-panel:hover,.connection-strip:hover{
+    transform:translateY(-2px);background:rgba(255,255,255,.92);border-color:rgba(47,89,60,.22);
+    box-shadow:inset 0 1.5px 0 0 #ffffff,0 18px 38px -12px rgba(20,42,27,.12),0 4px 10px -2px rgba(20,42,27,.06);
+  }
+}
+
+/* Paso 4: Internal Details of Plant & Climate Cards */
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.card-top>span:first-child{font-size:13px;color:var(--muted)}
+.plant-name{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 16px}
+.plant-name h3{font-size:25px;font-weight:500;letter-spacing:-.02em;margin:0 0 4px}
+.plant-name p{font-size:14px;color:var(--muted);margin:0}
+.plant-pedestal{
+  width:64px;height:64px;min-width:64px;border-radius:18px;
+  background:radial-gradient(circle at 50% 35%,#ffffff 0%,rgba(232,240,232,.7) 100%);
+  border:1px solid rgba(47,89,60,.12);
+  box-shadow:inset 0 1.5px 0 #ffffff,0 6px 16px -4px rgba(20,42,27,.10);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;
+}
+.plant-pedestal .plant-drawing{width:auto;height:48px;max-height:48px;max-width:48px;color:#507c43}
+.plant-reading{border-top:1px solid rgba(28,49,34,.08);padding-top:14px}
+.plant-reading>span{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.plant-reading .icon{width:16px;height:16px;color:var(--sage)}
+.plant-reading small,.metric small{color:var(--muted)}
+.plant-reading strong{display:block;font-size:39px;font-weight:500;line-height:1.2;margin:4px 0 0;font-variant-numeric:tabular-nums}
+.sensor-track{
+  height:6px;border-radius:9999px;background:rgba(28,49,34,.07);
+  box-shadow:inset 0 1px 2px rgba(20,35,24,.12),0 1px 0 rgba(255,255,255,.8);
+  margin:.85rem 0;
+}
+.reading-note{color:var(--muted);border-top:none!important;padding-top:0!important;margin-top:0;font-size:13px;line-height:1.5}
+.absent{color:var(--muted)}
+
+.metric{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.metric .metric-symbol{margin-bottom:6px}
+.metric h3{font-size:15px;font-weight:500;color:var(--muted);margin:0}
+.metric strong{display:block;font-size:33px;font-weight:500;letter-spacing:-.5px;line-height:1.2;margin:4px 0 8px;font-variant-numeric:tabular-nums}
+.metric .badge{margin-top:auto}
+.metric p,.measurement-note,.panel-footnote{color:var(--muted);font-size:13px}
+.measurement-note{margin:14px 0 28px}
+.notice-link{color:#77500e}
+.notice-count{border-color:#aa874e}
+
+.water-panel,.notice-panel{display:flex;flex-direction:column}
+.water-panel>.small-copy{font-size:13px}
+.panel-title{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.panel-title h2{font-size:20px;font-weight:500;line-height:1.3;margin:0}
+.water-panel>p,.notice-panel>p{font-size:14px;line-height:1.65;color:var(--muted);margin-top:12px}
+.water-panel .badge{margin-bottom:4px}
+.notice-panel .no-alerts{color:var(--text);font-size:15px;font-weight:500;margin-top:0}
+
+/* Paso 5: Status Chips IoT for "Sin datos" and "Sin conexión" */
+.dashboard .badge{
+  border-radius:9999px;padding:.3rem .75rem;font-size:.78rem;font-weight:500;color:#4a5d4e;
+  background:rgba(235,242,237,.85);border:1px solid rgba(28,49,34,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+  display:inline-flex;align-items:center;gap:.4rem;width:fit-content;line-height:1.4;white-space:nowrap;
+}
+.dashboard .badge::before{
+  content:"";width:6px;height:6px;border-radius:50%;background:#8c9c8f;
+  box-shadow:0 0 0 2px rgba(140,156,143,.22);flex-shrink:0;
+}
+.dashboard .badge .icon{display:none}
+.auth-quote h2{font-family:var(--body);font-weight:400;font-size:49px;line-height:1.12;letter-spacing:-.045em}
+.auth-quote>p:last-child,.auth-image-caption{color:#d6dbc9;font-size:14px}
+.auth-form-wrap>h1{font-weight:500;font-size:39px;line-height:1.12;letter-spacing:-.04em}
+.field label{font-size:16px;font-weight:500;color:var(--text)}
+.field input{background:#fffdf6;color:var(--text);border-color:#8e8577;font-size:16px;min-height:48px}
+.field input:hover{border-color:#355a44}
+.field input::placeholder{color:#71695f}
+.field input:disabled{background:#e9e5dc;color:#71695f;border-color:#b7afa3}
+.field input[aria-invalid=true]{border-color:#9c3027}
+.field-error{color:#9c3027;font-size:14px}
+.login-form .field,
+.login-form input[type="email"],
+.password-input-group,
+.login-form button[type="submit"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.login-form input[type="email"] {
+  height: 48px !important;
+  min-height: 48px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(28, 49, 34, 0.22) !important;
+  border-radius: 10px !important;
+  padding: 0 1rem !important;
+  font-size: 0.95rem !important;
+  color: #142419 !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.login-form input[type="email"]:focus {
+  border-color: #2f593c !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(47, 89, 60, 0.14) !important;
+}
+
+.password-input-group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(28, 49, 34, 0.22);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.password-input-group:focus-within {
+  border-color: #2f593c;
+  box-shadow: 0 0 0 3px rgba(47, 89, 60, 0.14);
+}
+
+.password-input-group .password-field-input,
+.password-input-group input {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 0 1rem !important;
+  font-size: 0.95rem;
+  color: #142419;
+  box-shadow: none !important;
+}
+
+button.password-eye-btn.no-glass {
+  all: unset;
+  box-sizing: border-box;
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(47, 89, 60, 0.05) !important;
+  border-left: 1px solid rgba(28, 49, 34, 0.14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  color: #264d32 !important;
+  cursor: pointer !important;
+  transition: background 0.2s ease, color 0.2s ease !important;
+}
+
+button.password-eye-btn.no-glass::before,
+button.password-eye-btn.no-glass::after {
+  display: none !important;
+  content: none !important;
+}
+
+button.password-eye-btn.no-glass:hover {
+  background: rgba(47, 89, 60, 0.12) !important;
+  color: #142419 !important;
+  transform: none !important;
+}
+
+button.password-eye-btn.no-glass:active {
+  background: rgba(47, 89, 60, 0.18) !important;
+  transform: none !important;
+}
+
+button.password-eye-btn.no-glass svg {
+  width: 20px !important;
+  height: 20px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  display: block !important;
+  pointer-events: none;
+}
+.field-hint{color:var(--muted);font-size:13px}
+.form-divider{color:var(--muted)}
+.form-feedback{background:#e2ecdf;color:#31543d;border-color:#87987f;font-size:15px}
+.toast{background:#fffdf6;color:#1f1915;border-color:#8e8577;font-size:15px}
+.review-body,.sheet-body{background:var(--bg)}
+.review-intro p,.review-footer{color:var(--muted);font-size:14px}
+.review-controls{background:#fffdf6;border-color:var(--line)}
+.review-controls label{color:var(--text);font-size:14px}
+.review-controls select{color:var(--text);background:#f2efe9;border-color:#8e8577;min-height:44px;font-size:16px}
+.size-control{background:#e9e5dc;border-color:var(--line)}
+.size-control button{color:var(--text);min-height:44px;font-size:14px}
+.size-control button[aria-pressed=true]{background:#355a44;color:#fffdf6}
+.review-frame,.review-frame iframe{background:#f2efe9;border-color:#8e8577}
+.review-canvas.mobile{background-image:radial-gradient(#ccc5b9 .8px,transparent .8px)}
+.sheet-title h1{font-family:var(--body);font-weight:400;font-size:clamp(39px,5vw,76px);line-height:1.08;letter-spacing:-.045em}
+.sheet-section>h2{font-family:var(--body);font-weight:500;line-height:1.2}
+.swatch-grid{grid-template-columns:repeat(3,1fr)}
+.type-sample .serif-sample{font-family:var(--body);font-weight:400;letter-spacing:-.04em}
+.type-sample .sans-sample{font-weight:500;letter-spacing:-.03em}
+.sheet-type-table{width:100%;border-collapse:collapse;font-size:15px}
+.sheet-type-table td,.sheet-type-table th{text-align:left;border-bottom:1px solid var(--line);padding:14px 8px}
+.sheet-type-table th{font-weight:500;color:var(--sage)}
+.type-table-wrap{overflow:auto;margin-top:24px}
+.glass-stage{background:linear-gradient(90deg,#233523dd,#172218dd),url('../img/habanero-editorial.png') center/cover;border-radius:16px;padding:28px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin-bottom:24px;color:#fffdf6;--focus:#fffdf6;--glass-edge:#969e89}
+.glass-stage p{flex-basis:100%;font-size:14px;color:#e0e4d5}
+.source-list{padding-left:21px;color:var(--muted);font-size:15px;line-height:1.8}
+.source-list a{color:var(--sage);text-decoration:underline;text-underline-offset:3px}
+
+@media(min-width:1500px){.hero{min-height:930px}.hero-content{padding-top:150px}}
+@media(max-width:1120px){.hero-content{grid-template-columns:1fr;gap:24px}.hero-text h1{font-size:clamp(60px,8vw,90px);max-width:900px}.prototype-render img{height:530px}.prototype-render figcaption{padding:24px}.page-heading h1{font-size:32px}}
+@media(max-width:850px){.prototype-render{grid-template-columns:1fr}.prototype-render img{height:auto;max-height:650px}.prototype-render figcaption{padding:24px 28px 32px;gap:16px}.prototype-render figcaption h3{font-size:25px}.swatch-grid{grid-template-columns:repeat(2,1fr)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media(forced-colors:active){.badge{border:1px solid CanvasText}.plant-card,.metric{border-color:CanvasText}}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Shared Liquid Glass controls. Opaque surfaces are the baseline. */
+:root{
+  --header-height:72px;
+  --disabled-fill:#e6e3dd;--disabled-ink:#655d54;--disabled-edge:#a39a8d;
+}
+html{scroll-padding-top:calc(var(--header-height) + 16px)}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible,.button.is-focus{
+  outline:3px solid var(--focus);outline-offset:4px;
+}
+.skip-link{z-index:100}
+.brand{display:inline-flex;align-items:center;min-height:44px;min-width:0;max-width:100%;font:500 1.75rem/1.2 var(--body);letter-spacing:-.055em;overflow-wrap:anywhere}
+.brand-name{display:block}
+.brand-logo{display:block;object-fit:contain;width:auto;height:auto;max-height:2.5rem;max-width:min(11rem,100%)}
+
+/* ==========================================================================
+   OFFICIAL LOGO SYSTEM: EL HABANERO TRIANGULAR
+   ========================================================================== */
+
+/* Contenedor del Imagotipo (Isotipo + Texto "El Chilito") */
+.brand-mark {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.68rem !important;
+  text-decoration: none !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 !important;
+  min-height: 44px !important;
+  border-radius: 0 !important;
+  cursor: pointer;
+}
+
+.brand-mark:hover,
+.brand-mark:focus,
+.brand-mark:active {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Símbolo libre, sin placa; conserva su espacio junto al nombre. */
+.brand-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.brand-logo-badge > svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+/* Texto "El Chilito" junto al isotipo */
+.brand-name {
+  font-weight: 600;
+  font-size: 1.18rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+/* ==========================================================================
+   LIQUID GLASS BUTTON SYSTEM (iPhone iOS 26 Aesthetic)
+   ========================================================================== */
+
+/* 1. Botones Liquid Glass Transparentes estilo iPhone iOS 26 (Header, Hero y secciones oscuras) */
+
+/* 1. Desactivar cualquier capa ::before o ::after que pinte una franja blancuzca en la mitad superior del botón */
+.btn-liquid-dark::before,
+.btn-liquid-dark::after,
+.site-header nav a::before,
+.site-header nav a::after,
+.site-header .header-cta::before,
+.site-header .header-cta::after,
+header nav a::before,
+header nav a::after,
+header a[class*="btn"]::before,
+header a[class*="btn"]::after,
+header a.btn-liquid-nav::before,
+header a.btn-liquid-nav::after,
+.public-header .header-actions a::before,
+.public-header .header-actions a::after,
+.btn-liquid::before,
+.btn-liquid::after,
+.btn-liquid-nav::before,
+.btn-liquid-nav::after,
+.btn-liquid-secondary::before,
+.btn-liquid-secondary::after,
+.btn-liquid-primary::before,
+.btn-liquid-primary::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+/* 2. Cristal Liquid Glass transparente y uniforme (sin mancha blancuzca arriba, solo filo de luz fino en el borde) */
+.btn-liquid-dark,
+.site-header nav a,
+.site-header .header-cta,
+header nav a,
+header a.btn-liquid-nav,
+.public-header .header-actions a,
+.public-header .btn-liquid-primary,
+.btn-liquid,
+.btn-liquid-nav,
+.btn-liquid-secondary,
+.btn-liquid-primary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
+  font-weight: 500;
+  min-height: 38px;
+  padding: 0.45rem 1.15rem;
+  font-size: 0.9rem;
+  /* Fondo translúcido uniforme con un tinte oscuro/cristal muy sutil, SIN blanco lechoso en la parte de arriba */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(15, 28, 19, 0.38) 100%
+  ) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  /* Brillo concentrado únicamente en el filo del borde (1px), sin invadir ni blanquear el interior superior */
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.10),
+    0 8px 20px -4px rgba(0, 0, 0, 0.35) !important;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease !important;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* 3. Estado Hover limpio (sin volverse blanco opaco arriba) */
+.btn-liquid-dark:hover,
+.site-header nav a:hover,
+.site-header .header-cta:hover,
+header nav a:hover,
+header a.btn-liquid-nav:hover,
+.public-header .header-actions a:hover,
+.public-header .btn-liquid-primary:hover,
+.btn-liquid:hover,
+.btn-liquid-nav:hover,
+.btn-liquid-secondary:hover,
+.btn-liquid-primary:hover {
+  transform: translateY(-1.5px);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(20, 38, 26, 0.45) 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.16),
+    0 12px 24px -4px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Interacción Active: compresión física al hacer clic */
+.btn-liquid-dark:active,
+header a.btn-liquid-nav:active,
+header nav a:active,
+.site-header nav a:active,
+.site-header .header-cta:active,
+.public-header .header-actions a:active,
+.btn-liquid:active,
+.btn-liquid-nav:active,
+.btn-liquid-secondary:active,
+.btn-liquid-primary:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* 2. Botones sobre Fondos Claros (Únicamente en Login y Dashboard) */
+
+/* 1. Regla base para garantizar que NINGÚN botón normal quede cuadrado o sin bordes (excepto el ícono del ojo y el logo) */
+button:not(.password-eye-btn),
+.button:not(.password-eye-btn),
+.btn-liquid-brand,
+.btn-liquid-light,
+.btn-liquid-sidebar,
+.dashboard-sidebar button,
+.dashboard-sidebar a,
+.dashboard-layout header button,
+.dashboard-layout header a.btn,
+.sidebar button,
+.sidebar a.button,
+.private-nav a,
+.app-header button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.65rem 1.4rem;
+  border-radius: 9999px !important; /* Devuelve la forma redondeada de cápsula a todos los botones */
+  font-weight: 500;
+  font-size: 0.95rem;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease !important;
+}
+
+/* 2. Botón "Iniciar sesión" dentro del formulario de Login (Cápsula redondeada Liquid Glass Verde Bosque) */
+.login-form button[type="submit"],
+.btn-liquid-brand {
+  width: 100% !important;
+  min-height: 48px !important;
+  border-radius: 9999px !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  background: linear-gradient(
+    135deg,
+    rgba(47, 89, 60, 0.88) 0%,
+    rgba(31, 64, 41, 0.94) 100%
+  ) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
+  backdrop-filter: blur(14px) saturate(165%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.32) !important;
+  box-shadow:
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 0 rgba(16, 35, 22, 0.45),
+    0 10px 24px -6px rgba(31, 64, 41, 0.38) !important;
+}
+
+.login-form button[type="submit"]:hover,
+.btn-liquid-brand:hover {
+  transform: translateY(-1.5px);
+  box-shadow:
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.80),
+    inset 0 -1px 0 0 rgba(16, 35, 22, 0.45),
+    0 14px 28px -6px rgba(31, 64, 41, 0.48) !important;
+}
+
+/* 3. Botón "Cerrar sesión" / "Salir" y botones secundarios en fondos claros (Cápsula redondeada Liquid Glass Claro) */
+.btn-liquid-light,
+.dashboard-layout header button,
+.dashboard-layout header a:not(.site-logo):not(.brand),
+.app-header .btn-liquid-light,
+.site-header.app-header button {
+  border-radius: 9999px !important;
+  padding: 0.55rem 1.35rem !important;
+  min-height: 40px !important;
+  color: #142419 !important;
+  font-weight: 500 !important;
+  background: rgba(255, 255, 255, 0.68) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  backdrop-filter: blur(14px) saturate(160%) !important;
+  border: 1px solid rgba(28, 49, 34, 0.16) !important;
+  box-shadow:
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 0 rgba(28, 49, 34, 0.06),
+    0 6px 16px -4px rgba(20, 42, 27, 0.08) !important;
+}
+
+.btn-liquid-light:hover,
+.dashboard-layout header button:hover,
+.app-header .btn-liquid-light:hover,
+.site-header.app-header button:hover {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-color: rgba(28, 49, 34, 0.28) !important;
+  transform: translateY(-1.5px);
+}
+
+/* 4. Botones de Navegación del Sidebar ("Mi huerto", "Avisos", "Cuenta", etc.) — Redondeados con bordes Liquid Glass */
+.btn-liquid-sidebar,
+.dashboard-sidebar button,
+.dashboard-sidebar nav a,
+.dashboard-sidebar a,
+.sidebar button,
+.sidebar a.button,
+.private-nav a {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  border-radius: 9999px !important;
+  padding: 0.75rem 1.15rem !important;
+  min-height: 44px !important;
+  color: #3b4d3f !important;
+  background: rgba(255, 255, 255, 0.52) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+  border: 1px solid rgba(28, 49, 34, 0.14) !important;
+  box-shadow:
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.90),
+    0 4px 12px -2px rgba(20, 35, 24, 0.06) !important;
+}
+
+/* Estado activo del botón seleccionado en el Sidebar ("Mi huerto", "Avisos", "Cuenta") */
+.btn-liquid-sidebar.is-active,
+.btn-liquid-sidebar.active,
+.btn-liquid-sidebar[aria-current="page"],
+.btn-liquid-sidebar[aria-current],
+.dashboard-sidebar button.active,
+.dashboard-sidebar a.active,
+.dashboard-sidebar [aria-current="page"],
+.sidebar [aria-current="page"],
+.sidebar [aria-current],
+.private-nav [aria-current="page"],
+.private-nav [aria-current] {
+  color: #142419 !important;
+  font-weight: 600 !important;
+  background: linear-gradient(
+    135deg,
+    rgba(62, 118, 78, 0.22) 0%,
+    rgba(62, 118, 78, 0.10) 100%
+  ) !important;
+  border: 1px solid rgba(47, 89, 60, 0.28) !important;
+  box-shadow:
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 0 rgba(47, 89, 60, 0.10),
+    0 6px 16px -4px rgba(31, 64, 41, 0.12) !important;
+}
+
+.button {
+  font-family: inherit;
+}
+.button.compact {
+  padding: 0.45rem 1.15rem !important;
+  min-height: 38px !important;
+}
+.button.full {
+  width: 100% !important;
+}
+@media(hover:hover){
+  .button:hover:where(:not(:disabled):not([aria-disabled=true]):not([aria-busy=true])){
+    transform:translateY(-1.5px);box-shadow:var(--liquid-hover-shadow);border-color:var(--liquid-hover-edge);
+  }
+}
+.button:active:where(:not(:disabled):not([aria-disabled=true]):not([aria-busy=true])),.button.is-pressed{
+  transform:translateY(0) scale(.97);box-shadow:inset 0 2px 5px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.45);
+}
+.button[aria-busy=true]{cursor:progress;transform:none}
+.button:disabled,.button[aria-disabled=true]{
+  background:var(--disabled-fill);color:var(--disabled-ink);border-color:var(--disabled-edge);
+  box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;transform:none;cursor:not-allowed;
+}
+.button:disabled::before,.button[aria-disabled=true]::before{display:none}
+.button-spinner{width:1em;height:1em;flex-shrink:0;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:button-spin 900ms linear infinite}
+@keyframes button-spin{to{transform:rotate(360deg)}}
+header,
+.site-header,
+.header-glass-dark {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 9999 !important;
+  isolation: isolate;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 24, 16, 0.72) 0%,
+    rgba(12, 24, 16, 0.48) 100%
+  ) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.08),
+    0 8px 24px -6px rgba(0, 0, 0, 0.28) !important;
+}
+
+main,
+section {
+  position: relative;
+  z-index: 1 !important;
+}
+
+.public-header{
+  color:#fffdf6;
+}
+.public-header.is-scrolled{
+  background: linear-gradient(
+    180deg,
+    rgba(10, 22, 14, 0.94) 0%,
+    rgba(10, 22, 14, 0.88) 100%
+  ) !important;
+}
+.header-inner{display:flex;align-items:center;flex-wrap:wrap;gap:12px 24px;min-height:80px;padding-block:16px}
+.header-nav{display:flex;align-items:center;gap:10px;margin-inline:auto}
+.header-actions{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0}
+.nav-toggle{display:none}
+.hero-photo{top:0;height:100%}
+body[data-screen="huerto"]{
+  background:radial-gradient(circle at 88% 6%,rgba(46,125,75,.08) 0%,transparent 48%),radial-gradient(circle at 10% 88%,rgba(56,142,90,.05) 0%,transparent 50%),linear-gradient(180deg,#f6f9f6 0%,#ebf1ec 100%);
+  background-attachment:fixed;
+}
+body[data-screen="huerto"] .site-header{
+  position:sticky !important;top:0 !important;z-index:9999 !important;
+  background:rgba(246,249,246,.72) !important;
+  -webkit-backdrop-filter:blur(20px) saturate(180%) !important;backdrop-filter:blur(20px) saturate(180%) !important;
+  border-bottom:1px solid rgba(24,52,34,.08) !important;
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.65), 0 4px 18px -4px rgba(20,35,24,.05) !important;
+}
+.private-layout{
+  display:grid;grid-template-columns:226px minmax(0,1fr);min-height:calc(100svh - var(--header-height));
+  background:radial-gradient(circle at 88% 6%,rgba(46,125,75,.08) 0%,transparent 48%),radial-gradient(circle at 10% 88%,rgba(56,142,90,.05) 0%,transparent 50%),linear-gradient(180deg,#f6f9f6 0%,#ebf1ec 100%);
+}
+.sidebar{
+  background:rgba(255,255,255,.45);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+  border-right:1px solid rgba(24,52,34,.07);
+  box-shadow:inset -1px 0 0 rgba(255,255,255,.8);
+  padding:32px 24px;min-width:0;
+}
+.private-nav{display:flex;flex-direction:column;gap:10px}
+.private-nav .icon{width:20px;height:20px}
+.plant-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.5rem;margin-bottom:32px}
+.metrics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.5rem}
+.water-alerts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;margin-top:24px}
+.dashboard.container{padding-top:36px;padding-bottom:64px;width:calc(100% - 72px);max-width:1232px}
+.auth-layout{position:relative;min-height:100vh;min-height:100svh}
+.auth-brand{position:absolute;top:32px;left:48px;z-index:2;color:#fffdf6;--focus:#fffdf6}
+.auth-visual{min-height:100%;padding:112px 48px 56px}
+.auth-visual-shade{background:linear-gradient(180deg,rgba(10,22,14,.6),rgba(10,22,14,.12) 35%,rgba(10,22,14,.9))}
+.auth-quote{padding-top:160px}
+.auth-main{justify-content:center;padding:80px 64px}
+.auth-form-wrap{margin:auto;padding:24px 0}
+.auth-form-wrap>h1{margin-top:0}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .button:where(:not(:disabled):not([aria-disabled=true])){
+    background:var(--liquid-surface);backdrop-filter:var(--liquid-filter);-webkit-backdrop-filter:var(--liquid-filter);
+  }
+  .site-header{background:var(--header-surface);backdrop-filter:blur(18px) saturate(165%);-webkit-backdrop-filter:blur(18px) saturate(165%)}
+}
+/* Explicit solid variant is also available to the local component checks. */
+.solid-material .button:where(:not(:disabled):not([aria-disabled=true])){background:var(--liquid-fill);backdrop-filter:none;-webkit-backdrop-filter:none}
+.solid-material .site-header{background:var(--header-fill);backdrop-filter:none;-webkit-backdrop-filter:none}
+.solid-material .button::before{display:none}
+
+/* -------------------------------------------------------------
+   RESPONSIVE DESIGN BREAKPOINTS (100% Adaptable sin desbordamiento)
+   ------------------------------------------------------------- */
+
+/* Tablet (<= 1024px) */
+@media (max-width: 1024px) {
+  .project-header-grid {
+    grid-template-columns: 1fr !important;
+    gap: 2.25rem !important;
+  }
+  .prototype-bento-showcase {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+  .prototype-visual-wrap {
+    min-height: 420px !important;
+    padding: 2rem !important;
+  }
+  .lifestyle-bento-banner {
+    grid-template-columns: 1fr !important;
+    padding: 2.25rem !important;
+    gap: 2rem !important;
+  }
+  .dark-glass-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.25rem !important;
+  }
+  .private-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+  .sidebar {
+    width: 200px;
+    padding: 24px 16px;
+  }
+  .dashboard.container {
+    width: calc(100% - 32px);
+    padding: 24px 0 48px;
+  }
+  .plant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+  .water-alerts-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+/* Auth / Login Responsive (<= 900px) */
+@media (max-width: 900px) {
+  .auth-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh;
+    min-height: 100svh;
+    grid-template-columns: 1fr !important;
+  }
+  .auth-brand {
+    position: absolute !important;
+    top: 1.25rem !important;
+    left: 1.5rem !important;
+    z-index: 10 !important;
+    color: #fffdf6 !important;
+  }
+  .auth-visual {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    min-height: 240px !important;
+    max-height: 300px !important;
+    padding: 1.5rem !important;
+    overflow: hidden !important;
+    background: #172218 !important;
+  }
+  .auth-visual > img {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center 30% !important;
+    z-index: 0 !important;
+  }
+  .auth-visual-shade {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: linear-gradient(180deg, rgba(10, 22, 14, 0.6) 0%, rgba(10, 22, 14, 0.2) 40%, rgba(10, 22, 14, 0.92) 100%) !important;
+    z-index: 1 !important;
+  }
+  .auth-quote {
+    position: relative !important;
+    z-index: 2 !important;
+    margin-top: auto !important;
+    padding-top: 0 !important;
+  }
+  .auth-quote h2 {
+    font-size: clamp(22px, 5vw, 28px) !important;
+    line-height: 1.2 !important;
+    margin: 0 0 4px !important;
+    color: #fffdf6 !important;
+  }
+  .auth-quote > p:last-child {
+    font-size: 13.5px !important;
+    color: #d1d4c5 !important;
+    margin: 0 !important;
+  }
+  .auth-main {
+    padding: 2rem 1.25rem !important;
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    justify-content: flex-start !important;
+    min-height: auto !important;
+  }
+  .auth-form-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .auth-form-wrap > h1 {
+    font-size: 28px !important;
+    margin-bottom: 8px !important;
+  }
+  .auth-intro {
+    font-size: 15px !important;
+    margin-bottom: 20px !important;
+  }
+  .field {
+    width: 100% !important;
+  }
+  .field input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .button.btn-liquid-brand.full {
+    width: 100% !important;
+    min-height: 48px !important;
+  }
+}
+
+/* Mobile (<= 768px) */
+@media (max-width: 768px) {
+  /* Public Header */
+  .public-header .header-inner {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem 1rem !important;
+    min-height: auto !important;
+    align-items: center !important;
+  }
+  .public-header .header-inner > .brand {
+    font-size: 1.35rem !important;
+  }
+  .public-header .header-nav {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    margin: 0 !important;
+    order: 0 !important;
+    border-top: none !important;
+    padding: 0 !important;
+  }
+  .public-header .header-nav .button,
+  .public-header .header-actions .button {
+    padding: 0.4rem 0.75rem !important;
+    font-size: 0.82rem !important;
+    min-height: 38px !important;
+  }
+  .public-header .header-actions {
+    margin-left: auto !important;
+  }
+  .nav-toggle {
+    display: none !important;
+  }
+
+  /* Hero */
+  .hero {
+    min-height: auto !important;
+  }
+  .hero-content {
+    padding-top: calc(var(--header-height, 72px) + 32px) !important;
+    padding-bottom: 40px !important;
+  }
+  .hero-text h1 {
+    font-size: clamp(2.2rem, 8vw, 4.5rem) !important;
+    line-height: 1.08 !important;
+    margin: 18px 0 16px !important;
+  }
+  .hero-description {
+    font-size: 1rem !important;
+    line-height: 1.6 !important;
+    max-width: 100% !important;
+  }
+
+  /* Dashboard Private Layout */
+  .private-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: auto !important;
+  }
+  .sidebar {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.65rem !important;
+    padding: 0.75rem 1rem !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(24, 52, 34, 0.06) !important;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.7) !important;
+    position: sticky !important;
+    top: var(--header-height, 60px) !important;
+    z-index: 30 !important;
+    overflow-x: auto !important;
+    box-sizing: border-box !important;
+  }
+  .private-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+  }
+  .private-nav .btn-liquid-sidebar {
+    flex: 1 1 0% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 0.5rem 0.75rem !important;
+    min-height: 42px !important;
+    white-space: nowrap !important;
+  }
+  .private-nav .btn-liquid-sidebar span {
+    display: inline-block;
+  }
+  .private-nav .btn-liquid-sidebar .icon {
+    margin-right: 4px;
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Dashboard Container & Bento Modules */
+  .dashboard.container {
+    width: 100% !important;
+    padding: 1.25rem 1rem 3rem !important;
+    box-sizing: border-box !important;
+  }
+  .page-heading {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
+    align-items: flex-start !important;
+    margin-bottom: 1.25rem !important;
+  }
+  .page-heading h1 {
+    font-size: clamp(24px, 6vw, 32px) !important;
+    line-height: 1.18 !important;
+    margin: 0 0 4px !important;
+  }
+  .page-heading p:not(.eyebrow) {
+    font-size: 14px !important;
+  }
+  .connection-strip {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    padding: 1rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+  .connection-strip .telemetry-cell-second {
+    border-left: none !important;
+    padding-left: 0 !important;
+    border-top: 1px solid rgba(28, 49, 34, 0.08) !important;
+    padding-top: 1rem !important;
+  }
+  .plant-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    margin-bottom: 1.75rem !important;
+  }
+  .metrics-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+  .water-alerts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    margin-top: 1.25rem !important;
+  }
+  .plant-card,
+  .metric,
+  .water-panel,
+  .notice-panel {
+    padding: 1.25rem 1rem !important;
+    border-radius: 18px !important;
+  }
+  .plant-reading strong {
+    font-size: 34px !important;
+  }
+  .metric strong {
+    font-size: 30px !important;
+  }
+
+  /* Landing Bento Grid & Vitrina (<= 768px) */
+  .project-section,
+  .prototype-section,
+  .functions-section {
+    padding: 4rem 1rem !important;
+  }
+  .project-header-grid,
+  .bento-stats-grid,
+  .dark-glass-features-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+  .prototype-section-heading {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    margin-bottom: 2rem !important;
+  }
+  .prototype-visual-wrap {
+    min-height: 300px !important;
+    padding: 1.5rem !important;
+  }
+  .prototype-visual-wrap img {
+    max-height: 280px !important;
+  }
+  .lifestyle-bento-banner {
+    padding: 1.5rem !important;
+    border-radius: 20px !important;
+  }
+  .lifestyle-content h2 {
+    margin-bottom: 0.85rem !important;
+  }
+  .lifestyle-content p {
+    margin-bottom: 1.5rem !important;
+    font-size: 15px !important;
+  }
+  .anatomy-glass-card {
+    padding: 1rem 1.15rem !important;
+  }
+  .anatomy-glass-card p {
+    padding-left: 0 !important;
+    margin-top: 0.4rem !important;
+  }
+  .bento-stat-card {
+    padding: 1.5rem 1.25rem !important;
+  }
+  .site-footer {
+    padding: 3.5rem 1.25rem 2rem !important;
+  }
+  .site-footer__grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem !important;
+    padding-bottom: 2rem !important;
+  }
+  .site-footer__bottom {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+}
+
+/* Small Screens (<= 480px) */
+@media (max-width: 480px) {
+  .bento-stat-number {
+    font-size: 42px !important;
+  }
+  .prototype-visual-wrap {
+    min-height: 250px !important;
+    padding: 1rem !important;
+  }
+  .prototype-visual-wrap img {
+    max-height: 220px !important;
+  }
+  .hero-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 0.75rem !important;
+  }
+  .hero-actions .button {
+    width: 100% !important;
+    min-height: 46px !important;
+    justify-content: center !important;
+  }
+  .auth-visual {
+    min-height: 220px !important;
+    padding: 1.25rem !important;
+  }
+  .auth-main {
+    padding: 1.5rem 1rem !important;
+  }
+}
+
+/* Extra Small Screens (<= 360px) */
+@media (max-width: 360px) {
+  .public-header .header-inner > .brand {
+    flex-basis: 100% !important;
+  }
+  .public-header .header-nav,
+  .public-header .header-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+}
+@media(prefers-reduced-transparency:reduce){
+  .button:where(:not(:disabled):not([aria-disabled=true])){background:var(--liquid-fill);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .site-header{background:var(--header-fill);backdrop-filter:none;-webkit-backdrop-filter:none}
+  body[data-screen="huerto"] .site-header,.sidebar,.connection-strip,.plant-card,.metric,.water-panel,.notice-panel{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+  .bento-stat-card, .anatomy-glass-card, .lifestyle-bento-banner, .dark-glass-feature-card { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .bento-stat-card, .anatomy-glass-card { background: #ffffff !important; }
+  .dark-glass-feature-card, .lifestyle-bento-banner { background: #152217 !important; }
+  .button::before{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .plant-card,.metric,.water-panel,.notice-panel,.connection-strip{transition:none!important;transform:none!important}
+  .bento-stat-card, .anatomy-glass-card, .prototype-visual-wrap img, .dark-glass-feature-card { transition: none !important; transform: none !important; }
+  .button,.button::before{transition:none}
+  .button:hover,.button:active,.button.is-pressed{transform:none}
+  .button-spinner{animation:none}
+}
+@media(forced-colors:active){
+  .button,.site-header{background:Canvas!important;color:CanvasText!important;border-color:ButtonText!important;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .button::before{display:none}
+  .button:disabled,.button[aria-disabled=true]{color:GrayText!important;border-color:GrayText!important}
+  :focus-visible,.button.is-focus{outline-color:Highlight}
+  .private-nav a[aria-current]{outline:2px solid Highlight;outline-offset:-3px}
+}
