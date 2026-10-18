@@ -30,6 +30,7 @@ Cada integrante genera sus credenciales y su base; no copiar secretos, dumps ni 
 - [Seguridad y verificación parcial](docs/SEGURIDAD-Y-VERIFICACION-LOCAL.md).
 - [Matriz ASVS actualizada y evidencias del hito](docs/MATRIZ-REQUISITOS-Y-EVIDENCIAS-2026-10-18.md).
 - [Arquitectura, flujos de datos y diagrama exportable](docs/ARQUITECTURA-Y-FLUJOS-2026-10-18.md).
+- [Hito del 19: índice de evidencias](docs/INDICE-EVIDENCIAS-HITO-1-2026-10-19.md), [dos historias](docs/BACKLOG-HU-01-HU-02-2026-10-19.md) y [alcance congelado](docs/ALCANCE-CONGELADO-HITO-1-2026-10-19.md).
 - [Backend, migraciones y pruebas](backend/README.md).
 - [Historial anterior del README](docs/HISTORIAL-README-ANTES-CI.md).
 Rafael: backend/integración; Carolina: PostgreSQL/logo; Rafael y Gabriela: frontend. Revisar diffs y documentar cambios. No cambiar permisos ni compartir claves para simplificar una demostración.
