@@ -36,4 +36,4 @@ Los documentos de etapas conservan resultados de su fecha. Las notas antiguas de
 ## CI inicial
 Push a main, pull request o ejecución manual ejecutan instalación limpia, PostgreSQL aislado, migraciones, validación Django, pruebas servidor y sintaxis JavaScript. Correo en memoria; sin secretos de producción. No equivale a auditoría completa ni ejecuta la revisión visual en dispositivos físicos.
 
-Estado remoto al 18/10: flujo configurado; ejecucion bloqueada por facturacion de la cuenta de GitHub. No hay todavia un run de CI aprobado. Ver [detalle y como reintentar](docs/CI-Y-PUBLICACION.md#estado-real-de-github-actions-al-publicar).
+Estado remoto al 18/10: [CI inicial aprobado](https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39150814752), con 127 pruebas del servidor y revision de sintaxis del frontend. Ver [alcance y evidencia](docs/CI-Y-PUBLICACION.md#estado-verificado-de-github-actions).

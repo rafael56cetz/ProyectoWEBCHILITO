@@ -36,11 +36,13 @@ $backendPython = "$env:LOCALAPPDATA\ElChilito\venvs\backend\Scripts\python.exe"
 $env:DJANGO_SETTINGS_MODULE = 'config.settings.local'
 $env:ELCHILITO_DB_SCOPE = 'test'
 $env:ELCHILITO_DB_ROLE = 'migrador'
+$env:ELCHILITO_LOCAL_REGISTRATION = '0'
+$env:ELCHILITO_LOCAL_EMAIL_ANY_RECIPIENT = '0'
 & $backendPython manage.py migrate --noinput
 $env:ELCHILITO_DB_ROLE = 'app'
 & $backendPython manage.py test tests --verbosity 2 --settings=config.settings.testing
 ~~~
-Usar una terminal separada para pruebas. No ejecutar en paralelo. El runner exige el_chilito_test/el_chilito_test_app sin privilegios administrativos, no destruye la base y revierte las transacciones de cada TestCase. No envía Gmail real.
+Usar una terminal separada para pruebas y cerrarla al terminar. Las dos opciones de presentacion se desactivan solo en esa terminal para migrar la base aislada; no desactivan las validaciones de seguridad ni cambian el registro de la aplicacion en uso. No ejecutar en paralelo. El runner exige el_chilito_test/el_chilito_test_app sin privilegios administrativos, no destruye la base y revierte las transacciones de cada TestCase. No envía Gmail real.
 La revisión visual usa Node/Playwright y herramientas adicionales descritas en la guía de presentación; no es requisito para abrir la aplicación.
 
 ## Registro y correo

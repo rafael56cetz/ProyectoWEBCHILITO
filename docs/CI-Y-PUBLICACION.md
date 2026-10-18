@@ -27,11 +27,13 @@ Se preparo una instalacion nueva en un contenedor PostgreSQL temporal separado: 
 Se revisaron los archivos candidatos a Git y no se encontraron coincidencias con las claves privadas locales ni respaldos incluidos. Estas comprobaciones no sustituyen las auditorias de seguridad pendientes.
 El resultado remoto debe consultarse en Actions para el commit publicado; no se deduce del resultado local.
 
-## Estado real de GitHub Actions al publicar
-El codigo se publico en main. El primer intento tuvo un error de contexto en el YAML, corregido en 3c6229b9771bd4404f8b148eeb02bb9e4da06655.
-GitHub acepto el flujo corregido, pero no inicio ningun paso: la cuenta tiene un bloqueo de facturacion. Evidencia: https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39149110084
-Mensaje: The job was not started because your account is locked due to a billing issue.
-Por tanto, CI esta configurado pero su ejecucion remota satisfactoria sigue pendiente. Las pruebas locales aprobadas no equivalen a un run de Actions aprobado.
+## Estado verificado de GitHub Actions
+El CI aprobo el 18 de octubre de 2026 para el commit d97702cdcc7ea6f98e07de46ae8b63db0b15d78e.
+Ejecucion: https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39150814752
+Resultado: success. Pasaron instalacion de dependencias, PostgreSQL, preparacion y migraciones de la base aislada, pip check, validaciones Django, comprobacion de migraciones, 127 pruebas del servidor y sintaxis JavaScript. El correo se mantuvo en memoria.
+
+## Incidencias resueltas
+El primer intento tuvo un error de contexto en YAML, corregido en 3c6229b. El intento siguiente no inicio por un bloqueo de facturacion de la cuenta. Al ejecutar manualmente, GitHub ya asigno el runner; esa ejecucion encontro una validacion de seguridad porque las migraciones de la base de pruebas heredaban opciones de presentacion local.
+En d97702c se desactivaron exclusivamente para el paso de migracion de CI las opciones ELCHILITO_LOCAL_REGISTRATION y ELCHILITO_LOCAL_EMAIL_ANY_RECIPIENT. Las validaciones siguieron activas, el rol migrador siguio separado y la configuracion de la web local no cambio. La ejecucion siguiente aprobo todos los pasos.
 Se fijo Ubuntu 24.04 para evitar el cambio anunciado de ubuntu-latest durante la fecha de entrega.
-El titular debe revisar Settings > Billing and licensing en GitHub. Si no hay un problema visible que resolver, contactar soporte; no es necesario asumir que debe comprar otro plan. Guia oficial: https://docs.github.com/en/billing/how-tos/troubleshooting/locked-account
-Despues de resolverlo, abrir Actions > CI El Chilito > Run workflow > main > Run workflow y comprobar todos los pasos. No se cambiaron pagos, suscripciones ni presupuestos.
+Los intentos anteriores se conservan como historial; el resultado que acredita este CI inicial es la ejecucion aprobada enlazada arriba. No se cambiaron pagos, suscripciones ni presupuestos.
