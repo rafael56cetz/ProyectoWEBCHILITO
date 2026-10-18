@@ -28,6 +28,7 @@ Cada integrante genera sus credenciales y su base; no copiar secretos, dumps ni 
 - [CI y publicación](docs/CI-Y-PUBLICACION.md) · [ejecuciones en GitHub](https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions).
 - [Contratos de integración](docs/CONTRATOS-INTEGRACION-LOCAL.md).
 - [Seguridad y verificación parcial](docs/SEGURIDAD-Y-VERIFICACION-LOCAL.md).
+- [Matriz ASVS actualizada y evidencias del hito](docs/MATRIZ-REQUISITOS-Y-EVIDENCIAS-2026-10-18.md).
 - [Backend, migraciones y pruebas](backend/README.md).
 - [Historial anterior del README](docs/HISTORIAL-README-ANTES-CI.md).
 Rafael: backend/integración; Carolina: PostgreSQL/logo; Rafael y Gabriela: frontend. Revisar diffs y documentar cambios. No cambiar permisos ni compartir claves para simplificar una demostración.

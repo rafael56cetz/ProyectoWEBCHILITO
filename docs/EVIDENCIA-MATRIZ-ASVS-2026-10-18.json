@@ -1,0 +1,1266 @@
+{
+  "review_date": "2026-10-18",
+  "code_revision": "fab3193075b7b3ac5c1fded558a636d2cd43a5fb",
+  "review_method": "Lectura de codigo/documentos y conciliacion del CI existente; sin pruebas nuevas ni pentest en esta tarea.",
+  "standard": {
+    "name": "OWASP ASVS",
+    "version": "5.0.0",
+    "catalog_url": "https://raw.githubusercontent.com/OWASP/ASVS/v5.0.0/5.0/docs_en/OWASP_Application_Security_Verification_Standard_5.0.0_en.csv",
+    "catalog_sha256": "98c8fe911b9edb403af8ee05d3ce8201ecac2659e313b053890a62847cdcf680",
+    "catalog_total": 345,
+    "minimum_levels": {
+      "L1": 70,
+      "L2": 183,
+      "L3": 92
+    },
+    "level_claimed": null
+  },
+  "summary": {
+    "selected": 13,
+    "states": {
+      "pendiente_de_evaluacion": 332,
+      "parcial": 6,
+      "verificado_local": 7
+    },
+    "not_applicable_decisions": 0
+  },
+  "ci_evidence": {
+    "run_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698",
+    "job_id": 117745755787,
+    "head_sha": "fab3193075b7b3ac5c1fded558a636d2cd43a5fb",
+    "conclusion": "success",
+    "backend_cases": 127,
+    "tests": [
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_bootstrap_closed_and_csrf_cookie_no_session_token",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_change_password_checks_current_and_invalidates_other_session",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_code_metadata_does_not_consume_attempts_or_expose_code",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_expired_code_rejected_by_server",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_expired_reset_link_rejected",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_foreign_origin_rejected_even_with_token",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_login_failures_are_rate_limited",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_login_requires_correct_credentials_and_no_email_each_login",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_missing_mail_is_error_for_existing_and_unknown_addresses",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_mutations_require_csrf_including_login_signup_and_logout",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_only_browser_auth_surface_is_exposed",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_profile_denies_missing_session_or_revoked_verification",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_profile_membership_is_explicit",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_profile_uses_session_identity_ignores_requested_user",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_registration_closed_even_with_acceptance_and_direct_request",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_resend_limited_and_bounded_by_process",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_reset_link_is_local_single_use_and_does_not_log_in",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_session_restores_in_another_client_and_logout_revokes_it",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_smtp_backend_restricts_recipients_before_connecting",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_smtp_failure_does_not_claim_delivery_or_expose_exception",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_unknown_reset_uses_neutral_response",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_verification_confirms_email_session_but_never_membership",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_access_integration.AccessIntegrationTests.test_wrong_code_exhausts_three_attempts_without_verifying",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_allauth_compatibility.AllauthCompatibilityTests.test_browser_login_rejects_missing_csrf",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_allauth_compatibility.AllauthCompatibilityTests.test_browser_session_has_no_app_token",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_allauth_compatibility.AllauthCompatibilityTests.test_registration_closed_even_at_library_endpoint",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_allauth_compatibility.AllauthCompatibilityTests.test_verified_password_login_compatible_without_membership_grant",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_final_review.FinalAccessReviewTests.test_authenticated_session_is_rotated_from_anonymous_session",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_final_review.FinalAccessReviewTests.test_private_api_and_reset_validation_are_not_cached",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_final_review.FinalAccessReviewTests.test_recovery_invalidates_previous_authenticated_session",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_final_review.FinalAccessReviewTests.test_resend_invalidates_previous_code",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_final_review.FinalAccessReviewTests.test_verification_code_is_bound_to_pending_session",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_anonymous_denied",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_app_cannot_alter_tables",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_app_cannot_create_schema_objects",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_app_is_not_administrative",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_database_rejects_orphan_zone",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_db_case_insensitive_unique_even_without_clean",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_email_identity_normalizes",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_garden_delete_protected",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_inactive_account_or_membership_denied",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_invalid_timezone_rejected",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_membership_cannot_move_even_with_queryset_update",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_membership_unique_even_without_clean",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_password_is_derived_not_stored_plain",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_provision_atomic_on_failure",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_provision_idempotent_and_preserves_manual_names",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_registration_grants_neither_verification_nor_membership",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_signup_closed_and_no_email_fallback",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_staff_has_no_automatic_garden_permission",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_unverified_account_denied_even_with_membership",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_verification_authority_is_allauth",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_verified_account_without_membership_denied",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_verified_member_allowed_only_for_own_garden",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_weak_password_rejected",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_zone_cannot_move_even_with_queryset_update",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_zone_number_is_stable_in_database",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_zone_range_enforced_in_database",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FoundationTests.test_zone_uniqueness_enforced_in_database",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_anonymous_endpoints_denied",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_app_cannot_alter_new_tables",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_database_failure_is_not_successful_empty_collection",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_database_rejects_invalid_severity_and_reversed_dates",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_empty_notices_are_valid_and_no_alert_is_created",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_foreign_notice_is_neutral_not_found_and_never_marked",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_garden_projects_persisted_names_and_no_physical_readings",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_inactive_account_denied",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_invalid_ids_are_neutral_not_found",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_mark_read_is_persisted_idempotent_and_does_not_resolve_notice",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_missing_zone_is_configuration_error_not_waiting_or_fake_zone",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_no_membership_discloses_neither_garden_nor_notices",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_notice_cannot_move_garden_after_recording_even_by_update",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_notices_have_stable_order_and_explicit_severity_mapping",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_other_garden_membership_does_not_select_another_current_garden",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_cannot_choose_another_user",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_receipt_cannot_be_reassigned",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_requires_csrf_and_put_not_get",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_state_is_per_user_and_profile_stays_own",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_resolved_notice_uses_recorded_resolution_not_read_date",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_revoked_membership_denies_existing_session_and_mutation",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_unique_receipt_even_when_bypassing_model_validation",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_unverified_account_denied_even_with_membership",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_garden_integration.GardenIntegrationTests.test_zone_from_another_garden_rejected_even_bypassing_model_clean",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_browser_cannot_approve_documents_or_invent_effective_versions",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_checkbox_requires_literal_boolean_true",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_configuration_allows_local_signup_without_approving_legal",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_csrf_and_foreign_origin_remain_blocked",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_delivery_reason_distinguishes_configuration_and_recipient",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_disabled_flag_denies_signup_even_with_acceptance",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_duplicate_email_keeps_one_account_and_generic_pending_response",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_expired_signup_code_does_not_verify",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_incorrect_signup_code_does_not_verify",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_library_signup_rate_limit_still_applies",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_membership_requires_separate_explicit_assignment",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_public_profiles_hosts_proxy_and_cors_cannot_activate_exception",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_recipient_diagnostic_does_not_disclose_account_existence",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_remote_peer_cannot_use_a_forged_local_host",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_resend_waits_and_invalidates_previous_code",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_server_rejects_invalid_passwords_even_without_frontend",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_signup_exact_password_code_session_and_no_automatic_membership",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_similarity_validator_uses_signup_email",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_smtp_failure_leaves_only_unverified_account_and_login_can_retry",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_technical_confirmation_cannot_claim_approved_documents",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_unauthorized_recipient_is_distinct_from_smtp_failure",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_unconfigured_delivery_creates_no_account",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_local_registration.LocalRegistrationTests.test_unlisted_address_signup_resend_login_and_reset_use_same_mail_policy",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_adapter_rejects_short_excess_numeric_common_and_similar",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_code_points_at_boundaries_and_combining_marks_are_preserved",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_direct_change_accepts_256_astral_code_points",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_direct_change_rejects_invalid_values_without_javascript",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_direct_recovery_rejects_short_and_excess_then_accepts_unicode",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_public_policy_matches_server_validators_and_adapter",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_password_guidance.PasswordGuidanceTests.test_spaces_are_not_trimmed_in_change_or_login",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_any_valid_recipient_passes_without_changing_a_list",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_disabling_local_option_restores_restricted_mode",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_invalid_recipients_remain_blocked_before_smtp",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_isolated_test_settings_do_not_enable_real_unrestricted_mail",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_local_configuration_no_longer_requires_recipient_list",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_missing_configuration_still_blocks_delivery",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_option_requires_boolean_true",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_partial_failure_does_not_report_success",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_smtp_failure_stays_sanitized",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_transport_accepts_unlisted_to_cc_bcc_with_tls",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_email_policy.LocalEmailPolicyTests.test_unsafe_profiles_fail_even_when_registration_is_disabled",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FrontendPreservationTests.test_existing_css_and_favicon_served",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FrontendPreservationTests.test_no_backend_files_or_traversal_exposed",
+        "result": "passed"
+      },
+      {
+        "id": "tests.test_foundation.FrontendPreservationTests.test_same_index_served_without_copy_or_rewrite",
+        "result": "passed"
+      }
+    ],
+    "email": "in_memory",
+    "browser_tests_executed_in_ci": false
+  },
+  "requirements": [
+    {
+      "id": "v5.0.0-1.2.1",
+      "id_interno": "AS-01",
+      "requisito": "Codificar los valores dinámicos según su contexto de salida.",
+      "estado": "parcial",
+      "historias": "HU-01; HU-02",
+      "motivo": "Las vistas de acceso, perfil y avisos insertan valores que podrían contener marcado.",
+      "implementacion": "authEscape escapa los cinco caracteres HTML; las vistas de cuenta y avisos lo reutilizan y los mensajes usan textContent.",
+      "tests": [
+        "test_garden_projects_persisted_names_and_no_physical_readings"
+      ],
+      "files": [
+        "dist/vista/acceso.js",
+        "dist/vista/aplicacion.js",
+        "dist/controlador/acceso.js"
+      ],
+      "observado": "Se revisó el escape existente y pasó el transporte de nombres persistidos. Esa prueba no envía contenido XSS.",
+      "limites": "Falta inventario de contextos HTML/atributo/URL y pruebas con entradas maliciosas en el DOM; sintaxis JavaScript no prueba resistencia XSS.",
+      "siguiente": "Probar valores con marcado, comillas y URLs en cada salida dinámica dentro de una base aislada.",
+      "test_cases": [
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_garden_projects_persisted_names_and_no_physical_readings",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L78",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/dist/vista/acceso.js",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/dist/vista/aplicacion.js",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/dist/controlador/acceso.js"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Texto legítimo se muestra conservando su significado.",
+      "criterio_negativo_esperado": "Marcado y comillas se muestran como texto sin ejecutar código; caso adversario aún pendiente."
+    },
+    {
+      "id": "v5.0.0-2.2.1",
+      "id_interno": "AS-02",
+      "requisito": "Validar en servidor las entradas que deciden seguridad y reglas de negocio.",
+      "estado": "verificado_local",
+      "historias": "HU-01; HU-02",
+      "motivo": "Contraseña, casilla, identidad, identificador de aviso y relaciones entre zona, huerto y lectura afectan decisiones.",
+      "implementacion": "Formularios Django/allauth, casilla booleana literal, ID con patrón/rango, identidad tomada de sesión y restricciones PostgreSQL.",
+      "tests": [
+        "test_signup_exact_password_code_session_and_no_automatic_membership",
+        "test_checkbox_requires_literal_boolean_true",
+        "test_server_rejects_invalid_passwords_even_without_frontend",
+        "test_invalid_ids_are_neutral_not_found",
+        "test_read_cannot_choose_another_user",
+        "test_zone_from_another_garden_rejected_even_bypassing_model_clean"
+      ],
+      "files": [
+        "backend/cuentas/api.py",
+        "backend/cuentas/inputs.py",
+        "backend/huerto/api.py",
+        "backend/huerto/migrations/0004_relaciones_avisos.py"
+      ],
+      "observado": "Alta válida y verificación aceptadas en aislamiento; casillas no booleanas, contraseñas inválidas, IDs fuera de rango, usuario impuesto y relaciones cruzadas rechazados.",
+      "limites": "Verificado para las entradas críticas enumeradas, al nivel de alcance L1 de este requisito. No se ha inventariado toda entrada requerida por L2.",
+      "siguiente": "Ampliar inventario a cada endpoint nuevo e integración IoT. La selección completa L2 permanece pendiente.",
+      "test_cases": [
+        {
+          "id": "tests.test_local_registration.LocalRegistrationTests.test_signup_exact_password_code_session_and_no_automatic_membership",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_local_registration.py#L85",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_local_registration.LocalRegistrationTests.test_checkbox_requires_literal_boolean_true",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_local_registration.py#L66",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_local_registration.LocalRegistrationTests.test_server_rejects_invalid_passwords_even_without_frontend",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_local_registration.py#L106",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_invalid_ids_are_neutral_not_found",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L149",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_cannot_choose_another_user",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L180",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_zone_from_another_garden_rejected_even_bypassing_model_clean",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L203",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/inputs.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/migrations/0004_relaciones_avisos.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Alta, contraseña y lectura con valores válidos se aceptan.",
+      "criterio_negativo_esperado": "Casilla no booleana, ID inválido, contraseña fuera de política o relación cruzada se rechazan."
+    },
+    {
+      "id": "v5.0.0-3.3.4",
+      "id_interno": "AS-03",
+      "requisito": "Proteger el identificador de sesión de la lectura por scripts y entregarlo mediante Set-Cookie.",
+      "estado": "verificado_local",
+      "historias": "HU-01",
+      "motivo": "La aplicación usa sesión de navegador, sin necesidad de exponer un token de aplicación a JavaScript.",
+      "implementacion": "Django usa cookie de sesión HttpOnly y sesiones en PostgreSQL; el frontend lee solo csrftoken para CSRF.",
+      "tests": [
+        "test_session_restores_in_another_client_and_logout_revokes_it",
+        "test_browser_session_has_no_app_token",
+        "test_code_metadata_does_not_consume_attempts_or_expose_code"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/config/urls.py",
+        "dist/modelo/servicio-acceso.js"
+      ],
+      "observado": "Cookie de sesión HttpOnly comprobada y sesión recuperable por cookie; la respuesta de sesión de navegador no expone session_token. La revisión de rutas/código no encontró otro canal previsto para ese identificador.",
+      "limites": "No demuestra el atributo Secure ni HTTPS: el perfil HTTP de loopback mantiene Secure desactivado. Ese transporte es otro requisito.",
+      "siguiente": "Revalidar cookies y canales de respuesta al añadir otro cliente o pasar a HTTPS.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_session_restores_in_another_client_and_logout_revokes_it",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L92",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_allauth_compatibility.AllauthCompatibilityTests.test_browser_session_has_no_app_token",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_allauth_compatibility.py#L8",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_code_metadata_does_not_consume_attempts_or_expose_code",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L128",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/urls.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/dist/modelo/servicio-acceso.js"
+      ],
+      "nivel_minimo": "L2",
+      "criterio_positivo_esperado": "La cookie permite recuperar sesión con HttpOnly.",
+      "criterio_negativo_esperado": "No se entrega identificador de sesión mediante un token de aplicación en JSON ni se permite su lectura JavaScript prevista."
+    },
+    {
+      "id": "v5.0.0-3.5.1",
+      "id_interno": "AS-04",
+      "requisito": "Rechazar solicitudes sensibles que no acrediten su origen mediante la protección CSRF.",
+      "estado": "verificado_local",
+      "historias": "HU-01; HU-02",
+      "motivo": "Login, registro, cierre, recuperación, contraseña y marcar aviso son operaciones sensibles.",
+      "implementacion": "CsrfViewMiddleware activo, token X-CSRFToken del mismo origen, métodos de mutación explícitos y sin CORS abierto.",
+      "tests": [
+        "test_mutations_require_csrf_including_login_signup_and_logout",
+        "test_foreign_origin_rejected_even_with_token",
+        "test_csrf_and_foreign_origin_remain_blocked",
+        "test_read_requires_csrf_and_put_not_get",
+        "test_mark_read_is_persisted_idempotent_and_does_not_resolve_notice"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/config/urls.py",
+        "backend/huerto/api.py",
+        "dist/modelo/servicio-acceso.js"
+      ],
+      "observado": "Solicitud válida de lectura aceptada; mutaciones sin token y login desde origen ajeno con token devuelven 403. GET de lectura devuelve 405.",
+      "limites": "Evaluación de las rutas web actuales. No incluye APIs IoT futuras ni una app instalada.",
+      "siguiente": "Repetir la comprobación al agregar endpoints y en el origen HTTPS definitivo.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_mutations_require_csrf_including_login_signup_and_logout",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L73",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_foreign_origin_rejected_even_with_token",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L80",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_local_registration.LocalRegistrationTests.test_csrf_and_foreign_origin_remain_blocked",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_local_registration.py#L77",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_requires_csrf_and_put_not_get",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L187",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_mark_read_is_persisted_idempotent_and_does_not_resolve_notice",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L155",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/urls.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/dist/modelo/servicio-acceso.js"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Solicitud legítima con CSRF y permiso ejecuta la operación.",
+      "criterio_negativo_esperado": "Mutación sin token, origen ajeno o método no permitido se rechaza sin cambiar datos."
+    },
+    {
+      "id": "v5.0.0-6.3.1",
+      "id_interno": "AS-05",
+      "requisito": "Aplicar controles documentados contra intentos de autenticación abusivos.",
+      "estado": "parcial",
+      "historias": "HU-01",
+      "motivo": "Las contraseñas, códigos y reenvíos pueden probarse repetidamente.",
+      "implementacion": "Cuotas allauth persistidas con caché de base de datos; límites por IP/clave/usuario y por proceso de verificación.",
+      "tests": [
+        "test_login_failures_are_rate_limited",
+        "test_wrong_code_exhausts_three_attempts_without_verifying",
+        "test_resend_limited_and_bounded_by_process",
+        "test_library_signup_rate_limit_still_applies"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/cuentas/api.py"
+      ],
+      "observado": "Se observaron límites del servidor en login, tres intentos de código y reenvíos/alta. No se cambió la política para facilitar la presentación.",
+      "limites": "Faltan pruebas de credential stuffing distribuido, efectividad bajo concurrencia/varias cuentas, recuperación tras ventanas y monitoreo operativo; la cuota por IP en loopback no representa una red pública.",
+      "siguiente": "Completar pruebas acotadas de las ventanas y varias cuentas; definir vigilancia y límites en el despliegue público.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_login_failures_are_rate_limited",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L237",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_wrong_code_exhausts_three_attempts_without_verifying",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L150",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_resend_limited_and_bounded_by_process",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L168",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_local_registration.LocalRegistrationTests.test_library_signup_rate_limit_still_applies",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_local_registration.py#L213",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Autenticación y verificación legítimas funcionan antes de alcanzar límites.",
+      "criterio_negativo_esperado": "Los intentos repetidos de login, código y reenvío alcanzan los límites configurados; abuso distribuido pendiente."
+    },
+    {
+      "id": "v5.0.0-6.4.3",
+      "id_interno": "AS-06",
+      "requisito": "Recuperar una contraseña mediante un proceso seguro sin eludir factores habilitados.",
+      "estado": "verificado_local",
+      "historias": "HU-01",
+      "motivo": "El usuario necesita recuperar acceso sin que conocer su correo conceda sesión.",
+      "implementacion": "Recuperación de allauth con enlace efímero, respuesta neutral, uso único y sin inicio de sesión automático; correo verificado para acceso al huerto.",
+      "tests": [
+        "test_reset_link_is_local_single_use_and_does_not_log_in",
+        "test_expired_reset_link_rejected",
+        "test_unknown_reset_uses_neutral_response",
+        "test_recovery_invalidates_previous_authenticated_session",
+        "test_direct_recovery_rejects_short_and_excess_then_accepts_unicode"
+      ],
+      "files": [
+        "backend/config/urls.py",
+        "backend/config/settings/base.py",
+        "backend/cuentas/api.py",
+        "backend/cuentas/inputs.py"
+      ],
+      "observado": "Enlace válido cambia la contraseña; vencido o reutilizado se rechaza. No crea sesión de acceso y la sesión autenticada anterior pierde acceso tras la recuperación.",
+      "limites": "No hay MFA ni passkeys habilitados; no se ha demostrado recuperación para esos factores. El correo del CI es en memoria y no acredita entrega Gmail.",
+      "siguiente": "Reevaluar recuperación antes de incorporar un segundo factor y comprobar entrega real por separado.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_reset_link_is_local_single_use_and_does_not_log_in",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L198",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_expired_reset_link_rejected",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L212",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_unknown_reset_uses_neutral_response",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L218",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_final_review.FinalAccessReviewTests.test_recovery_invalidates_previous_authenticated_session",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_final_review.py#L41",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_password_guidance.PasswordGuidanceTests.test_direct_recovery_rejects_short_and_excess_then_accepts_unicode",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_password_guidance.py#L76",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/urls.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/inputs.py"
+      ],
+      "nivel_minimo": "L2",
+      "criterio_positivo_esperado": "Un enlace válido permite cambiar la contraseña sin conceder sesión automática.",
+      "criterio_negativo_esperado": "Enlace vencido o reutilizado se rechaza y sesión anterior pierde acceso."
+    },
+    {
+      "id": "v5.0.0-7.2.1",
+      "id_interno": "AS-07",
+      "requisito": "Validar la sesión mediante el servicio confiable del backend.",
+      "estado": "verificado_local",
+      "historias": "HU-01; HU-02",
+      "motivo": "Un fragmento de URL o estado JavaScript no debe autorizar datos privados.",
+      "implementacion": "SessionMiddleware y AuthenticationMiddleware de Django; perfil y consultas verifican request.user, verificación de correo y membresía.",
+      "tests": [
+        "test_login_requires_correct_credentials_and_no_email_each_login",
+        "test_session_restores_in_another_client_and_logout_revokes_it",
+        "test_profile_denies_missing_session_or_revoked_verification",
+        "test_anonymous_endpoints_denied"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/cuentas/api.py",
+        "backend/huerto/api.py",
+        "backend/huerto/services.py"
+      ],
+      "observado": "Credenciales válidas permiten sesión; sin sesión no se obtiene perfil/huerto/avisos. Revocar verificación bloquea las operaciones privadas correspondientes.",
+      "limites": "La estructura genérica del dashboard visible sin membresía no es información privada ni un permiso de consulta.",
+      "siguiente": "Mantener este criterio en cualquier API nueva y al agregar el dispositivo.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_login_requires_correct_credentials_and_no_email_each_login",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L85",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_session_restores_in_another_client_and_logout_revokes_it",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L92",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_profile_denies_missing_session_or_revoked_verification",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L113",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_anonymous_endpoints_denied",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L38",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/services.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "La sesión válida se reconoce y permite consultar el perfil propio.",
+      "criterio_negativo_esperado": "Sin sesión o con verificación revocada se rechazan datos privados."
+    },
+    {
+      "id": "v5.0.0-7.2.4",
+      "id_interno": "AS-08",
+      "requisito": "Renovar el identificador de sesión al autenticar y terminar el identificador anterior.",
+      "estado": "parcial",
+      "historias": "HU-01",
+      "motivo": "Evitar conservar un identificador anónimo al adquirir identidad autenticada.",
+      "implementacion": "Flujo de autenticación Django/allauth; existe prueba explícita de rotación desde una sesión anónima persistida.",
+      "tests": [
+        "test_authenticated_session_is_rotated_from_anonymous_session",
+        "test_change_password_checks_current_and_invalidates_other_session"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/cuentas/api.py"
+      ],
+      "observado": "Tras login el identificador cambia y la fila de sesión previa ya no existe. El cambio de contraseña invalida la otra sesión comprobada.",
+      "limites": "El requisito incluye reautenticación. No se ha demostrado un recorrido específico de reautenticación y rotación para todos los cambios de privilegio/factor.",
+      "siguiente": "Definir recorridos de reautenticación y agregar prueba explícita antes de declarar todo el requisito verificado.",
+      "test_cases": [
+        {
+          "id": "tests.test_final_review.FinalAccessReviewTests.test_authenticated_session_is_rotated_from_anonymous_session",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_final_review.py#L61",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_change_password_checks_current_and_invalidates_other_session",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L223",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "El login crea un identificador distinto del anónimo anterior.",
+      "criterio_negativo_esperado": "El identificador previo desaparece del servidor; reautenticación específica pendiente."
+    },
+    {
+      "id": "v5.0.0-7.4.1",
+      "id_interno": "AS-09",
+      "requisito": "Impedir reutilizar una sesión una vez terminada por cierre o vencimiento.",
+      "estado": "parcial",
+      "historias": "HU-01",
+      "motivo": "Cerrar sesión debe revocar el acceso del identificador que el navegador conservaba.",
+      "implementacion": "DELETE de sesión allauth y sesiones de servidor; duración local de ocho horas/cierre de navegador configurada.",
+      "tests": [
+        "test_session_restores_in_another_client_and_logout_revokes_it",
+        "test_recovery_invalidates_previous_authenticated_session"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/config/urls.py"
+      ],
+      "observado": "Una copia de la cookie funciona antes del logout y recibe 401 después. También se prueba pérdida de acceso tras recuperación.",
+      "limites": "El cierre se demostró. Falta prueba explícita de vencimiento de la sesión en servidor; cerrar un navegador no acredita por sí solo caducidad ni revocación.",
+      "siguiente": "Ejecutar un caso de sesión vencida con reloj/fecha controlados en la base aislada.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_session_restores_in_another_client_and_logout_revokes_it",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L92",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_final_review.FinalAccessReviewTests.test_recovery_invalidates_previous_authenticated_session",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_final_review.py#L41",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/urls.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Antes de cerrar, una copia de la cookie conserva el acceso autorizado.",
+      "criterio_negativo_esperado": "Después de cerrar, esa copia recibe 401; vencimiento explícito pendiente."
+    },
+    {
+      "id": "v5.0.0-8.2.1",
+      "id_interno": "AS-10",
+      "requisito": "Restringir funciones a cuentas con permisos explícitos.",
+      "estado": "verificado_local",
+      "historias": "HU-01; HU-02",
+      "motivo": "Verificar correo no debe conceder acceso automático al único huerto.",
+      "implementacion": "Membresía explícita activa, cuenta activa/verificada y autorización en todas las consultas y mutaciones del huerto.",
+      "tests": [
+        "test_no_membership_discloses_neither_garden_nor_notices",
+        "test_revoked_membership_denies_existing_session_and_mutation",
+        "test_unverified_account_denied_even_with_membership",
+        "test_staff_has_no_automatic_garden_permission",
+        "test_membership_requires_separate_explicit_assignment"
+      ],
+      "files": [
+        "backend/huerto/api.py",
+        "backend/huerto/services.py",
+        "backend/huerto/management/commands/asignar_huerto.py"
+      ],
+      "observado": "Miembro autorizado consulta; cuenta sin membresía/verificación o con membresía revocada recibe rechazo sin lectura ni mutación. Staff no obtiene permiso automático.",
+      "limites": "No se evalúan funciones inexistentes de mando de bombas, IA, ARCO ni vinculación real.",
+      "siguiente": "Mantener comprobación por función en cada nueva ruta. Los comandos administrativos locales requieren autorización del operador.",
+      "test_cases": [
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_no_membership_discloses_neither_garden_nor_notices",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L54",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_revoked_membership_denies_existing_session_and_mutation",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L63",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_unverified_account_denied_even_with_membership",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L45",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_foundation.FoundationTests.test_staff_has_no_automatic_garden_permission",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_foundation.py#L150",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_local_registration.LocalRegistrationTests.test_membership_requires_separate_explicit_assignment",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_local_registration.py#L224",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/services.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/management/commands/asignar_huerto.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Miembro activo y verificado consulta las funciones de su huerto.",
+      "criterio_negativo_esperado": "Cuenta sin permiso, sin verificación o con membresía revocada recibe rechazo."
+    },
+    {
+      "id": "v5.0.0-8.2.2",
+      "id_interno": "AS-11",
+      "requisito": "Restringir cada dato u objeto a la identidad y permisos correspondientes.",
+      "estado": "verificado_local",
+      "historias": "HU-01; HU-02",
+      "motivo": "Cambiar un ID o enviar otro usuario no debe revelar avisos ni modificar lecturas ajenas.",
+      "implementacion": "Consultas de avisos filtradas por huerto autorizado y lectura por request.user; perfil ligado a la sesión.",
+      "tests": [
+        "test_foreign_notice_is_neutral_not_found_and_never_marked",
+        "test_read_state_is_per_user_and_profile_stays_own",
+        "test_read_cannot_choose_another_user",
+        "test_profile_uses_session_identity_ignores_requested_user",
+        "test_mark_read_is_persisted_idempotent_and_does_not_resolve_notice"
+      ],
+      "files": [
+        "backend/huerto/services.py",
+        "backend/huerto/api.py",
+        "backend/cuentas/api.py"
+      ],
+      "observado": "Aviso de otro registro lógico y aviso inexistente dan la misma respuesta neutral 404; no se crea lectura ajena. Lectura y perfil conservan identidad propia.",
+      "limites": "Los registros lógicos adicionales solo son fixtures transaccionales de pruebas; no implican construir otro dispositivo físico.",
+      "siguiente": "Revisar aislamiento por objeto al agregar solicitudes ARCO, historial e identidad del dispositivo.",
+      "test_cases": [
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_foreign_notice_is_neutral_not_found_and_never_marked",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L137",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_state_is_per_user_and_profile_stays_own",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L169",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_read_cannot_choose_another_user",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L180",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_profile_uses_session_identity_ignores_requested_user",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L103",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_garden_integration.GardenIntegrationTests.test_mark_read_is_persisted_idempotent_and_does_not_resolve_notice",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_garden_integration.py#L155",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/services.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/huerto/api.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py"
+      ],
+      "nivel_minimo": "L1",
+      "criterio_positivo_esperado": "Consultar y marcar un aviso propio conserva estado de lectura por usuario.",
+      "criterio_negativo_esperado": "ID ajeno o usuario impuesto no revela ni modifica el objeto de otra identidad."
+    },
+    {
+      "id": "v5.0.0-13.3.1",
+      "id_interno": "AS-12",
+      "requisito": "Gestionar creación, almacenamiento, acceso y retirada de secretos fuera de código y artefactos.",
+      "estado": "parcial",
+      "historias": "HU-01; HU-02",
+      "motivo": "Django, PostgreSQL y Gmail necesitan secretos que no deben llegar al navegador o GitHub.",
+      "implementacion": "Archivos privados fuera del repositorio, generación aleatoria, ACL de Windows/modo 0600 y credenciales efímeras para CI; scripts no sobrescriben claves existentes.",
+      "tests": [
+        "test_no_backend_files_or_traversal_exposed"
+      ],
+      "files": [
+        "backend/config/private.py",
+        "backend/tools/private_files.py",
+        "infra/configurar_correo_local.ps1",
+        ".gitignore",
+        ".github/workflows/ci.yml"
+      ],
+      "observado": "Rutas de backend/configuración no se sirven al navegador. La preparación aislada y revisión de publicación registraron preservación de secretos y cero coincidencias con claves privadas en los candidatos a Git.",
+      "limites": "No hay ciclo completo documentado y ensayado de rotación, revocación y destrucción; tampoco se verificó la historia completa de Git ni todas las copias/respaldos.",
+      "siguiente": "Definir responsables, inventario, renovación y eliminación; evaluar una solución de secretos adecuada al hosting.",
+      "test_cases": [
+        {
+          "id": "tests.test_foundation.FrontendPreservationTests.test_no_backend_files_or_traversal_exposed",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_foundation.py#L192",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/private.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tools/private_files.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/infra/configurar_correo_local.ps1",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/.gitignore",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/.github/workflows/ci.yml"
+      ],
+      "nivel_minimo": "L2",
+      "criterio_positivo_esperado": "Preparación crea secretos propios fuera de Git y conserva los existentes.",
+      "criterio_negativo_esperado": "Archivos de backend no son accesibles por HTTP y claves locales no aparecen en candidatos publicados; ciclo completo pendiente."
+    },
+    {
+      "id": "v5.0.0-16.2.5",
+      "id_interno": "AS-13",
+      "requisito": "Excluir, enmascarar o limitar datos sensibles de acuerdo con su nivel de protección al registrar eventos.",
+      "estado": "parcial",
+      "historias": "HU-01; HU-02",
+      "motivo": "Contraseñas, códigos, cookies y enlaces de recuperación no deben aparecer en registros.",
+      "implementacion": "DEBUG=False; loggers de request/server/CSRF con NullHandler y errores SMTP sanitizados; informes de pruebas sin secretos vigentes.",
+      "tests": [
+        "test_smtp_failure_does_not_claim_delivery_or_expose_exception",
+        "test_smtp_failure_stays_sanitized",
+        "test_code_metadata_does_not_consume_attempts_or_expose_code",
+        "test_reset_link_is_local_single_use_and_does_not_log_in"
+      ],
+      "files": [
+        "backend/config/settings/base.py",
+        "backend/cuentas/email.py",
+        "backend/cuentas/api.py"
+      ],
+      "observado": "Los errores y respuestas comprobados no revelan excepción SMTP, código o clave de recuperación. La supresión de loggers se verificó por lectura de configuración.",
+      "limites": "Las pruebas de respuesta no prueban por sí mismas el contenido de todos los logs. Falta capturar y revisar registros de proceso/proxy/dependencias y documentar clasificación/retención. Silenciar logs tampoco demuestra auditoría de seguridad.",
+      "siguiente": "Ensayar captura saneada de logs y definir qué eventos registrar, quién accede y cuánto tiempo se conservan.",
+      "test_cases": [
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_smtp_failure_does_not_claim_delivery_or_expose_exception",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L191",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_email_policy.LocalEmailPolicyTests.test_smtp_failure_stays_sanitized",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_email_policy.py#L83",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_code_metadata_does_not_consume_attempts_or_expose_code",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L128",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        },
+        {
+          "id": "tests.test_access_integration.AccessIntegrationTests.test_reset_link_is_local_single_use_and_does_not_log_in",
+          "result": "passed",
+          "source_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/tests/test_access_integration.py#L198",
+          "execution_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39151447698"
+        }
+      ],
+      "implementation_urls": [
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/config/settings/base.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/email.py",
+        "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/fab3193075b7b3ac5c1fded558a636d2cd43a5fb/backend/cuentas/api.py"
+      ],
+      "nivel_minimo": "L2",
+      "criterio_positivo_esperado": "Los fallos se traducen a respuestas sanitizadas útiles.",
+      "criterio_negativo_esperado": "Errores y respuestas no revelan excepción SMTP/código/enlace; captura integral de logs pendiente."
+    }
+  ],
+  "MASVS": {
+    "status": "deferred_mobile_client_not_delivered_in_this_milestone",
+    "version_for_future_assessment": "pending",
+    "no_claim_of_compliance": true,
+    "reference": "https://mas.owasp.org/MASVS/"
+  }
+}

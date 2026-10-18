@@ -1,5 +1,7 @@
 # Seguridad y plan de verificación local
 
+> **Revisión del 18/10/2026:** la selección ASVS se concilió con código y CI aprobado: 7 verificados en alcance local, 6 parciales y 332 pendientes. Ver [matriz y evidencia actuales](MATRIZ-REQUISITOS-Y-EVIDENCIAS-2026-10-18.md). Las cifras de 0/13 y notas de backend/CI pendientes que aparecen abajo son históricas.
+
 Etapa 0 · 17-10-2026. Marcos fijados por Rafael: **NIST SSDF 1.1, requisitos seleccionados OWASP ASVS 5.0.0 y procedimientos OWASP WSTG 4.2**. No se declara certificación o cumplimiento total por usar Django. Esta etapa combina revisión pasiva y planificación; no es un pentest de backend inexistente.
 
 Skills utilizadas por solicitud: sdlc-seguro (descubrimiento/diseño), asvs-requisitos (selección trazable), ssdf-practicas (actividades), wstg-pruebas (plan futuro) e iot-seguro (límites del contrato del dispositivo). No se aplicaron habilidades de rediseño visual.
