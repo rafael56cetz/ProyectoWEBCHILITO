@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-18",
+  "scope": "Publicacion, instalacion del equipo y CI inicial",
+  "published_integration_commit": "882f1555b4fbad0bc47a28937fdd9af2a9341b5d",
+  "ci_corrected_commit": "3c6229b9771bd4404f8b148eeb02bb9e4da06655",
+  "local_verification": {
+    "backend_tests": 127,
+    "backend_result": "passed",
+    "pip_check": "passed",
+    "migration_drift": "none",
+    "fresh_install": {
+      "isolated_container": true,
+      "migrations": 31,
+      "zones": 3,
+      "accounts": 0,
+      "repeated_setup_preserves_secrets": true,
+      "application_role_limited": true
+    },
+    "private_secret_matches_in_publication_candidates": 0
+  },
+  "github_actions": {
+    "run_url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39149110084",
+    "job_started": false,
+    "result": "blocked_account_billing",
+    "message": "The job was not started because your account is locked due to a billing issue."
+  },
+  "limitations": [
+    "No remote CI success yet",
+    "No new visual/device audit in this task",
+    "No real SMTP mail sent in this task",
+    "Not a complete security audit",
+    "Not a public deployment"
+  ]
+}
