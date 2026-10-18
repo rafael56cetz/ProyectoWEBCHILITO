@@ -1,0 +1,40 @@
+flowchart LR
+    U["E1 · Usuario"]
+    subgraph CLIENTE["Cliente local · entradas no confiables"]
+      B["C1 · Navegador<br/>Frontend MVC"]
+    end
+    subgraph SERVIDOR["TB01 · Django confía solo en validaciones del servidor"]
+      P("P1 · Django / allauth / API<br/>127.0.0.1:8766<br/>Un proceso: estáticos, acceso y huerto")
+    end
+    subgraph BASE["TB02 · Servicio y roles PostgreSQL"]
+      DB[("D1 · PostgreSQL 17 en Docker<br/>5433 local → 5432 contenedor<br/>Cuentas, sesiones, cuotas, huerto, avisos")]
+    end
+    subgraph PRIVADO["TB03 · Acceso mediante permisos del sistema operativo"]
+      S[("D2 · Archivos privados<br/>Fuera de Git y del frontend")]
+    end
+    subgraph EXTERNO["TB04 · Proveedores externos de correo"]
+      G["E2 · SMTP Gmail<br/>smtp.gmail.com:587"]
+      M["E3 · Buzón del destinatario"]
+    end
+    U -->|"F01 · Entradas y acciones"| B
+    B -->|"F02 · Vistas y resultados"| U
+    B -->|"F03 · GET recursos"| P
+    P -->|"F04 · HTML / CSS / JS"| B
+    B -->|"F05 · Acceso JSON, cookie, CSRF"| P
+    P -->|"F06 · Estado / Set-Cookie"| B
+    B -->|"F07 · Consulta / lectura de aviso"| P
+    P -->|"F08 · Datos autorizados / error"| B
+    P -->|"F09 · Consultas y escrituras con rol app"| DB
+    DB -->|"F10 · Filas / resultado"| P
+    S -->|"F11 · Configuración y secretos de ejecución"| P
+    P -->|"F12 · Correo con STARTTLS"| G
+    G -->|"F13 · Aceptación / error SMTP"| P
+    G -->|"F14 · Entrega externa"| M
+    M -->|"F15 · Código / enlace para el usuario"| U
+    S -->|"F16 · Secreto administrativo, solo arranque Docker"| DB
+    classDef process fill:#e2f0e8,stroke:#2f654b,color:#142c20
+    classDef store fill:#e9f0fb,stroke:#42669a,color:#1a304e
+    classDef external fill:#fff3df,stroke:#95723b,color:#49391e
+    class P process
+    class DB,S store
+    class G,M external

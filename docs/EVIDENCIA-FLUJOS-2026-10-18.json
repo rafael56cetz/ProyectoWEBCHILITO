@@ -1,0 +1,409 @@
+{
+  "date": "2026-10-18",
+  "code_revision": "dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b",
+  "task": "E19-03",
+  "method": "Lectura de codigo y contratos; validacion documental sin ejecutar nuevos tests de aplicacion ni escaneos",
+  "sources": [
+    {
+      "file": "backend/config/private.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/config/private.py",
+      "sha256": "eefa408b0e96c3914889d879ca7aa89994d0459fc2186cd211dc88c815ede202"
+    },
+    {
+      "file": "backend/config/settings/base.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/config/settings/base.py",
+      "sha256": "4c3277d9dec5da2a583be16c6931d13ac6a5de3b8f477724ec5d4f15f55792f6"
+    },
+    {
+      "file": "backend/config/settings/local.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/config/settings/local.py",
+      "sha256": "032ed46dfee374d01ecc0ab2ae4de5c137c57689e14462b07aee484c3271e50f"
+    },
+    {
+      "file": "backend/config/urls.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/config/urls.py",
+      "sha256": "86eb5501a99f73739965e8b7a651790b063ea16a61385681b256ebb38338e2d4"
+    },
+    {
+      "file": "backend/config/views.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/config/views.py",
+      "sha256": "6a638ebb5bcd8538af08989e494cea7d109d891b589842e7c165c68354b57f51"
+    },
+    {
+      "file": "backend/cuentas/api.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/cuentas/api.py",
+      "sha256": "36860d762c4a98627469f085f0325e2804607f297b8ca3a668f177654840c750"
+    },
+    {
+      "file": "backend/cuentas/email.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/cuentas/email.py",
+      "sha256": "3b9b495f42cf8072e427ad6b912ca9fba1e2b97967e311d55891842492e02eb2"
+    },
+    {
+      "file": "backend/cuentas/inputs.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/cuentas/inputs.py",
+      "sha256": "7d8e8f6cf5b665829878ea5f972695ce172ae74b40d6cb67e5e72327d21c77ce"
+    },
+    {
+      "file": "backend/cuentas/models.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/cuentas/models.py",
+      "sha256": "ad31cd187af8c4768b9936ba492a7325684a941e9eff8762df443d2352bd074d"
+    },
+    {
+      "file": "backend/huerto/api.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/huerto/api.py",
+      "sha256": "f99056cc4155271afc133c65bcdd47e7289b097aabfcd6f42d3ee9236e7ebf05"
+    },
+    {
+      "file": "backend/huerto/models.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/huerto/models.py",
+      "sha256": "438545a9993df4a4a571e0c94f0a493c3d142417e0883bbddf5021d31428de9d"
+    },
+    {
+      "file": "backend/huerto/services.py",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/backend/huerto/services.py",
+      "sha256": "627f53b358b12e6e791731ee89e2863a76b70c6c97e386f609e989af43a057e9"
+    },
+    {
+      "file": "compose.yaml",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/compose.yaml",
+      "sha256": "387c9df3c341b3e44721c0b91fecf58ecffa151c9f01ee9af6534cfc6fa1f3d8"
+    },
+    {
+      "file": "dist/controlador/acceso.js",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/dist/controlador/acceso.js",
+      "sha256": "e99cd76ebc31cfea831725f87eeea7588572998506f1c54bb7019a35be2cfae3"
+    },
+    {
+      "file": "dist/controlador/site.js",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/dist/controlador/site.js",
+      "sha256": "bd4e3c31a32c9c93cb784e60fbc7259ff332dc2264571ff7feb7adfeb6a932af"
+    },
+    {
+      "file": "dist/modelo/servicio-acceso.js",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/dist/modelo/servicio-acceso.js",
+      "sha256": "b6fe2bf331af21e749e1c838dd6d60a048668f144b649501c15c86b25a2dafe7"
+    },
+    {
+      "file": "dist/modelo/servicio-aplicacion.js",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/dist/modelo/servicio-aplicacion.js",
+      "sha256": "b1d94d6b38f776f93541421c268bc8d848ea350c5aa06d842a6403bb85c41b9b"
+    },
+    {
+      "file": "dist/vista/aplicacion.js",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/dist/vista/aplicacion.js",
+      "sha256": "19cd8d226dd933757062d1cfcc9c5b58abeccadbb33cdf8cd73c38a26a9060a1"
+    },
+    {
+      "file": "infra/iniciar_aplicacion.ps1",
+      "url": "https://github.com/rafael56cetz/ProyectoWEBCHILITO/blob/dae9dd57a32ab71688d8aa60ab1ff3ad6fdb330b/infra/iniciar_aplicacion.ps1",
+      "sha256": "6164fcead4bc3fcb74b4e8bfe33c34eea64ca408e288c81e5b42ac9cb697085f"
+    }
+  ],
+  "flows": [
+    {
+      "id": "F01",
+      "source": "E1 Usuario",
+      "destination": "C1 Navegador",
+      "data": "Correo, contraseña, casilla, código, nueva contraseña o acción de consulta/lectura.",
+      "transport": "Interacción local de formularios",
+      "trust_boundary": "TB01 al llegar a API",
+      "internal_risks": "R-04; R-05; R-06; R-11",
+      "implementation": "dist/controlador/acceso.js"
+    },
+    {
+      "id": "F02",
+      "source": "C1 Navegador",
+      "destination": "E1 Usuario",
+      "data": "Vistas, errores, perfil y estructura del huerto; sin membresía solo estructura genérica.",
+      "transport": "Presentación DOM",
+      "trust_boundary": "Cliente no confiable",
+      "internal_risks": "R-06; R-09; R-12",
+      "implementation": "dist/vista/aplicacion.js"
+    },
+    {
+      "id": "F03",
+      "source": "C1 Navegador",
+      "destination": "P1 Django",
+      "data": "GET de index.html y recursos de vista/modelo/controlador; el fragmento #ruta no viaja en HTTP.",
+      "transport": "HTTP 127.0.0.1:8766",
+      "trust_boundary": "TB01",
+      "internal_risks": "R-08; R-12",
+      "implementation": "backend/config/urls.py"
+    },
+    {
+      "id": "F04",
+      "source": "P1 Django",
+      "destination": "C1 Navegador",
+      "data": "HTML, CSS, JavaScript, imágenes y favicon públicos autorizados por las rutas.",
+      "transport": "HTTP, recursos estáticos del mismo origen",
+      "trust_boundary": "TB01",
+      "internal_risks": "R-08; R-12",
+      "implementation": "backend/config/views.py"
+    },
+    {
+      "id": "F05",
+      "source": "C1 Navegador",
+      "destination": "P1 Django",
+      "data": "JSON de acceso/alta/código/recuperación/cambio; cookies y X-CSRFToken en mutaciones. Inspección de recuperación: X-Password-Reset-Key.",
+      "transport": "HTTP JSON del mismo origen",
+      "trust_boundary": "TB01",
+      "internal_risks": "R-01; R-04; R-05; R-11",
+      "implementation": "dist/modelo/servicio-acceso.js"
+    },
+    {
+      "id": "F06",
+      "source": "P1 Django",
+      "destination": "C1 Navegador",
+      "data": "JSON de estado/configuración/errores y metadatos de verificación; Set-Cookie de sesión/CSRF según operación. No código ni clave de recuperación en respuesta.",
+      "transport": "HTTP JSON y cabeceras",
+      "trust_boundary": "TB01",
+      "internal_risks": "R-01; R-05; R-06; R-08; R-11",
+      "implementation": "backend/cuentas/api.py"
+    },
+    {
+      "id": "F07",
+      "source": "C1 Navegador",
+      "destination": "P1 Django",
+      "data": "GET de perfil/huerto/avisos y PUT de lectura con ID y cuerpo {}; cookie de sesión, y CSRF para PUT.",
+      "transport": "HTTP JSON del mismo origen",
+      "trust_boundary": "TB01",
+      "internal_risks": "R-01; R-02; R-03; R-04",
+      "implementation": "dist/modelo/servicio-aplicacion.js"
+    },
+    {
+      "id": "F08",
+      "source": "P1 Django",
+      "destination": "C1 Navegador",
+      "data": "Perfil propio, huerto autorizado, avisos y lectura por usuario; null para mediciones. 401/403/404/503 según contrato.",
+      "transport": "HTTP JSON, respuestas privadas no-store",
+      "trust_boundary": "TB01",
+      "internal_risks": "R-02; R-03; R-06; R-09",
+      "implementation": "backend/huerto/api.py"
+    },
+    {
+      "id": "F09",
+      "source": "P1 Django",
+      "destination": "D1 PostgreSQL",
+      "data": "Consultas y escrituras ORM/psycopg: cuentas, hashes de contraseña, verificación, sesiones, cuotas, confirmación técnica, huerto y avisos. Credenciales DB solo para autenticar conexión.",
+      "transport": "PostgreSQL TCP 127.0.0.1:5433 -> contenedor:5432, sslmode=disable",
+      "trust_boundary": "TB02",
+      "internal_risks": "R-01; R-05; R-07; R-08; R-11",
+      "implementation": "backend/config/settings/local.py"
+    },
+    {
+      "id": "F10",
+      "source": "D1 PostgreSQL",
+      "destination": "P1 Django",
+      "data": "Filas consultadas, resultados de escritura y errores de base; Django filtra y transforma antes de devolver JSON.",
+      "transport": "PostgreSQL sobre conexión local",
+      "trust_boundary": "TB02",
+      "internal_risks": "R-01; R-05; R-06; R-07; R-08",
+      "implementation": "backend/huerto/services.py"
+    },
+    {
+      "id": "F11",
+      "source": "D2 Archivos privados",
+      "destination": "P1 Django",
+      "data": "Clave Django, contraseña del rol DB, configuración y contraseña de aplicación SMTP; se leen fuera del repositorio.",
+      "transport": "Lectura de archivos del sistema operativo",
+      "trust_boundary": "TB03",
+      "internal_risks": "R-08",
+      "implementation": "backend/config/private.py"
+    },
+    {
+      "id": "F12",
+      "source": "P1 Django",
+      "destination": "E2 SMTP Gmail",
+      "data": "Autenticación del remitente con contraseña de aplicación; destinatario, asunto y correo con código o enlace de recuperación. Nunca se envía la contraseña de acceso de El Chilito.",
+      "transport": "smtp.gmail.com:587, SMTP con STARTTLS",
+      "trust_boundary": "TB04",
+      "internal_risks": "R-05; R-08",
+      "implementation": "backend/cuentas/email.py"
+    },
+    {
+      "id": "F13",
+      "source": "E2 SMTP Gmail",
+      "destination": "P1 Django",
+      "data": "Aceptación/rechazo SMTP o error de transporte, traducido a resultado/error saneado. Aceptación no garantiza recepción.",
+      "transport": "Respuesta sobre sesión SMTP",
+      "trust_boundary": "TB04",
+      "internal_risks": "R-06; R-08",
+      "implementation": "backend/cuentas/email.py"
+    },
+    {
+      "id": "F14",
+      "source": "E2 SMTP Gmail",
+      "destination": "E3 Buzón del destinatario",
+      "data": "Mensaje con código o enlace; entrega gestionada por proveedores externos.",
+      "transport": "Entrega de correo fuera del control de El Chilito",
+      "trust_boundary": "Externo al sistema",
+      "internal_risks": "R-05; R-08",
+      "implementation": "backend/cuentas/email.py"
+    },
+    {
+      "id": "F15",
+      "source": "E3 Buzón del destinatario",
+      "destination": "E1 Usuario",
+      "data": "Lectura del código o apertura del enlace; el usuario vuelve a F01/F05. El servicio de correo autentica su propio buzón.",
+      "transport": "Cliente o web de correo externo",
+      "trust_boundary": "Externo al sistema",
+      "internal_risks": "R-05",
+      "implementation": "backend/config/settings/local.py"
+    },
+    {
+      "id": "F16",
+      "source": "D2 Archivos privados",
+      "destination": "D1 PostgreSQL",
+      "data": "Docker monta el secreto administrativo para la inicialización/arranque del contenedor. No es la credencial del rol app ni una orden del navegador.",
+      "transport": "Archivo montado como Docker secret",
+      "trust_boundary": "TB03 / operación local",
+      "internal_risks": "R-08",
+      "implementation": "compose.yaml"
+    }
+  ],
+  "http_surface": [
+    {
+      "method": "GET",
+      "path": "/api/acceso/configuracion",
+      "condition": "Pública",
+      "meaning": "Política, estado legal y cookie CSRF. No entrega credenciales."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/auth/signup",
+      "condition": "Excepción local explícita + CSRF",
+      "meaning": "email, password, termsAccepted booleano; crea confirmación técnica y proceso de verificación."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/auth/login",
+      "condition": "CSRF y límites",
+      "meaning": "email y password; sesión o proceso pendiente de verificar."
+    },
+    {
+      "method": "GET",
+      "path": "/_allauth/browser/v1/auth/session",
+      "condition": "Cookie si existe",
+      "meaning": "Estado de sesión de navegador; no token de aplicación."
+    },
+    {
+      "method": "DELETE",
+      "path": "/_allauth/browser/v1/auth/session",
+      "condition": "CSRF",
+      "meaning": "Cierra la sesión servidor."
+    },
+    {
+      "method": "GET",
+      "path": "/api/acceso/verificacion",
+      "condition": "Proceso pendiente",
+      "meaning": "Correo y expiresAt; no devuelve código."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/auth/email/verify",
+      "condition": "Proceso pendiente + CSRF",
+      "meaning": "key contiene el código introducido; valida, no concede membresía."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/auth/email/verify/resend",
+      "condition": "Proceso pendiente + CSRF y límites",
+      "meaning": "Cuerpo {}; nuevo envío si está permitido."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/auth/password/request",
+      "condition": "CSRF y límites",
+      "meaning": "email; respuesta neutral para cuenta desconocida si el correo está disponible."
+    },
+    {
+      "method": "GET",
+      "path": "/_allauth/browser/v1/auth/password/reset",
+      "condition": "Clave de enlace",
+      "meaning": "X-Password-Reset-Key para inspeccionar validez; no realiza el cambio."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/auth/password/reset",
+      "condition": "Clave de enlace + CSRF",
+      "meaning": "key y password; no inicia sesión automáticamente."
+    },
+    {
+      "method": "POST",
+      "path": "/_allauth/browser/v1/account/password/change",
+      "condition": "Sesión verificada + CSRF",
+      "meaning": "current_password y new_password; valida contraseña actual."
+    },
+    {
+      "method": "GET",
+      "path": "/api/cuenta",
+      "condition": "Cuenta activa, autenticada y correo verificado",
+      "meaning": "Perfil propio y gardenAssigned; no el usuario elegido por query string."
+    },
+    {
+      "method": "GET",
+      "path": "/api/huertos/actual",
+      "condition": "Sesión, verificación y membresía activa",
+      "meaning": "Huerto principal y tres zonas; mediciones nulas."
+    },
+    {
+      "method": "GET",
+      "path": "/api/huertos/actual/avisos",
+      "condition": "Mismo permiso del huerto",
+      "meaning": "Lista persistida; vacía no significa fallo del servicio."
+    },
+    {
+      "method": "GET",
+      "path": "/api/huertos/actual/avisos/<str:notice_id>",
+      "condition": "Permiso por huerto y objeto",
+      "meaning": "Detalle autorizado o 404 neutral."
+    },
+    {
+      "method": "PUT",
+      "path": "/api/huertos/actual/avisos/<str:notice_id>/lectura",
+      "condition": "Permiso por objeto + CSRF",
+      "meaning": "Cuerpo {}; marca leído para request.user y no resuelve la condición."
+    }
+  ],
+  "checks": {
+    "flow_ids": 16,
+    "unique_ids": true,
+    "svg_xml_valid": true,
+    "all_flows_in_svg_and_mermaid": true,
+    "catalog_sources_exist": true,
+    "endpoint_paths_found_in_urlconf": 17,
+    "application_tests_executed_in_this_task": false,
+    "screenshots_generated": false,
+    "visual_export_review": "SVG exportado a PNG y revisado visualmente; no captura de la aplicacion",
+    "mermaid_rendered_by_parser": false
+  },
+  "limitations": [
+    "No captura de trafico ni comprobacion nueva de SMTP",
+    "No evaluacion de hardware/firmware ni servicios futuros",
+    "Revisores humanos no acreditados en esta tarea",
+    "No modelo de amenazas completo ni alcance congelado"
+  ],
+  "artifacts": [
+    {
+      "path": "ARQUITECTURA-Y-FLUJOS-2026-10-18.md",
+      "sha256": "7121731c160a05f9d6707bd06635ebd4e6c850473cfa98a2ae3e32093236b02f"
+    },
+    {
+      "path": "diagramas/DFD-LOCAL-2026-10-18.mmd",
+      "sha256": "ab53da7ee43792b78296d262f0d1da7f026060114cf892885647114605e3418f"
+    },
+    {
+      "path": "diagramas/DFD-LOCAL-2026-10-18.svg",
+      "sha256": "c900563bfd5083ddc4f8fddbd1d3afdbfd2416e8e517321e7744bac887806fe8"
+    },
+    {
+      "path": "diagramas/DFD-LOCAL-2026-10-18.png",
+      "sha256": "047915a75fd593e60586e00616c0de1726c6452d309918fff1606d48d1976f37"
+    },
+    {
+      "path": "diagramas/FLUJOS-LOCAL-2026-10-18.csv",
+      "sha256": "96fd427377f3125e60d8879bae42b26795966b2268e4f1e8d1e7e663f2134e52"
+    }
+  ]
+}

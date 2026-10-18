@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
+<title id="title">El Chilito: arquitectura, flujos de datos y límites de confianza</title>
+<desc id="desc">Diagrama de la web local real. Navegador, Django, PostgreSQL Docker, archivos privados y correo Gmail. Flechas F01 a F16 detalladas en el catálogo. ESP32 y otras funciones futuras no tienen conexiones activas.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#315f4a"/></marker></defs>
+<rect x="0" y="0" width="1800" height="1180" rx="14" fill="#ffffff" stroke="#ffffff" stroke-width="2"/>
+<text x="48" y="51" font-family="Arial, sans-serif" font-size="30" fill="#20322c" font-weight="700" text-anchor="start">
+<tspan x="48" dy="0">EL CHILITO · FLUJOS DE DATOS DE LA WEB</tspan>
+</text>
+<text x="48" y="87" font-family="Arial, sans-serif" font-size="19" fill="#52665e" font-weight="400" text-anchor="start">
+<tspan x="48" dy="0">18 de octubre de 2026 · Código dae9dd5 · Presentación local HTTP · Ver catálogo F01–F16</tspan>
+</text>
+<rect x="45" y="120" width="1290" height="820" rx="14" fill="#f5f8f6" stroke="#b9c9c0" stroke-width="2"/>
+<text x="68" y="150" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="600" text-anchor="start">
+<tspan x="68" dy="0">UNA COMPUTADORA · navegador, Django, Docker y archivos locales</tspan>
+</text>
+<rect x="1375" y="120" width="380" height="820" rx="14" fill="#fffbf2" stroke="#b89757" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="1396" y="150" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="start">
+<tspan x="1396" dy="0">TB04 · EXTERNO</tspan>
+<tspan x="1396" dy="24">Proveedor y buzón de correo</tspan>
+</text>
+<rect x="80" y="180" width="280" height="100" rx="14" fill="#ffffff" stroke="#b9c9c0" stroke-width="2"/>
+<text x="220" y="221" font-family="Arial, sans-serif" font-size="19" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="220" dy="0">E1 · Usuario</tspan>
+<tspan x="220" dy="27">Datos de cuenta / acciones</tspan>
+</text>
+<rect x="80" y="420" width="280" height="200" rx="14" fill="#ffffff" stroke="#b9c9c0" stroke-width="2"/>
+<text x="220" y="458" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="220" dy="0">C1 · Navegador</tspan>
+<tspan x="220" dy="33">Frontend MVC</tspan>
+<tspan x="220" dy="33">Cookie de sesión / token CSRF</tspan>
+<tspan x="220" dy="33">Nunca credenciales DB o SMTP</tspan>
+</text>
+<rect x="535" y="365" width="380" height="275" rx="14" fill="#e2f0e8" stroke="#2f654b" stroke-width="2"/>
+<text x="725" y="404" font-family="Arial, sans-serif" font-size="19" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="725" dy="0">P1 · Django + allauth + API</tspan>
+<tspan x="725" dy="36">127.0.0.1:8766</tspan>
+<tspan x="725" dy="36">Estáticos y configuración pública</tspan>
+<tspan x="725" dy="36">Acceso, verificación y sesión</tspan>
+<tspan x="725" dy="36">Perfil, permisos, huerto y avisos</tspan>
+<tspan x="725" dy="36">Validación y errores del servidor</tspan>
+</text>
+<rect x="1015" y="185" width="285" height="205" rx="14" fill="#e9f0fb" stroke="#42669a" stroke-width="2"/>
+<text x="1157" y="225" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="1157" dy="0">D1 · PostgreSQL 17</tspan>
+<tspan x="1157" dy="31">En Docker: el_chilito</tspan>
+<tspan x="1157" dy="31">5433 local → 5432 contenedor</tspan>
+<tspan x="1157" dy="31">Cuentas / sesiones / cuotas</tspan>
+<tspan x="1157" dy="31">Huerto / membresías / avisos</tspan>
+</text>
+<rect x="565" y="790" width="365" height="120" rx="14" fill="#e9f0fb" stroke="#42669a" stroke-width="2"/>
+<text x="747" y="826" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="747" dy="0">D2 · Archivos privados</tspan>
+<tspan x="747" dy="29">Clave Django, DB y SMTP</tspan>
+<tspan x="747" dy="29">Fuera del proyecto; permisos de SO</tspan>
+</text>
+<rect x="1410" y="450" width="310" height="125" rx="14" fill="#fff3df" stroke="#95723b" stroke-width="2"/>
+<text x="1565" y="487" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="1565" dy="0">E2 · SMTP Gmail</tspan>
+<tspan x="1565" dy="30">smtp.gmail.com:587</tspan>
+<tspan x="1565" dy="30">STARTTLS · remitente propio</tspan>
+</text>
+<rect x="1410" y="710" width="310" height="100" rx="14" fill="#fff3df" stroke="#95723b" stroke-width="2"/>
+<text x="1565" y="752" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="1565" dy="0">E3 · Buzón del destinatario</tspan>
+<tspan x="1565" dy="27">Código o enlace de recuperación</tspan>
+</text>
+<text x="1565" y="884" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="400" text-anchor="middle">
+<tspan x="1565" dy="0">F15 · El usuario lee el correo</tspan>
+<tspan x="1565" dy="24">y vuelve a F01 / F05</tspan>
+<tspan x="1565" dy="24">El Chilito no lee su buzón</tspan>
+</text>
+<path d="M450 325 V700" stroke="#b36d3a" stroke-width="2" stroke-dasharray="7 6"/>
+<text x="450" y="307" font-family="Arial, sans-serif" font-size="18" fill="#8b522b" font-weight="700" text-anchor="middle">
+<tspan x="450" dy="0">TB01</tspan>
+</text>
+<text x="450" y="727" font-family="Arial, sans-serif" font-size="16" fill="#8b522b" font-weight="400" text-anchor="middle">
+<tspan x="450" dy="0">Cliente → servidor</tspan>
+</text>
+<rect x="990" y="165" width="325" height="240" rx="14" fill="none" stroke="#b36d3a" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="1005" y="432" font-family="Arial, sans-serif" font-size="16" fill="#8b522b" font-weight="400" text-anchor="start">
+<tspan x="1005" dy="0">TB02 · servicio / permisos DB</tspan>
+</text>
+<rect x="545" y="775" width="405" height="150" rx="14" fill="none" stroke="#b36d3a" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="747" y="760" font-family="Arial, sans-serif" font-size="17" fill="#8b522b" font-weight="400" text-anchor="middle">
+<tspan x="747" dy="0">TB03 · archivos con acceso restringido</tspan>
+</text>
+<path d="M155 280 V420" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="106.25" y="325" width="39.5" height="23" rx="4" fill="#f5f8f6"/>
+<text x="126" y="342" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="126" dy="0">F01</tspan>
+</text>
+<path d="M285 420 V280" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="295.25" y="325" width="39.5" height="23" rx="4" fill="#f5f8f6"/>
+<text x="315" y="342" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="315" dy="0">F02</tspan>
+</text>
+<path d="M360 455 H535" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="373.0" y="380" width="150.0" height="46" rx="4" fill="#f5f8f6"/>
+<text x="448" y="397" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="448" dy="0">F03 / F05 / F07</tspan>
+<tspan x="448" dy="23">Solicitudes HTTP</tspan>
+</text>
+<path d="M535 580 H360" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="377.25" y="605" width="141.5" height="46" rx="4" fill="#f5f8f6"/>
+<text x="448" y="622" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="448" dy="0">F04 / F06 / F08</tspan>
+<tspan x="448" dy="23">Recursos / JSON</tspan>
+</text>
+<path d="M800 365 V295 H1015" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="738.25" y="228" width="243.5" height="46" rx="4" fill="#f5f8f6"/>
+<text x="860" y="245" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="860" dy="0">F09 · ORM / psycopg</tspan>
+<tspan x="860" dy="23">Rol app, consultas acotadas</tspan>
+</text>
+<path d="M1015 355 H965 V440 H915" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="888.25" y="456" width="141.5" height="23" rx="4" fill="#f5f8f6"/>
+<text x="959" y="473" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="959" dy="0">F10 · resultado</tspan>
+</text>
+<path d="M747 790 V640" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="761.0" y="688" width="218.0" height="46" rx="4" fill="#f5f8f6"/>
+<text x="870" y="705" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="870" dy="0">F11 · lectura privada</tspan>
+<tspan x="870" dy="23">Solo dentro del servidor</tspan>
+</text>
+<path d="M915 510 H1410" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1068.75" y="475" width="192.5" height="23" rx="4" fill="#f5f8f6"/>
+<text x="1165" y="492" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="1165" dy="0">F12 · SMTP / STARTTLS</tspan>
+</text>
+<path d="M1410 552 H915" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1056.0" y="576" width="218.0" height="23" rx="4" fill="#f5f8f6"/>
+<text x="1165" y="593" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="1165" dy="0">F13 · aceptación / error</tspan>
+</text>
+<path d="M1565 575 V710" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1468.75" y="634" width="192.5" height="23" rx="4" fill="#f5f8f6"/>
+<text x="1565" y="651" font-family="Arial, sans-serif" font-size="17" fill="#20322c" font-weight="600" text-anchor="middle">
+<tspan x="1565" dy="0">F14 · entrega externa</tspan>
+</text>
+<path d="M1565 810 V846" fill="none" stroke="#315f4a" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M930 858 H1320 V332 H1300" fill="none" stroke="#697890" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="1125" y="887" font-family="Arial, sans-serif" font-size="16" fill="#52687f" font-weight="400" text-anchor="middle">
+<tspan x="1125" dy="0">F16 · secreto administrativo</tspan>
+<tspan x="1125" dy="23">Solo arranque de Docker</tspan>
+</text>
+<text x="68" y="972" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="600" text-anchor="start">
+<tspan x="68" dy="0">LEYENDA · Flechas: datos · Marco discontinuo: confianza/acceso · Cruces sin punto: sin unión</tspan>
+</text>
+<text x="68" y="1005" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="start">
+<tspan x="68" dy="0">F01–F11 y F16: operación local. F12–F15: salida a correo externo. El HTTP y PostgreSQL locales no usan TLS.</tspan>
+</text>
+<rect x="45" y="1030" width="1710" height="110" rx="14" fill="#f7f7f7" stroke="#c8d0cc" stroke-width="2"/>
+<text x="68" y="1063" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="700" text-anchor="start">
+<tspan x="68" dy="0">FUERA DEL FLUJO ACTUAL</tspan>
+</text>
+<text x="68" y="1094" font-family="Arial, sans-serif" font-size="18" fill="#20322c" font-weight="400" text-anchor="start">
+<tspan x="68" dy="0">ESP32, telemetría, bombas y vinculación real · IA por API · ARCO operativo · Passkeys · App instalada · Hosting público</tspan>
+<tspan x="68" dy="27">No hay flechas activas hacia estos componentes. Un dashboard con guiones no demuestra conexión con sensores.</tspan>
+</text>
+</svg>
