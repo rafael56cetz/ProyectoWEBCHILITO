@@ -40,6 +40,9 @@ jobs:
         env:
           ELCHILITO_DB_SCOPE: test
           ELCHILITO_DB_ROLE: migrador
+          # The isolated DB is not the local presentation. Keep checks enabled.
+          ELCHILITO_LOCAL_REGISTRATION: "0"
+          ELCHILITO_LOCAL_EMAIL_ANY_RECIPIENT: "0"
         run: python manage.py migrate --noinput
       - name: Revisar configuracion y migraciones
         working-directory: backend
