@@ -1,74 +1,37 @@
-# El Chilito · Frontend principal
+# El Chilito · Aplicación web
+Entrega local integrada: 18 de octubre de 2026. Django/Python, PostgreSQL 17 en Docker y frontend MVC existente. Un solo origen: http://127.0.0.1:8766/index.html.
 
-Diseño principal de la web de El Chilito, preparado para integrar el backend. Incluye la portada, acceso, registro, verificación, recuperación, Mi huerto, Avisos, Asistente y Mi cuenta. Conserva el logo actual sin recuadro, Geist y los estilos Liquid Glass existentes.
+## Instalar y abrir
+Requisitos: Windows 10/11, Python 3.13 con lanzador py, Git y Docker Desktop con contenedores Linux/Compose v2. Abrir Docker Desktop antes.
+~~~powershell
+git clone https://github.com/rafael56cetz/ProyectoWEBCHILITO.git El-Chilito-Aplicacion-Web
+Set-Location .\El-Chilito-Aplicacion-Web
+& .\infra\preparar_equipo.ps1
+& .\infra\configurar_correo_local.ps1
+& .\infra\iniciar_aplicacion.ps1
+~~~
+[Instalación completa y correo propio](docs/INSTALACION-EQUIPO.md). Primera instalación y migraciones son explícitas; el inicio diario no reinstala ni migra. No usar http.server.
 
-**Punto de entrada: `dist/index.html`.** Los archivos de `dist/` son el código fuente editable; no se requiere compilación, Node ni un framework.
+## Qué funciona
+- Registro local con casilla obligatoria, verificación por código, correo/contraseña, sesión, perfil, recuperación y cierre reales.
+- Huerto y tres zonas persistidos, avisos y lectura individual con permisos.
+- Sin membresía: estructura genérica; la API no entrega información privada. Sin mediciones: guiones, no números inventados.
+- Contraseñas de 15 a 256 caracteres; el código de correo verifica el registro, no se exige en cada inicio.
+- Registro habilitado solo en perfil local; confirmación técnica no equivale a documentos legales aprobados.
 
-## Abrir en local
+## Límites
+Vinculación visual sin envío; sin telemetría/actuadores, IA, ARCO o passkeys operativos. No hay app instalada ni despliegue público. PostgreSQL y Django solo escuchan en loopback. Un teléfono no accede a la PC usando 127.0.0.1.
+Cada integrante genera sus credenciales y su base; no copiar secretos, dumps ni datos personales. El correo requiere Gmail configurado, Internet y disponibilidad del proveedor.
 
-Con Python 3 instalado, desde la raíz de este repositorio:
+## Evidencias y trabajo del equipo
+- [Guía de presentación y revisión del 18/10](docs/INICIO-LOCAL-PRESENTACION.md).
+- [CI y publicación](docs/CI-Y-PUBLICACION.md) · [ejecuciones en GitHub](https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions).
+- [Contratos de integración](docs/CONTRATOS-INTEGRACION-LOCAL.md).
+- [Seguridad y verificación parcial](docs/SEGURIDAD-Y-VERIFICACION-LOCAL.md).
+- [Backend, migraciones y pruebas](backend/README.md).
+- [Historial anterior del README](docs/HISTORIAL-README-ANTES-CI.md).
+Rafael: backend/integración; Carolina: PostgreSQL/logo; Rafael y Gabriela: frontend. Revisar diffs y documentar cambios. No cambiar permisos ni compartir claves para simplificar una demostración.
+Los documentos de etapas conservan resultados de su fecha. Las notas antiguas de registro cerrado, frontend sin backend o servidores de revisión no sustituyen este estado.
 
-```sh
-python -m http.server 8766 --bind 127.0.0.1 --directory dist
-```
-
-Abrir <http://127.0.0.1:8766/index.html> en el navegador. Este comando solo sirve los archivos estáticos; no implementa el backend de El Chilito.
-
-## Estado del acceso
-
-**Todavía no hay cuentas ni contraseñas funcionales.** El adaptador normal de acceso devuelve «servicio no disponible» hasta que se integre el backend. No se incluyeron credenciales, datos de prueba ni el modo de demostración.
-
-Para revisar directamente la presentación de cada pantalla se puede abrir la ruta correspondiente, por ejemplo <http://127.0.0.1:8766/index.html#huerto>. Las vistas privadas no tienen datos reales ni autorización implementada; abrir una ruta no concede permisos sobre un dispositivo.
-
-| Pantalla | Ruta |
-| --- | --- |
-| Portada | `#inicio` |
-| Inicio de sesión | `#acceso` |
-| Registro | `#registro` |
-| Verificar correo | `#verificar` |
-| Recuperar acceso | `#recuperar` |
-| Restablecer contraseña | `#restablecer` (requiere enlace válido del futuro servicio) |
-| Mi huerto | `#huerto` |
-| Avisos / detalle | `#avisos` / `#avisos/:id` |
-| Asistente | `#asistente` |
-| Mi cuenta / contraseña | `#cuenta` / `#cuenta/contrasena` |
-
-El enlace antiguo `#huerto/avisos` redirige a Avisos. Los destinos legales heredados siguen siendo provisionales.
-
-## Organización MVC
-
-```text
-dist/
-├── index.html                    Entrada: carga modelos, vistas y controladores
-├── favicon.svg
-├── modelo/
-│   ├── acceso.js                 Validaciones y configuración del acceso
-│   ├── aplicacion.js             Datos, estados y normalización para las vistas
-│   ├── servicio-acceso.js        Punto de integración de autenticación
-│   └── servicio-aplicacion.js    Punto de integración de huerto, avisos y perfil
-├── vista/
-│   ├── paginas.js                Portada, logo compartido y tarjetas del huerto
-│   ├── acceso.js                 Formularios y resultados de acceso
-│   ├── aplicacion.js             Navegación privada, Avisos, Asistente y Mi cuenta
-│   ├── icons.js                  Iconos compartidos
-│   ├── css/                      Estilos base y ajustes de acceso/aplicación
-│   ├── fonts/                    Geist y su licencia
-│   └── img/                      Imágenes utilizadas por la web actual
-└── controlador/
-    ├── site.js                   Rutas y coordinación de pantallas
-    ├── navigation.js             Encabezado, anclas y foco
-    ├── acceso.js                 Eventos y respuestas de los formularios
-    └── aplicacion.js             Consultas, filtros, lectura de avisos y cierre
-docs/
-└── INTEGRACION-BACKEND.md         Guía de conexión para Kevin
-```
-
-Esta entrega contiene una sola versión del diseño. Se excluyeron demostraciones, escenarios ficticios, capturas, diseños anteriores, documentos académicos, modelos de Blender y recursos sin uso. Los archivos del frontend incluidos conservan su contenido y rutas relativos del proyecto original.
-
-## Para Kevin
-
-Comenzar por [la guía de integración](docs/INTEGRACION-BACKEND.md) y los dos adaptadores de `dist/modelo/`. El backend se desarrollará en Python; Django continúa como propuesta pendiente de confirmación. La estructura de información y los contratos indicados necesitan acuerdo del equipo antes de integrar servicios reales.
-
-La portada describe las capacidades previstas del proyecto. Esta entrega no implementa base de datos, correos, IA, conexión ESP32 ni control del riego. El Asistente solo presenta el apartado inicial de próxima etapa.
-
-Rafael y Gabriela trabajan en diseño y frontend; Carolina en logo y base de datos; Kevin en backend.
+## CI inicial
+Push a main, pull request o ejecución manual ejecutan instalación limpia, PostgreSQL aislado, migraciones, validación Django, pruebas servidor y sintaxis JavaScript. Correo en memoria; sin secretos de producción. No equivale a auditoría completa ni ejecuta la revisión visual en dispositivos físicos.

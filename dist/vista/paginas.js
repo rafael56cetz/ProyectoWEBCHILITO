@@ -33,6 +33,7 @@ const publicFooter = () => `<footer class="site-footer">
           <li><a href="#acceso" class="site-footer__link">Iniciar sesión en el panel</a></li>
           <li><a href="#terminos" class="site-footer__link">Términos y condiciones</a></li>
           <li><a href="#privacidad" class="site-footer__link">Aviso de privacidad</a></li>
+          <li><a href="#derechos-arco" class="site-footer__link">Derechos ARCO</a></li>
           <li><a href="#seguridad" class="site-footer__link">Seguridad y protección de datos</a></li>
         </ul>
       </div>
@@ -183,15 +184,19 @@ function plantDrawing(n){return `<svg class="plant-drawing plant-${n}" viewBox="
 function garden(data) {
   const [status, explanation, symbol] = AppModel.states[data.status];
   const heading = AppViews.heading(data.name, 'El cuidado de tus tres plantas, en un mismo lugar.');
-  if (['error','unassigned'].includes(data.status)) return heading + AppViews.state(status, explanation, false, data.status === 'error');
-  const quality = reading => reading.quality === 'invalid' ? 'Lectura inválida' : reading.value == null ? 'Sin datos' : 'Lectura registrada';
-  const tank = {low:['Nivel bajo','Revisa el depósito antes de continuar con el riego.'], 'not-low':['Nivel bajo no detectado','El flotador no detecta nivel bajo. No mide el volumen de agua.'], unknown:['Estado desconocido','Aún no hay información del detector de nivel bajo.']}[data.tank.state];
-  return `${heading}<div class="connection-strip"><div class="telemetry-cell"><span class="icon-medallion">${icon(symbol)}</span><span><small>Estado del huerto</small>${status}</span></div><div class="telemetry-cell telemetry-cell-second"><span class="icon-medallion">${icon('clock')}</span><span><small>Última actualización</small>${AppViews.date(data.updatedAt)}</span></div><p class="connection-note">${explanation}</p></div>
+  if (['loading','error'].includes(data.status)) return heading + AppViews.state(status, explanation, data.status === 'loading', data.status === 'error');
+  const empty = reading => reading.value == null && reading.quality === 'missing';
+  const note = reading => empty(reading) ? '' : `<p class="reading-note">${AppViews.readingNote(reading)}</p>`;
+  const quality = reading => reading.quality === 'invalid' ? 'Lectura inválida' : 'Lectura registrada';
+  const tank = {low:['Nivel bajo','Revisa el depósito antes de continuar con el riego.'], 'not-low':['Nivel bajo no detectado','El flotador no detecta nivel bajo. No mide el volumen de agua.']}[data.tank.state];
+  const hasMeasurements = data.plants.some(plant => !empty(plant.reading)) || !empty(data.temperature) || !empty(data.humidity) || data.tank.state !== 'unknown';
+  return `${heading}<div class="connection-strip"><div class="telemetry-cell"><span><small>Estado del huerto</small>${status}</span></div><div class="telemetry-cell telemetry-cell-second"><span><small>Última actualización</small>${data.updatedAt ? AppViews.date(data.updatedAt) : '—'}</span></div>${data.status !== 'unassigned' && (hasMeasurements || data.status === 'waiting') ? `<p class="connection-note">${explanation}</p>` : ''}</div>
+    ${data.status === 'unassigned' ? AppViews.gardenLink() : ''}
     <section aria-labelledby="plants-title"><div class="panel-heading"><h2 id="plants-title">Tus tres plantas</h2><p>Humedad del sustrato por planta</p></div><div class="plant-grid">
-      ${data.plants.map(plant=>`<article class="plant-card"><div class="card-top">${badge(quality(plant.reading))}</div><div class="plant-name"><div><h3>${authEscape(plant.name)}</h3><p>Chile habanero</p></div><div class="plant-pedestal">${plantDrawing(plant.id)}</div></div><div class="plant-reading"><span>${icon('drop')}Humedad del sustrato</span>${AppViews.reading(plant.reading,'%')}<div class="sensor-track" aria-hidden="true">${plant.reading.value == null ? '' : `<span style="width:${plant.reading.value}%"></span>`}</div></div><p class="reading-note">${AppViews.readingNote(plant.reading)}</p></article>`).join('')}
+      ${data.plants.map(plant=>`<article class="plant-card">${empty(plant.reading) ? '' : `<div class="card-top">${badge(quality(plant.reading))}</div>`}<div class="plant-name"><div><h3>${authEscape(plant.name)}</h3><p>Chile habanero</p></div><div class="plant-pedestal">${plantDrawing(plant.id)}</div></div><div class="plant-reading"><span>${icon('drop')}Humedad del sustrato</span>${AppViews.reading(plant.reading,'%')}<div class="sensor-track" aria-hidden="true">${plant.reading.value == null ? '' : `<span style="width:${plant.reading.value}%"></span>`}</div></div>${note(plant.reading)}</article>`).join('')}
     </div></section>
     <section aria-labelledby="ambient-title"><div class="panel-heading"><h2 id="ambient-title">Ambiente del huerto</h2><p>Condiciones compartidas por las tres plantas</p></div><div class="metrics-grid">
-      ${[['temp','Temperatura ambiental',data.temperature,'°C'],['drop','Humedad ambiental',data.humidity,'%']].map(([ico,title,reading,unit])=>`<article class="metric"><span class="metric-symbol">${icon(ico)}</span><h3>${title}</h3>${AppViews.reading(reading,unit)}<p class="reading-note">${AppViews.readingNote(reading)}</p></article>`).join('')}
+      ${[['temp','Temperatura ambiental',data.temperature,'°C'],['drop','Humedad ambiental',data.humidity,'%']].map(([ico,title,reading,unit])=>`<article class="metric"><span class="metric-symbol">${icon(ico)}</span><h3>${title}</h3>${AppViews.reading(reading,unit)}${note(reading)}</article>`).join('')}
     </div></section>
-    <section class="water-panel garden-tank" aria-labelledby="tank-title"><div class="panel-title"><span class="icon-medallion">${icon('tank')}</span><h2 id="tank-title">Depósito de agua</h2></div>${badge(tank[0])}<p>${tank[1]}</p><p class="reading-note">Última lectura: ${AppViews.date(data.tank.at)}</p></section>`;
+    <section class="water-panel garden-tank" aria-labelledby="tank-title"><div class="panel-title"><span class="icon-medallion">${icon('tank')}</span><h2 id="tank-title">Depósito de agua</h2></div>${tank ? `${badge(tank[0])}<p>${tank[1]}</p><p class="reading-note">Última lectura: ${AppViews.date(data.tank.at)}</p>` : '<strong class="tank-reading absent">—</strong>'}</section>`;
 }

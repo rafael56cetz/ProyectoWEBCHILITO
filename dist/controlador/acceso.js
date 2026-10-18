@@ -1,22 +1,27 @@
 const AuthController = (() => {
   const actions = { acceso:'login', registro:'register', verificar:'verify', recuperar:'request-reset', restablecer:'reset', cambiar:'change-password' };
   const pendingLabels = { login:'Iniciando sesión…', register:'Enviando solicitud…', verify:'Verificando…', 'request-reset':'Enviando solicitud…', reset:'Guardando contraseña…', 'change-password':'Guardando contraseña…', resend:'Solicitando reenvío…' };
-  function mount(screen, { root = document.getElementById('app'), service = AuthService, config = AuthConfig, context = {}, assets = '', embedded = false, onNavigate, onSessionConfirmed } = {}) {
+  function mount(screen, { root = document.getElementById('app'), service = AuthService, config = AuthConfig, context = {}, assets = '', embedded = false, review = false, passkeyInteraction = null, onNavigate, onSessionConfirmed } = {}) {
     const lifetime = new AbortController();
     let request = null;
     let disposed = false;
     let busy = false;
+    let passkeys = null, passkeyBusy = false;
     let serial = 0;
     let retryAt = 0;
     let resendAt = context.resendAt || 0;
     let expiresAt = context.expiresAt || 0;
     let expiredNotified = false;
+    let helpState = null, helpAnnouncementTimer;
     let resetToken = context.resetToken || '';
-    let challengeId = context.challengeId || '';
-    root.innerHTML = AuthViews.render(screen, { config, context, assets, embedded });
+    root.innerHTML = AuthViews.render(screen, { config, context, assets, embedded, review });
     const find = selector => root.querySelector(selector);
     const content = () => find('#auth-content');
-    const values = () => Object.fromEntries(Array.from(root.querySelectorAll('input[name]')).map(input => [input.name, input.value]));
+    const values = () => Object.fromEntries(Array.from(root.querySelectorAll('input[name]')).map(input => [input.name, input.type === 'checkbox' ? input.checked : input.value]));
+    const clearPasswords = () => {
+      root.querySelectorAll('input[name="password"],input[name="currentPassword"],input[name="confirmation"]').forEach(input => { input.value = ''; });
+      refreshPasswordHelp();
+    };
     const show = (text, error = false, focus = true) => {
       const box = find('#auth-feedback');
       if (!box) return;
@@ -34,11 +39,44 @@ const AuthController = (() => {
       error.textContent = message;
       error.hidden = !message;
     };
+    // Announce boundary changes only; the visible counter still updates per input.
+    function refreshPasswordHelp(announce = false) {
+      if (disposed || !find('#password-counter')) return;
+      const progress = AuthModel.passwordProgress(find('#password').value, find('#confirmation')?.value || '', config);
+      AuthViews.updatePasswordHelp(root, progress);
+      const next = {range:progress.range, confirmation:progress.confirmation};
+      const live = find('#password-help-status');
+      const messages = [];
+      if (announce && helpState) {
+        if (next.range !== helpState.range) {
+          if (next.range === 'within-range') messages.push('Mínimo alcanzado.');
+          else if (next.range === 'over-maximum') messages.push(`Supera el máximo de ${progress.maxLength} caracteres.`);
+          else if (progress.length > 0 && next.range === 'below-minimum') messages.push('Todavía faltan caracteres para el mínimo.');
+        }
+        if (next.confirmation !== helpState.confirmation && next.confirmation !== 'empty')
+          messages.push(next.confirmation === 'matches' ? 'Las contraseñas coinciden.' : 'Las contraseñas todavía no coinciden.');
+      }
+      helpState = next;
+      if (messages.length && live) {
+        clearTimeout(helpAnnouncementTimer);
+        live.textContent = '';
+        helpAnnouncementTimer = setTimeout(() => {
+          if (!disposed && live.isConnected) live.textContent = messages.join(' ');
+        }, 400);
+      } else if (!announce && live) {
+        clearTimeout(helpAnnouncementTimer);
+        live.textContent = '';
+      }
+    }
     function validate(resend = false) {
       const data = values();
+      if (!data.email && context.email) {
+        data.email = context.email;
+      }
       if (data.email !== undefined) {
         data.email = data.email.trim();
-        find('#email').value = data.email;
+        const emailField = find('#email');
+        if (emailField) emailField.value = data.email;
       }
       const errors = AuthModel.validate(resend ? 'recuperar' : screen, data, config);
       const email = find('#email');
@@ -62,7 +100,7 @@ const AuthController = (() => {
       const resend = AuthModel.secondsLeft(resendAt);
       const submit = find('[type="submit"]');
       const resendButton = find('[data-auth-action="resend"]');
-      if (submit) submit.disabled = busy || retry > 0 || (screen === 'verificar' && expiresAt > 0 && Date.now() >= expiresAt);
+      if (submit) submit.disabled = busy || passkeyBusy || retry > 0 || (screen === 'verificar' && expiresAt > 0 && Date.now() >= expiresAt);
       if (resendButton) resendButton.disabled = busy || retry > 0 || resend > 0;
       const wait = find('#auth-wait');
       if (wait) {
@@ -83,13 +121,17 @@ const AuthController = (() => {
     }
     function setBusy(value, action) {
       busy = value;
+      passkeys?.setBlocked(value);
       if (!value) {
         const feedback = find('#auth-feedback');
         if (feedback) { feedback.hidden = true; feedback.textContent = ''; feedback.classList.remove('sr-only'); }
       }
       const form = find('form');
       form?.setAttribute('data-busy', String(value));
-      root.querySelectorAll('input').forEach(input => { input.readOnly = value; });
+      root.querySelectorAll('input').forEach(input => {
+        if (input.type === 'checkbox') input.disabled = value;
+        else input.readOnly = value;
+      });
       const submit = find('[type="submit"]');
       if (submit) {
         submit.setAttribute('aria-busy', String(value && action !== 'resend'));
@@ -117,6 +159,7 @@ const AuthController = (() => {
       if (action === 'inspect-reset') {
         if (status === 'reset-valid') {
           content().innerHTML = AuthViews.form(screen, config, context);
+          refreshPasswordHelp();
           find('#password')?.focus();
         } else if (status === 'invalid-link' || status === 'expired-link') {
           resetToken = '';
@@ -130,16 +173,38 @@ const AuthController = (() => {
       if (status === 'limited') {
         retryAt = AuthModel.deadline(response.retryAfterSeconds);
         show('Has realizado demasiados intentos. Espera un momento antes de volver a intentarlo.', true);
+      } else if (status === 'csrf-failed') {
+        show('La sesión del formulario ha cambiado. Recarga la página e inténtalo de nuevo.', true);
+      } else if (status === 'unauthenticated') {
+        result('Inicia sesión de nuevo', 'Tu sesión ya no está disponible.', 'Iniciar sesión', '#acceso');
+      } else if (status === 'verification-expired') {
+        result('Vuelve a iniciar sesión', 'La verificación ha vencido o ya no está disponible. Inicia sesión para solicitar un nuevo código.', 'Iniciar sesión', '#acceso');
+      } else if (action === 'login' && status === 'verification-required') {
+        onNavigate?.('verificar', {email:response.email,expiresAt:AuthModel.expiry(response.expiresAt)});
       } else if (action === 'login' && status === 'invalid-credentials') {
         show('El correo o la contraseña no son correctos. Revisa tus datos e inténtalo de nuevo.', true);
+      } else if (action === 'register' && status === 'registration-disabled') {
+        show('El registro no está disponible en este momento.', true);
+      } else if (action === 'register' && status === 'email-not-authorized') {
+        setError('email', 'Este correo no está autorizado para la prueba local. Revisa que coincida con la dirección que indicaste.');
+        find('#email').focus();
+      } else if (action === 'register' && status === 'mail-unavailable') {
+        show('No fue posible completar el envío a este correo. Inténtalo más tarde o inicia sesión para solicitar otro código.', true);
+      } else if (action === 'register' && status === 'invalid-registration') {
+        setError('email', 'Revisa el correo y los datos del registro.');
+        find('#email').focus();
+      } else if (action === 'register' && ['terms-required','legal-version-changed'].includes(status)) {
+        find('#termsAccepted').checked = false;
+        setError('termsAccepted', status === 'terms-required' ? 'Debes aceptar los Términos y condiciones para continuar' : 'Los términos han cambiado. Consulta el documento y vuelve a marcar la casilla para continuar.');
+        find('#termsAccepted').focus();
       } else if (['register', 'request-reset'].includes(action) && status === 'accepted') {
         if (action === 'request-reset') {
           result('Revisa tu correo', 'Si existe una cuenta asociada a ese correo, recibirás instrucciones para recuperar el acceso.');
+
         } else {
           // Same public outcome for both new and existing addresses; only the server knows which applies.
           const next = {
             email: find('#email').value.trim(),
-            challengeId: typeof response.challengeId === 'string' ? response.challengeId : '',
             expiresAt: AuthModel.expiry(response.expiresAt) || AuthModel.deadline(config.code.expiresAfterSeconds),
             resendAt: AuthModel.deadline(response.resendAfterSeconds ?? config.code.resendAfterSeconds)
           };
@@ -149,7 +214,9 @@ const AuthController = (() => {
       } else if (action === 'verify' && status === 'verified') {
         find('form').reset();
         result('Correo verificado', 'La verificación de tu correo se completó.');
-        if (response.sessionConfirmed === true && onSessionConfirmed) onSessionConfirmed(response);
+        if (response.sessionConfirmed === true && onSessionConfirmed) {
+          result('Correo verificado', 'Tu correo está verificado. Puedes continuar a tu cuenta.', 'Mi huerto', '#huerto');
+        }
       } else if (action === 'verify' && status === 'incorrect-code') {
         setError('code', 'El código no es correcto. Revísalo e inténtalo de nuevo.');
         show('No pudimos verificar ese código.', true, false);
@@ -158,9 +225,8 @@ const AuthController = (() => {
         expiresAt = Date.now();
         expiredNotified = false;
       } else if (action === 'resend' && status === 'accepted') {
-        if (typeof response.challengeId === 'string') challengeId = response.challengeId;
         resendAt = AuthModel.deadline(response.resendAfterSeconds ?? config.code.resendAfterSeconds);
-        expiresAt = AuthModel.expiry(response.expiresAt) || AuthModel.deadline(config.code.expiresAfterSeconds);
+        expiresAt = AuthModel.expiry(response.expiresAt) || expiresAt;
         expiredNotified = false;
         setError('code');
         find('#code').value = '';
@@ -191,15 +257,19 @@ const AuthController = (() => {
       tick();
     }
     async function send(action) {
-      if (busy || AuthModel.secondsLeft(retryAt) || (action === 'resend' && AuthModel.secondsLeft(resendAt))) return;
+      if (busy || passkeyBusy || AuthModel.secondsLeft(retryAt) || (action === 'resend' && AuthModel.secondsLeft(resendAt))) return;
       let payload = action === 'inspect-reset' ? { token: resetToken } : validate(action === 'resend');
       if (!payload) return;
+      if (action === 'register' && config.registrationAllowed !== true) {
+        clearPasswords();
+        apply({status:'registration-disabled'}, action);
+        return;
+      }
       if (action === 'verify' && expiresAt && Date.now() >= expiresAt) { tick(); return; }
       // Confirmation is a client-side check only, never part of the proposed service payload.
       delete payload.confirmation;
       if (action === 'verify') payload.code = payload.code.trim();
       if (action === 'resend') payload = { email: payload.email };
-      if (action === 'verify' || action === 'resend') payload.challengeId = challengeId;
       if (action === 'reset') payload.token = resetToken;
       const id = ++serial;
       request = new AbortController();
@@ -229,7 +299,7 @@ const AuthController = (() => {
         lifetime.signal.removeEventListener('abort', abortRequest);
         for (const key of Object.keys(payload)) payload[key] = '';
         payload = null;
-        if (!disposed) root.querySelectorAll('input[name="password"],input[name="currentPassword"],input[name="confirmation"]').forEach(input => { input.value = ''; });
+        if (!disposed) clearPasswords();
       }
     }
     root.addEventListener('submit', event => {
@@ -251,16 +321,22 @@ const AuthController = (() => {
       const action = event.target.closest('[data-auth-action]')?.dataset.authAction;
       if (action === 'resend') send('resend');
       if (action === 'check-reset') send('inspect-reset');
+
     }, { signal: lifetime.signal });
     root.addEventListener('input', event => {
       if (!event.target.matches('input[name]')) return;
       const errors = AuthModel.validate(screen, values(), config);
       if (event.target.type === 'email' && !event.target.validity.valid) errors.email = 'Escribe un correo válido, como nombre@dominio.com.';
       if (event.target.getAttribute('aria-invalid') === 'true') setError(event.target.name, errors[event.target.name]);
-      if (event.target.name === 'password' && find('#confirmation')?.hasAttribute('aria-invalid')) setError('confirmation', errors.confirmation);
+      refreshPasswordHelp(true);
+      if (event.target.name === 'password' && find('#confirmation')?.getAttribute('aria-invalid') === 'true') setError('confirmation', errors.confirmation);
       const summary = find('#access-errors');
       if (summary) summary.textContent = '';
     }, { signal: lifetime.signal });
+    root.addEventListener('change', () => refreshPasswordHelp(true), { signal: lifetime.signal });
+    root.addEventListener('focusin', () => refreshPasswordHelp(), { signal: lifetime.signal });
+    root.addEventListener('reset', () => queueMicrotask(() => refreshPasswordHelp()), { signal: lifetime.signal });
+    refreshPasswordHelp();
     const keepFieldVisible = () => {
       const input = document.activeElement;
       if (!root.contains(input) || !input.matches('input,button')) return;
@@ -268,11 +344,25 @@ const AuthController = (() => {
       if (viewport && input.getBoundingClientRect().bottom > viewport.height + viewport.offsetTop - 20) input.scrollIntoView({block:'center'});
     };
     window.visualViewport?.addEventListener('resize', keepFieldVisible);
+    if(screen === 'acceso') {
+      passkeys = SecurityController.mount('login', {
+        root:find('[data-passkey-access]'),service,config,review,interaction:passkeyInteraction,
+        onBusy(value) {
+          passkeyBusy = value;
+          if(value) clearPasswords();
+          root.querySelectorAll('#access-form input').forEach(input=>{input.readOnly=value;});
+          tick();
+        },
+        onPassword() { find('#email')?.focus(); },
+        onContinue(response) { find('#access-form')?.reset(); onSessionConfirmed?.(response); }
+      });
+    }
     const interval = setInterval(tick, 1000);
     if (screen === 'restablecer') {
       if (resetToken) send('inspect-reset');
       else apply({ status:'invalid-link' }, 'inspect-reset');
     }
+    if(context.feedback) show(context.feedback, true, false);
     tick();
     return {
       present: apply,
@@ -280,7 +370,9 @@ const AuthController = (() => {
         disposed = true;
         serial++;
         lifetime.abort();
+        passkeys?.dispose();
         clearInterval(interval);
+        clearTimeout(helpAnnouncementTimer);
         window.visualViewport?.removeEventListener('resize', keepFieldVisible);
         resetToken = '';
         root.querySelectorAll('input[type="password"],input[name="password"],input[name="currentPassword"],input[name="confirmation"],input[name="code"]').forEach(input => { input.value = ''; });

@@ -1,0 +1,981 @@
+{
+  "scope": "Etapa 0: revision y contrato, sin implementacion",
+  "date": "2026-10-17",
+  "recordedAt": "2026-10-17T22:48:57.371Z",
+  "activeRoot": "C:\\Users\\rafae\\OneDrive\\Documentos\\El-Chilito-Aplicacion-Web",
+  "requestSource": "C:\\Users\\rafae\\.codex\\attachments\\769363eb-049e-40f2-9b07-1243ae3b5d4f\\Texto pegado.txt",
+  "git": {
+    "branch": "main",
+    "head": "f5605359cdff0fb596a63cfc0c352026fb5060e2",
+    "initialStatus": [
+      " M README.md",
+      " M dist/controlador/acceso.js",
+      " M dist/controlador/aplicacion.js",
+      " M dist/controlador/navigation.js",
+      " M dist/controlador/site.js",
+      " M dist/index.html",
+      " M dist/modelo/acceso.js",
+      " M dist/modelo/servicio-acceso.js",
+      " M dist/vista/acceso.js",
+      " M dist/vista/aplicacion.js",
+      " M dist/vista/css/acceso.css",
+      " M dist/vista/css/aplicacion.css",
+      " M dist/vista/css/geist-glass.css",
+      " M dist/vista/icons.js",
+      " M dist/vista/paginas.js",
+      " M docs/INTEGRACION-BACKEND.md",
+      "?? compose.yaml",
+      "?? dist/controlador/privacidad.js",
+      "?? dist/controlador/seguridad.js",
+      "?? dist/desarrollo/",
+      "?? dist/modelo/privacidad.js",
+      "?? dist/modelo/servicio-privacidad.js",
+      "?? dist/vista/css/privacidad.css",
+      "?? dist/vista/css/seguridad.css",
+      "?? dist/vista/legales.js",
+      "?? dist/vista/privacidad.js",
+      "?? dist/vista/seguridad.js",
+      "?? docs/CIERRE-INTEGRACIONES-FRONTEND.md",
+      "?? docs/ENTREGA-ETAPA-1.md",
+      "?? docs/ENTREGA-ETAPA-2.md",
+      "?? docs/ENTREGA-ETAPA-3.md",
+      "?? docs/ORGANIZACION-Y-ENTRADA-UNICA.md",
+      "?? docs/PLAN-INTEGRACIONES-FRONTEND-ETAPA-0.md",
+      "?? infra/",
+      "?? scratch/"
+    ],
+    "fetchCheckoutResetCleanCommitPushPerformed": false
+  },
+  "baseline": {
+    "purpose": "Huellas iniciales de codigo, recursos, documentos y configuracion no secreta; no incluye archivos privados.",
+    "fileCount": 50,
+    "sha256": {
+      "dist/favicon.svg": "e958ccaf767121ebe38bacd05350da18c35b0082b995de660b8f3a0c364f786d",
+      "dist/index.html": "2a1c8c9eec384a651390ddd742708787a096c846ac7bc1bf8171135273af99d1",
+      "dist/controlador/acceso.js": "d621f70e1fe8b8779a1ddc9a7856d37d5f27047ff29e8d016ca1bb9e06fee81a",
+      "dist/controlador/aplicacion.js": "6986fb866934585cd2a4b9fca5f93638d810940788d0309d05cad7b513b37aa0",
+      "dist/controlador/navigation.js": "f619f8baf92b4edce5c8f6c54a5425e44c77bd9f9d9e22c5338cf94b647a2434",
+      "dist/controlador/privacidad.js": "71043701a1aa4e17c91e7ba6a2fe0d5955db7aaf6e635b1e5ef0f6dc72470f1d",
+      "dist/controlador/seguridad.js": "5e46e046f71c9d37cde19148aee290de28eecc6eef3c32d327643dcadb2ea60e",
+      "dist/controlador/site.js": "94031392b0cf1d86c924d901b5618d6d53bb6bd7e8354bbe09530cdcea4e5e85",
+      "dist/desarrollo/acceso.js": "a87f463905a96a84ae7c98532c93037116597097ebcfe05c5ad95260041c1b46",
+      "dist/desarrollo/aplicacion.js": "0abda341e37b4d0393c17e0005fc54ef65b904a03c3100ca0de335df62cbf14e",
+      "dist/desarrollo/comun.js": "6fb9da31092e3fda72f72a1a1eb280c04fc2c3ad168b3d576aea171935037f11",
+      "dist/desarrollo/inicio.js": "0f5f0e9f087312c7f3ebfc24a89e0bb15828f93043b5640e2f1b21424cc81c20",
+      "dist/desarrollo/privacidad.js": "0655b8bc04767652a68856985d4fdeb484ccb9b0861240a5b20535e1f518cad5",
+      "dist/desarrollo/seguridad.js": "0a16f965c91d9397b74b6825277310c7eaae95ba3eb1e8d8d3a38e75811c87a1",
+      "dist/modelo/acceso.js": "d8ab641b8454a56fe9079b9db0a38330a5e961ced8505e4408f5f3622c2a33e1",
+      "dist/modelo/aplicacion.js": "62669bf96afb748b61ffb6e857e3effbb3934004dc47619bb465b78fe1713491",
+      "dist/modelo/privacidad.js": "fb8b674d96403142b9d3baa25d045a5e70aa6b8f0ee41f69ae56cba04bded41d",
+      "dist/modelo/servicio-acceso.js": "5604d9e826d16a84207780464c3dda7e9ed9c828bd0886d0e5b0e15fd6749781",
+      "dist/modelo/servicio-aplicacion.js": "5d706acd9e471a3083b951cbd7bd7fa7a2d7d38d949aebb0107c2673a81fce26",
+      "dist/modelo/servicio-privacidad.js": "cf0353974f6dfb63df67929e2349a3ffa76c5697359b601c6b9e10094567c099",
+      "dist/vista/acceso.js": "0255ee701d11a74f03320efe0f2ed4d3b2ef8b2d5c34c3abe6d40a3d64b194d6",
+      "dist/vista/aplicacion.js": "fcf728212b497850d8da5ae214c8503a403fcc77329de904fa58b1239f8caa2b",
+      "dist/vista/icons.js": "db4c17f4e9532e4a6661d61431a21fd8c69ba5bfab673b797770c8e94543d7df",
+      "dist/vista/legales.js": "dac8b25c9f80153544767d23af6ed654cfe0a5671146b78b6300efeccc767984",
+      "dist/vista/paginas.js": "7591e4028297f9c7e763a2fa392afa3dd0058b1170dd8d5498a170d6c54a15af",
+      "dist/vista/privacidad.js": "95305d2b3293abdd717bf15388369de13df253f908d4cfaecc27d7fdd8741131",
+      "dist/vista/seguridad.js": "8d6e9902517d5b036ab3a29afba64cb5330f96dd910142ad59df035f5546bdc9",
+      "dist/vista/css/acceso.css": "a1c28d54ec4ba271721455c4acd6ca7c71ccbd0cce529afab7c059c04ceaeda4",
+      "dist/vista/css/aplicacion.css": "04f024fd1e63616c4b96bf608874a5337f2bc537c8a7d5501d755df3d4b8f8a0",
+      "dist/vista/css/geist-glass.css": "d08610db3cccee983869cafa295ad8522acdaf125ee6c608815b7e9132fa528f",
+      "dist/vista/css/privacidad.css": "38aed1601d6da81bc8a87936898b172da9a71b40973f8f7e7b72e4df42c8268f",
+      "dist/vista/css/seguridad.css": "b7cb853e1c32bded1eb7ee5bcff428de557121a260a1d78e3888079f7e80a57e",
+      "dist/vista/css/site.css": "65632d7829118c3c9cea854a4b9734888f886f6cab2cf7ef621e46206647a427",
+      "dist/vista/fonts/Geist-OFL.txt": "1781d2806a07d91c4edf4740b88449fab7d0eadad53f7c351b94cd4d4eb8c00f",
+      "dist/vista/fonts/Geist-Variable.ttf": "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659",
+      "dist/vista/img/el-chilito-convivir.jpg": "91c4f75895a830f4f13fd91007ee6f3b853f90862cbbcfb617c8c8f109958a06",
+      "dist/vista/img/habanero-editorial.png": "08a3610f5a29f8ec3ddea8ddf438e1067cc32e89cafe10c6ccd493f56c714a43",
+      "dist/vista/img/prototipo-estacion.jpg": "bd51a1da473a777557eead579cfd8b3219ad1f31c5b85204354df0e45fe13ea5",
+      "docs/CIERRE-INTEGRACIONES-FRONTEND.md": "440b46daf99b2109c032204f8fab89e11646367c34fe33c8fb0e9f3a84dd82b2",
+      "docs/ENTREGA-ETAPA-1.md": "5c9bb3bb886aaa3c193002981b015f1cc0bc742744855b8b335e93402c69d519",
+      "docs/ENTREGA-ETAPA-2.md": "b7516c65cf01fc0916e0b3e0a58448ca928529029c50aa3a46499565d8623555",
+      "docs/ENTREGA-ETAPA-3.md": "f59cee29a3500cceb72d45833511e639e14332e2ef2f043d789f850375cfb7f3",
+      "docs/INTEGRACION-BACKEND.md": "71fc3bf4796fcf756c225f3f9e6191e072bdf5fec3db92598d716ed293ed02c9",
+      "docs/ORGANIZACION-Y-ENTRADA-UNICA.md": "4be0dd05f032a1ea639d71b78bf5eb497d2cbec0d55656fe9d17990242682c1e",
+      "docs/PLAN-INTEGRACIONES-FRONTEND-ETAPA-0.md": "2630b3f745a2b633ceacfe5a39d8292174a973c8e0635169c30eb19cd87f7e9a",
+      "infra/00_preparar_postgresql_local.sql": "af2ccb2c8cd102bfa88f713ad2dd38a7e28692fa8945f315667f9927f417907c",
+      "scratch/patch-final.js": "7a3344e8c69de1fa6121326a3fef50e827d536b29b460068d341c2d7d2b93cb4",
+      "README.md": "76b275f50bcb759e271044f76e3b979d5dda19a425342135638704e4389084b4",
+      "compose.yaml": "387c9df3c341b3e44721c0b91fecf58ecffa151c9f01ee9af6534cfc6fa1f3d8",
+      ".gitignore": "6a7324dc492bd4d72f52dd5fb16a422f5c5cab89d484501b63277561db85be69"
+    }
+  },
+  "browser": {
+    "servedEntryMatches": true,
+    "indexSha256": "2a1c8c9eec384a651390ddd742708787a096c846ac7bc1bf8171135273af99d1",
+    "routes": [
+      {
+        "route": "inicio",
+        "screen": "inicio",
+        "title": "Tu huerto de habanero, dentro de casa · El Chilito",
+        "h1": "Tu huerto dehabanero,dentro de casa.",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#acceso",
+          "#terminos",
+          "#privacidad",
+          "#derechos-arco",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "el-proyecto",
+        "screen": "inicio",
+        "title": "Tu huerto de habanero, dentro de casa · El Chilito",
+        "h1": "Tu huerto dehabanero,dentro de casa.",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#acceso",
+          "#terminos",
+          "#privacidad",
+          "#derechos-arco",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "prototipo",
+        "screen": "inicio",
+        "title": "Tu huerto de habanero, dentro de casa · El Chilito",
+        "h1": "Tu huerto dehabanero,dentro de casa.",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#acceso",
+          "#terminos",
+          "#privacidad",
+          "#derechos-arco",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "como-funciona",
+        "screen": "inicio",
+        "title": "Tu huerto de habanero, dentro de casa · El Chilito",
+        "h1": "Tu huerto dehabanero,dentro de casa.",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#acceso",
+          "#terminos",
+          "#privacidad",
+          "#derechos-arco",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "acceso",
+        "screen": "acceso",
+        "title": "Inicia sesión · El Chilito",
+        "h1": "Inicia sesión",
+        "forms": [
+          {
+            "id": "access-form",
+            "fields": [
+              {
+                "name": "email",
+                "type": "email",
+                "required": true
+              },
+              {
+                "name": "password",
+                "type": "password",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "",
+            "action": null
+          },
+          {
+            "text": "Iniciar sesión",
+            "action": null
+          },
+          {
+            "text": "Acceder con huella o PIN (Llave de acceso)",
+            "action": "login"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#recuperar",
+          "#registro"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "registro",
+        "screen": "registro",
+        "title": "Crea tu cuenta · El Chilito",
+        "h1": "Crea tu cuenta",
+        "forms": [
+          {
+            "id": "access-form",
+            "fields": [
+              {
+                "name": "email",
+                "type": "email",
+                "required": true
+              },
+              {
+                "name": "password",
+                "type": "password",
+                "required": true
+              },
+              {
+                "name": "confirmation",
+                "type": "password",
+                "required": true
+              },
+              {
+                "name": "termsAccepted",
+                "type": "checkbox",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "",
+            "action": null
+          },
+          {
+            "text": "",
+            "action": null
+          },
+          {
+            "text": "Crear cuenta",
+            "action": null
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#terminos",
+          "#privacidad",
+          "#acceso"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "verificar",
+        "screen": "verificar",
+        "title": "Verifica tu correo · El Chilito",
+        "h1": "Verifica tu correo",
+        "forms": [
+          {
+            "id": "access-form",
+            "fields": [
+              {
+                "name": "email",
+                "type": "email",
+                "required": true
+              },
+              {
+                "name": "code",
+                "type": "text",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Verificar correo",
+            "action": null
+          },
+          {
+            "text": "Reenviar código",
+            "action": "resend"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#acceso"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "recuperar",
+        "screen": "recuperar",
+        "title": "Recupera el acceso · El Chilito",
+        "h1": "Recupera el acceso",
+        "forms": [
+          {
+            "id": "access-form",
+            "fields": [
+              {
+                "name": "email",
+                "type": "email",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Enviar enlace de recuperación",
+            "action": null
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#acceso"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "restablecer",
+        "screen": "restablecer",
+        "title": "Este enlace ya no está disponible · El Chilito",
+        "h1": "Este enlace ya no está disponible",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#recuperar"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "terminos",
+        "screen": "terminos",
+        "title": "Términos y condiciones · El Chilito",
+        "h1": "Términos y condiciones de uso",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#acceso",
+          "#privacidad",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#terminos",
+          "#derechos-arco",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "privacidad",
+        "screen": "privacidad",
+        "title": "Aviso de privacidad · El Chilito",
+        "h1": "Aviso de privacidad integral",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#acceso",
+          "#terminos",
+          "#derechos-arco",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#privacidad",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "derechos-arco",
+        "screen": "derechos-arco",
+        "title": "Derechos ARCO · El Chilito",
+        "h1": "Derechos ARCO",
+        "forms": [
+          {
+            "id": "",
+            "fields": [
+              {
+                "name": "requesterName",
+                "type": "text",
+                "required": true
+              },
+              {
+                "name": "contactEmail",
+                "type": "email",
+                "required": true
+              },
+              {
+                "name": "right",
+                "type": "select-one",
+                "required": true
+              },
+              {
+                "name": "description",
+                "type": "textarea",
+                "required": true
+              },
+              {
+                "name": "requestedCorrection",
+                "type": "textarea",
+                "required": true
+              },
+              {
+                "name": "accountRelation",
+                "type": "text",
+                "required": false
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Enviar solicitud",
+            "action": null
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#acceso",
+          "#privacidad",
+          "#terminos",
+          "#derechos-arco",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#seguridad"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "huerto",
+        "screen": "huerto",
+        "title": "Mi huerto · El Chilito",
+        "h1": "Mi huerto de habanero",
+        "forms": [],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "avisos",
+        "screen": "avisos",
+        "title": "Avisos · El Chilito",
+        "h1": "Avisos",
+        "forms": [],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          },
+          {
+            "text": "Todos",
+            "action": "all"
+          },
+          {
+            "text": "Activos",
+            "action": "active"
+          },
+          {
+            "text": "Resueltos",
+            "action": "resolved"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "avisos/no-existe",
+        "screen": "avisos",
+        "title": "Detalle del aviso · El Chilito",
+        "h1": "Aviso no disponible",
+        "forms": [],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "asistente",
+        "screen": "asistente",
+        "title": "Asistente · El Chilito",
+        "h1": "Asistente",
+        "forms": [],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "cuenta",
+        "screen": "cuenta",
+        "title": "Mi cuenta · El Chilito",
+        "h1": "Mi cuenta",
+        "forms": [],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta",
+          "#cuenta/seguridad",
+          "#cuenta/privacidad",
+          "#cuenta/contrasena"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "cuenta/contrasena",
+        "screen": "cuenta",
+        "title": "Cambiar contraseña · El Chilito",
+        "h1": "Cambiar contraseña",
+        "forms": [
+          {
+            "id": "access-form",
+            "fields": [
+              {
+                "name": "currentPassword",
+                "type": "password",
+                "required": true
+              },
+              {
+                "name": "password",
+                "type": "password",
+                "required": true
+              },
+              {
+                "name": "confirmation",
+                "type": "password",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          },
+          {
+            "text": "",
+            "action": null
+          },
+          {
+            "text": "",
+            "action": null
+          },
+          {
+            "text": "",
+            "action": null
+          },
+          {
+            "text": "Guardar contraseña",
+            "action": null
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "cuenta/privacidad",
+        "screen": "cuenta",
+        "title": "Privacidad · El Chilito",
+        "h1": "Privacidad",
+        "forms": [
+          {
+            "id": "",
+            "fields": [
+              {
+                "name": "requesterName",
+                "type": "text",
+                "required": true
+              },
+              {
+                "name": "contactEmail",
+                "type": "email",
+                "required": true
+              },
+              {
+                "name": "right",
+                "type": "select-one",
+                "required": true
+              },
+              {
+                "name": "description",
+                "type": "textarea",
+                "required": true
+              },
+              {
+                "name": "requestedCorrection",
+                "type": "textarea",
+                "required": true
+              },
+              {
+                "name": "accountRelation",
+                "type": "text",
+                "required": false
+              }
+            ]
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          },
+          {
+            "text": "Plantear una solicitud",
+            "action": "toggle-form"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta",
+          "#cuenta/seguridad",
+          "#cuenta/privacidad",
+          "#privacidad",
+          "#terminos",
+          "#derechos-arco"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "cuenta/seguridad",
+        "screen": "cuenta",
+        "title": "Seguridad · El Chilito",
+        "h1": "Seguridad",
+        "forms": [],
+        "buttons": [
+          {
+            "text": "Cerrar sesión",
+            "action": "logout"
+          },
+          {
+            "text": "Crear llave de acceso",
+            "action": "create"
+          }
+        ],
+        "links": [
+          "#contenido",
+          "#huerto",
+          "#avisos",
+          "#asistente",
+          "#cuenta",
+          "#cuenta/seguridad",
+          "#cuenta/privacidad",
+          "#cuenta/contrasena"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "seguridad",
+        "screen": "inicio",
+        "title": "Tu huerto de habanero, dentro de casa · El Chilito",
+        "h1": "Tu huerto dehabanero,dentro de casa.",
+        "forms": [],
+        "buttons": [],
+        "links": [
+          "#contenido",
+          "#inicio",
+          "#el-proyecto",
+          "#prototipo",
+          "#como-funciona",
+          "#acceso",
+          "#terminos",
+          "#privacidad",
+          "#derechos-arco",
+          "#seguridad"
+        ],
+        "overflow": false
+      }
+    ],
+    "mobile": [
+      {
+        "route": "huerto",
+        "navPosition": "fixed",
+        "nav": [
+          "Mi huerto",
+          "Avisos",
+          "Asistente",
+          "Mi cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "avisos",
+        "navPosition": "fixed",
+        "nav": [
+          "Mi huerto",
+          "Avisos",
+          "Asistente",
+          "Mi cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "asistente",
+        "navPosition": "fixed",
+        "nav": [
+          "Mi huerto",
+          "Avisos",
+          "Asistente",
+          "Mi cuenta"
+        ],
+        "overflow": false
+      },
+      {
+        "route": "cuenta",
+        "navPosition": "fixed",
+        "nav": [
+          "Mi huerto",
+          "Avisos",
+          "Asistente",
+          "Mi cuenta"
+        ],
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "requests": [],
+    "external": [],
+    "method": "Navegacion GET sin enviar formularios, sin capturas; Chromium headless 1440x960 y cuatro destinos a 390x844.",
+    "limitations": [
+      "No prueba autenticacion real",
+      "Sin lector de pantalla o telefono fisico",
+      "No se ejecuto bateria historica de mocks",
+      "No se comprobo entrega de correos o permisos HTTP de backend"
+    ]
+  },
+  "docker": {
+    "client": "29.8.2",
+    "server": "29.8.2",
+    "composeProject": "el-chilito",
+    "service": "db",
+    "container": "el-chilito-db-1",
+    "state": "running",
+    "health": "healthy",
+    "image": "postgres:17",
+    "serverVersion": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "publishedPort": "127.0.0.1:5433:5432",
+    "dataVolume": "el-chilito_pgdata",
+    "dataMount": "/var/lib/postgresql/data",
+    "secretContentsRead": false,
+    "servicesStartedStoppedRestarted": false
+  },
+  "database": {
+    "method": "psql -X -w dentro del contenedor como postgres; BEGIN READ ONLY/SHOW/SELECT catalogos/COMMIT; sin filas personales ni contrasenas",
+    "name": "el_chilito",
+    "encoding": "UTF8",
+    "owner": "el_chilito_migrador",
+    "appRole": "el_chilito_app",
+    "roles": {
+      "el_chilito_migrador": {
+        "login": true,
+        "superuser": false,
+        "createDb": false,
+        "createRole": false,
+        "replication": false,
+        "bypassRls": false
+      },
+      "el_chilito_app": {
+        "login": true,
+        "superuser": false,
+        "createDb": false,
+        "createRole": false,
+        "replication": false,
+        "bypassRls": false
+      }
+    },
+    "appPrivileges": {
+      "connect": true,
+      "databaseCreate": false,
+      "publicUsage": true,
+      "publicCreate": false
+    },
+    "publicSchemaOwner": "pg_database_owner",
+    "publicUsageForPublic": true,
+    "publicCreateForPublic": false,
+    "databasePublicAclAbsent": true,
+    "defaultPrivileges": {
+      "owner": "el_chilito_migrador",
+      "schema": "public",
+      "tables": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "sequences": [
+        "USAGE",
+        "SELECT"
+      ]
+    },
+    "nonSystemTables": [],
+    "publicRelations": [],
+    "djangoMigrationsTableExists": false,
+    "mutationsPerformed": false,
+    "windowsRolePasswordAuthenticationTested": false
+  },
+  "python": {
+    "interpreter": "C:\\Python313\\python.exe",
+    "version": "3.13.7",
+    "installedDjango": "5.2.8",
+    "installedAllauth": "65.14.3",
+    "psycopgInstalledInExaminedInterpreter": false,
+    "locationKind": "user site-packages, no entorno backend del proyecto",
+    "packagesInstalledOrChanged": false
+  },
+  "proposal": {
+    "root": "C:\\Users\\rafae\\OneDrive\\Documentos\\IOTCHILITO\\output\\propuesta-bd-2026-10-17",
+    "sha256": {
+      "00_preparar_postgresql_local.sql": "e96f3c3ced27a0a80b84b41c59b4a3fbe7892d1cdc9e786424a0674dcedfaf14",
+      "cuentas/models.py": "5d9041376ba8a6e0190cadaa28a595311b012e8b2dbd40391b093813454f7fad",
+      "huerto/models.py": "0dbf51de3df08f4341bf436214dd7a26a65a172e455ad373a7f0582affe5d882",
+      "LEEME.md": "fcb386c3d5c79f8366749fcfc4725cd869110ff0603979b93872bdb74720d173",
+      "settings_fragment.py": "4ec320ed8f5cb98a604328610b3435a979d5d3380ab5c6456cb42bbc3c377cc4"
+    },
+    "pythonAstSyntax": "3 archivos parseados sin importar/ejecutar modelos",
+    "migrationsOrPostgreSqlTestsExecuted": false,
+    "copiedIntoBackend": false,
+    "approved": false
+  },
+  "officialSources": {
+    "asvs": {
+      "version": "5.0.0",
+      "tag": "v5.0.0",
+      "commit": "3383877f732ce89a458a1af43288f2f1b1d7db0c",
+      "catalogSha256": "98c8fe911b9edb403af8ee05d3ce8201ecac2659e313b053890a62847cdcf680",
+      "total": 345,
+      "minimumLevelCounts": {
+        "L1": 70,
+        "L2": 183,
+        "L3": 92
+      },
+      "selectedPlanned": 13,
+      "pendingApplicability": 332,
+      "integratedControlsVerified": 0
+    },
+    "allauthReference": {
+      "tag": "65.14.3",
+      "commit": "d729357926074a1af64a4b881afac45db305aa16",
+      "purpose": "contrastar requisitos/OpenAPI/codigo de version instalada, no version futura aprobada"
+    },
+    "ssdf": "1.1 final SP 800-218",
+    "wstg": "4.2, seis procedimientos planificados; no ejecutados"
+  },
+  "preservationVerification": {
+    "verifiedAt": "2026-10-17T22:50:32.417897+00:00",
+    "initialFiles": 50,
+    "unchangedFiles": 49,
+    "changedOnlyExistingFile": "docs/INTEGRACION-BACKEND.md (nota documental; contenido previo conservado)",
+    "frontendReadmeComposeSqlResourcesAndScratchUnchanged": true,
+    "proposalFilesUnchanged": 5,
+    "javaScriptSyntaxOnly": {
+      "files": 25,
+      "passed": 25,
+      "note": "node --check; no pruebas funcionales backend"
+    },
+    "documentationChecks": {
+      "localLinksExist": true,
+      "jsonValid": true,
+      "asvsRows": 345,
+      "selectedIds": 13,
+      "unselectedPending": 332,
+      "citedAsvsIdsExist": true,
+      "gitDiffCheck": "sin errores de espacios"
+    },
+    "oldTestSuitesExecuted": false,
+    "screenshotsOrImagesGenerated": false,
+    "implementationStarted": false,
+    "databaseMutated": false,
+    "createdFiles": [
+      "docs/ETAPA-0-INTEGRACION-REAL-2026-10-17.md",
+      "docs/CONTRATOS-INTEGRACION-LOCAL.md",
+      "docs/REVISION-POSTGRESQL-Y-MODELOS.md",
+      "docs/SEGURIDAD-Y-VERIFICACION-LOCAL.md",
+      "docs/ASVS-5.0.0-ALCANCE-LOCAL.csv",
+      "docs/EVIDENCIA-ETAPA-0-LOCAL.json"
+    ]
+  }
+}

@@ -31,13 +31,31 @@
 .auth-flow #password-requirements{margin:-4px 0 20px}
 .auth-flow #password-requirements ul{padding-left:20px;margin:6px 0 0}
 .auth-flow .auth-permission-note{margin-top:20px}
+.auth-flow .terms-field{margin:0 0 24px;color:var(--muted);font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.auth-flow .terms-label{display:flex;align-items:flex-start;gap:12px;min-height:44px;padding-block:10px;color:var(--text);font-size:15px;line-height:1.6;cursor:pointer}
+.auth-flow .terms-label input[type=checkbox]{appearance:auto;-webkit-appearance:checkbox;flex:0 0 22px;width:22px;height:22px;min-height:22px;margin:1px 0 0;padding:0;accent-color:#264d32;border-radius:0;cursor:pointer}
+.auth-flow .terms-label input:focus-visible{outline:3px solid #264d32;outline-offset:4px}
+.auth-flow .terms-label input:disabled{cursor:wait}
+.auth-flow .terms-label:has(input:disabled){cursor:wait}
+.auth-flow .terms-required{display:block;margin-left:34px;font-size:13px}
+.auth-flow .terms-field .field-error{display:block;margin:8px 0;color:#8b291f}
+.auth-flow .terms-field .field-error[hidden]{display:none}
+.auth-flow .terms-field p{margin:12px 0 0}
+.auth-flow .terms-field a{color:#264d32;text-decoration:underline;text-underline-offset:3px}
+.auth-flow .terms-field a:focus-visible{outline:3px solid #264d32;outline-offset:3px}
+.auth-flow .registration-note{padding:12px 14px;border-radius:12px;background:#edf3ee;color:#4a5d4e}
+@media(forced-colors:active){
+  .auth-flow .terms-field,.auth-flow .terms-label,.auth-flow .terms-field .field-error,.auth-flow .registration-note{color:CanvasText;background:Canvas}
+  .auth-flow .terms-field a{color:LinkText}
+  .auth-flow .terms-field :focus-visible{outline-color:Highlight!important}
+}
 .auth-flow .auth-resend{margin-top:12px}
 .auth-flow .auth-feedback{
   margin:0 0 20px;padding:16px;border-radius:16px;border:1px solid #91aa98;
   background:#edf5ef;color:#264d32;line-height:1.6;font-size:15px;overflow-wrap:anywhere;
 }
 .auth-flow .auth-feedback.is-error{color:#8b291f;background:#fff3f0;border-color:#c59288}
-.auth-flow .auth-feedback:focus,.auth-flow .auth-result:focus{outline:2px solid #264d32!important;outline-offset:5px}
+.auth-flow .auth-feedback:focus,.auth-flow .auth-result:focus{outline:none!important}
 .auth-flow #auth-wait{margin:-4px 0 16px}
 .auth-flow .verification-code{font-variant-numeric:tabular-nums;letter-spacing:.16em}
 .auth-flow .auth-result-icon{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:16px;color:#264d32;background:#e8f1e9;box-shadow:inset 0 1.5px 0 #fff;margin-bottom:20px}
@@ -65,7 +83,27 @@
   .auth-flow .auth-bento{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 .solid-material .auth-flow .auth-bento{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+@media(prefers-reduced-motion:reduce){
+  .auth-flow .button,.auth-flow .button:hover,.auth-flow .button:active{transition:none!important;animation:none!important;transform:none!important}
+}
 @media(forced-colors:active){
   .auth-flow .auth-bento,.auth-flow .auth-feedback{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none;backdrop-filter:none}
   .auth-flow .field input:focus-visible,.auth-flow .password-input-group:focus-within,.auth-flow button.password-eye-btn.no-glass:focus-visible{outline-color:Highlight!important}
 }
+
+/* Password guidance shares the server policy and existing access palette. */
+.auth-flow .password-guidance{margin-top:10px}
+.auth-flow .password-counter{font-size:14px;line-height:1.6;color:var(--muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.auth-flow .password-counter.is-error{color:#8b291f}
+.auth-flow .password-check{display:flex;align-items:flex-start;gap:7px;margin-top:6px;color:var(--muted);font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.auth-flow .password-check[hidden]{display:none}
+.auth-flow .password-check .icon{width:17px;height:17px;flex:none;margin-top:3px}
+.auth-flow .password-check.is-met{color:var(--sage)}
+.auth-flow .field #password-requirements{margin:8px 0 0}
+.auth-flow .field #password-requirements p{margin-top:6px}
+@media(forced-colors:active){
+  .auth-flow .password-counter,.auth-flow .password-counter.is-error,.auth-flow .password-check,.auth-flow .password-check.is-met{color:CanvasText}
+}
+
+.auth-flow .password-check [data-password-check-icon]{display:flex;align-items:center;justify-content:center;flex:0 0 18px;width:18px;height:18px;margin-top:2px;border:1px solid currentColor;border-radius:50%}
+.auth-flow .password-check [data-password-check-icon] .icon{width:14px;height:14px;margin:0}

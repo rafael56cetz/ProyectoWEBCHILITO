@@ -26,7 +26,7 @@
     window.addEventListener('scroll', updateAppearance, { passive: true });
     const keepFocusVisible = event => {
       const target = event.target;
-      if (!(target instanceof HTMLElement) || header.contains(target) || target.matches('.skip-link,[tabindex="-1"]')) return;
+      if (!(target instanceof HTMLElement) || header.contains(target) || target.closest('.account-tabs') || target.matches('.skip-link,[tabindex="-1"]')) return;
       const bounds = target.getBoundingClientRect();
       if (bounds.top < header.getBoundingClientRect().bottom + 12) target.scrollIntoView({ block: 'start' });
     };

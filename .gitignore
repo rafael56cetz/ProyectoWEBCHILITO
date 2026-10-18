@@ -26,3 +26,11 @@ node_modules/
 /revision/
 /referencia/
 /output/
+
+# Private backups, scratch work and local test output
+/scratch/
+*.dump
+*.backup
+*.pgpass
+coverage.xml
+htmlcov/
