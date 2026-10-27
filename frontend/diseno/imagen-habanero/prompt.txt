@@ -1,0 +1,11 @@
+Use case: photorealistic-natural.
+Asset type: finished high-quality wide photographic background for the El Chilito website hero and login panel.
+Input image: the attached screenshot is a COMPOSITION AND SUBJECT REFERENCE ONLY. Recreate the underlying pepper photograph, not the webpage. Remove ALL writing, headings, buttons, navigation, lines, borders and scrollbar. The output must be a completely clean photograph with absolutely no lettering or UI.
+
+Recreate this specific composition as closely as possible: a close-up living habanero plant with a large ripe orange Capsicum chinense fruit hanging by its curved green stem in the lower-right quadrant, around 79% across and 72% down. This main fruit has a glossy naturally wrinkled, lobed lantern shape, warm amber-orange highlights on its left side, deeper orange shaded right side and a subtly pointed lower end. Keep the entire main fruit inside the photo. Large deep-green leaves with clear veins frame it above and to its left, with branching stems crossing the upper-right region. A second ripe orange habanero is partially cropped at the far upper-right edge, as in the reference.
+
+The LEFT 55–60% must remain very soft, out-of-focus dark olive/forest-green negative space for white website copy. Preserve the reference's soft warm green bokeh glow in the upper left and its darker lower left. No visible peppers, sharp branches, dominant objects, scenery or pots on the left. This is not a forest landscape or a mass of many peppers.
+
+Style: premium realistic botanical editorial photography, shallow depth of field, soft natural filtered daylight, detailed waxy leaf texture and natural fruit skin, rich but restrained dark greens, lifelike orange rather than neon. Match the reference's moody close-up and lighting. The photograph itself should have a naturally quiet dark left side, with the sharp pepper and leaves primarily on the right.
+Composition: very wide landscape approximately 2.3:1, high resolution, ideally around 3072 by 1344 or the best supported landscape resolution. Make a polished production-ready image, not a screenshot, mockup, illustration or collage.
+Constraints: no text of any kind, no logo, no watermark, no frame, no interface, no people, no hands, no pot, no excessive fruit cluster.

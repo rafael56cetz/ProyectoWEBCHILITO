@@ -1,4 +1,6 @@
 # El Chilito · Aplicación web
+
+**Frontend actualizado · 26 de octubre de 2026:** el diseño integrado actual está en [`frontend/`](frontend/README.md), con sus imágenes, paneles de usuario y administrador y navegación adaptable. Es una entrega de frontend independiente. `dist/`, `backend/` y las instrucciones de la aplicación original se conservan. Consultar el README de `frontend/` para abrir el diseño.
 Entrega local integrada: 18 de octubre de 2026. Django/Python, PostgreSQL 17 en Docker y frontend MVC existente. Un solo origen: http://127.0.0.1:8766/index.html.
 
 ## Instalar y abrir

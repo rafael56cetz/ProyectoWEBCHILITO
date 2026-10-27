@@ -1,0 +1,17 @@
+{
+  "fecha": "2026-10-26",
+  "metodo": "image_gen integrado de Codex",
+  "referencia": "referencia-captura.png",
+  "prompt": "prompt.txt",
+  "original": "../../vista/img/habanero-fondo-original.png",
+  "web": "../../vista/img/habanero-fondo.webp",
+  "dimensiones": [
+    1896,
+    830
+  ],
+  "original_sha256": "704c816d48b0c66e770dc68013d4aaed1ecec648cd0bf33e30f8f29a65cb2ca6",
+  "web_sha256": "cd7b90e5177a1c91be6392a1ba29f6efb4b9e8440e598185ae375f0a7b4fe2c2",
+  "original_bytes": 1805799,
+  "web_bytes": 159362,
+  "nota": "Imagen generada a partir de la composición de la captura del propietario; sin texto, botones ni interfaz. WebP mantiene la resolución, sin recorte; PNG conserva el resultado original."
+}
