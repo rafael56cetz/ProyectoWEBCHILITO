@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-27",
+  "final_status": "passed",
+  "rounds": [
+    {
+      "suite_total": 98,
+      "result": "failed",
+      "failures": 2,
+      "errors": 1,
+      "corrections": [
+        "Tipo de contenido incorrecto consumido por CSRF: rechazar antes de leer body,400 controlado.",
+        "Recuperación exitosa de allauth devuelve401 no autenticado; comprobar hash y no autologin.",
+        "Reloj de prueba de permiso debía aislarse del reloj de sesiones Django."
+      ]
+    },
+    {
+      "suite_total": 101,
+      "result": "passed"
+    },
+    {
+      "suite_total": 105,
+      "result": "passed",
+      "additional_regressions": [
+        "Replay tras revocar membresía",
+        "Paginación antes de serializar",
+        "Logout con cuenta inactiva/no verificada",
+        "JSON profundo/tamaño excesivo"
+      ]
+    },
+    {
+      "suite_total": 110,
+      "result": "passed",
+      "additional_regressions": [
+        "Cinco pruebas de configuración SMTP sin red y destinatarios válidos de registro público"
+      ]
+    },
+    {
+      "suite_total": 114,
+      "result": "passed",
+      "additional_regressions": [
+        "Cuatro pruebas de resolución del puerto local tras reiniciar el contenedor"
+      ]
+    }
+  ],
+  "additional_fixes": [
+    "SELECT de solo lectura de django_migrations para arranque local con runtime, sin DDL",
+    "Cuotas de negocio serializadas con advisory lock PostgreSQL",
+    "Recibos idempotentes reautorizan recursos",
+    "Perfildeployment rechaza sslmode degradado",
+    "Identificadores/enums/Unicode y resetkey en memoria, no URLAPI",
+    "Auditoría traducida en interfaz sin alterar códigospersistidos",
+    "Arranque y herramienta de operador consultan el puerto actual del contenedor propio en loopback y esperan disponibilidad PostgreSQL; base y credenciales conservadas."
+  ]
+}

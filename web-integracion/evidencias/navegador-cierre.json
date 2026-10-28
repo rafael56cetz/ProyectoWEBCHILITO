@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-27",
+  "status": "partial-browser-test",
+  "origin": "http://127.0.0.1:8781",
+  "smtp_real_sent": false,
+  "synthetic_environment_only": true,
+  "checks": [
+    "Cuenta sintética preparada por operador solo para soporte; no registro de navegador.",
+    "Permiso emitido por interfaz con consentimiento sobre recurso ficticio.",
+    "Recarga conservó caso/permiso y no recuperó token original.",
+    "Administrador vio el mismo caso y abrió sesión con token exacto de 43 caracteres.",
+    "Diagnóstico devuelve ausencia de hardware, sin lecturas fabricadas.",
+    "Cierre técnico bloqueó de nuevo la interfaz.",
+    "Nueva apertura y logout regresaron al acceso."
+  ],
+  "pending": [
+    "Registro/verificación/reenvío/recuperación reales",
+    "Revocación y caducidad en navegador",
+    "Permisos por recurso modificando IDs desde navegador"
+  ],
+  "user_steering": "Propietario rechazó crear la cuenta de registro ficticia; no se creó. Se detuvo el servidor efímero sin afectar instancia del puerto 8780.",
+  "screenshots": [
+    "cierre-soporte-recargado.jpg",
+    "cierre-consola-bloqueada.jpg"
+  ]
+}

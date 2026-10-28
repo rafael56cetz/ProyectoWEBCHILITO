@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-27",
+  "status": "passed",
+  "version": "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "django_check": "System check identified no issues (0 silenced).",
+  "migrations": "No changes detected",
+  "suite": "s_still_enforced (tests.test_smtp_config.SMTPConfigurationTests.test_restricted_mode_is_still_enforced) ... ok\n\n----------------------------------------------------------------------\nRan 114 tests in 56.387s\n\nOK\nPreserving test database for alias 'default' ('test_chilito_integracion_sinteticos')...\n",
+  "runtime": "HTTP runtime: cuenta, registro/verificación en memoria, huerto, mantenimiento, solicitud pending, soporte y consola aprobados; DDL/TRUNCATE/auditoría/membresía denegados.",
+  "smtp_sent": false,
+  "real_databases_used": false,
+  "browser_verified": "partial; navegador-cierre.json",
+  "suite_total": 114,
+  "data_regression_tests": 51,
+  "http_auth_tests": 25,
+  "http_data_admin_tests": 29,
+  "smtp_configuration_without_network_tests": 5,
+  "local_startup_without_docker_tests": 4,
+  "smtp_received_confirmed": false,
+  "final_design_comparison": "pending-input",
+  "publication": "not-pushed",
+  "publication_phase": "snapshot-before-commit-and-push",
+  "publication_note": "Instantánea de comprobaciones previa a la publicación solicitada por el propietario; consultar el commit y la rama para identificar el código compartido."
+}

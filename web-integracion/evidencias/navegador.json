@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-27",
+  "tool": "cua_repl, navegador integrado",
+  "origin": "http://127.0.0.1:8780",
+  "synthetic_accounts_only": true,
+  "checks": [
+    "Portada e imagen servidas con mismo origen; acceso real de usuario con sesión.",
+    "Huerto con tres plantas, cultivo y lecturas ausentes sin ceros fabricados.",
+    "Registro de recarga desde botón; recarga de página e historial persistido recuperado.",
+    "Solicitud de apagado registrada como sin confirmación, sin ejecución física.",
+    "Logout desde diálogo y regreso a acceso.",
+    "Login de administrador con capacidades del servidor; navegación flota, gobernanza, soporte y cambios.",
+    "Validación de versión y solicitud de publicación desde interfaz; versión en servicio permanece ausente; solicitud persiste al recargar.",
+    "Vista móvil390x844: menú superior desplegable con logout, sin desbordamiento horizontal (ancho390, scrollWidth375).",
+    "Aplicación recargada tras reiniciar Django con correcciones; sesión restaurada y auditoría en español.",
+    "Logout al finalizar, viewport restablecido y acceso de fixtures retirado por operador conservando historia."
+  ],
+  "not_verified_in_browser": [
+    "Registro/verificación/recuperación completos (sí probados por HTTP con correo en memoria)",
+    "Ciclo completo de token/consola (sí probado por HTTP y servicios)",
+    "TLS/SMTP real/VM/hardware"
+  ],
+  "screenshots": [
+    "navegador-usuario.jpg",
+    "navegador-mantenimiento-persistido.jpg",
+    "navegador-admin-flota.jpg",
+    "navegador-admin-solicitud-persistida.jpg",
+    "navegador-menu-movil.jpg"
+  ]
+}

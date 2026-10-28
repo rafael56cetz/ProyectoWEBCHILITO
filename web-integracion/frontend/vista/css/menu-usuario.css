@@ -1,0 +1,60 @@
+/* User navigation: original desktop sidebar, top disclosure on phones. */
+.private-menu-toggle,.private-menu-footer,.private-menu-shade,.private-menu-close-icon { display:none; }
+.private-menu-toggle { display:none!important; }
+@media (max-width:768px) {
+  body[data-private=true][data-role=user] .private-layout { min-height:100svh!important;min-height:100dvh!important;box-sizing:border-box; }
+  body[data-private=true][data-role=user] .private-menu-toggle { display:inline-flex!important;align-items:center;gap:9px; }
+  body[data-private=true][data-role=user] .private-header-logout { display:none!important; }
+  .private-menu-toggle .icon { width:20px;height:20px; }
+  .private-menu-toggle>span { display:flex;align-items:center; }
+  .private-menu-toggle[aria-expanded=false] .private-menu-close-icon,.private-menu-toggle[aria-expanded=true] .private-menu-open-icon { display:none; }
+  .private-menu-toggle[aria-expanded=true] .private-menu-close-icon { display:flex; }
+  body[data-private=true][data-role=user] .sidebar {
+    display:none!important;position:fixed!important;top:calc(var(--header-height,80px) + 10px)!important;
+    bottom:auto!important;left:max(12px,env(safe-area-inset-left))!important;right:max(12px,env(safe-area-inset-right))!important;
+    width:auto!important;max-height:calc(100vh - var(--header-height,80px) - 30px - env(safe-area-inset-bottom));
+    max-height:calc(100dvh - var(--header-height,80px) - 30px - env(safe-area-inset-bottom));
+    min-height:0!important;z-index:9998!important;padding:14px!important;
+    border:1px solid #4d6c59!important;border-radius:24px;
+    background:#173c2f!important;box-shadow:inset 0 1px rgba(255,255,255,.15),0 20px 45px -16px rgba(11,34,23,.5)!important;
+    overflow:hidden!important;flex-direction:column!important;
+  }
+  body[data-private=true][data-role=user] .sidebar[data-open=true] { display:flex!important; }
+  body[data-private=true][data-role=user] .private-nav {
+    display:flex!important;flex-direction:column!important;gap:6px!important;flex:1 1 auto;
+    min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:3px;
+  }
+  body[data-private=true][data-role=user] .private-nav .button {
+    display:flex;flex-direction:row!important;align-items:center;justify-content:flex-start!important;
+    flex:0 0 auto!important;text-align:left!important;gap:13px;padding:11px 17px!important;min-height:46px!important;
+    font-size:15px;line-height:1.45;white-space:normal!important;border-radius:999px!important;
+  }
+  body[data-private=true][data-role=user] .private-nav .button span { white-space:normal;overflow-wrap:normal; }
+  body[data-private=true][data-role=user] .private-menu-footer {
+    display:block;flex:0 0 auto;margin:11px 3px 0;padding-top:11px;border-top:1px solid rgba(219,236,222,.25);
+  }
+  body[data-private=true][data-role=user] .private-menu-logout {
+    display:flex;align-items:center;justify-content:flex-start;gap:13px;width:100%;min-height:46px;
+    padding:11px 17px!important;border-radius:999px!important;color:#f1f7f2!important;
+    border:1px solid rgba(255,255,255,.18)!important;background:rgba(255,255,255,.065)!important;
+    box-shadow:inset 0 1px rgba(255,255,255,.14)!important;font-size:15px;
+  }
+  .private-menu-logout .icon { width:20px;height:20px;flex-shrink:0; }
+  body[data-private=true][data-role=user] .private-menu-logout:hover { background:rgba(255,255,255,.13)!important; }
+  body[data-private=true][data-role=user] .private-menu-logout:focus-visible { outline:3px solid #d6e8a7!important;outline-offset:3px; }
+  body[data-private=true][data-role=user] .private-menu-shade:not([hidden]) {
+    display:block;position:fixed;inset:var(--header-height,80px) 0 0;z-index:9997;
+    background:rgba(18,37,27,.24);
+  }
+  body[data-private=true][data-role=user].private-menu-open { overflow:hidden; }
+  body[data-private=true][data-role=user] .dashboard.container { padding-bottom:32px!important; }
+}
+@media (forced-colors:active) {
+  body[data-private=true][data-role=user] .sidebar,
+  body[data-private=true][data-role=user] .private-menu-logout { background:Canvas!important;color:CanvasText!important;border-color:CanvasText!important;box-shadow:none!important; }
+  .private-menu-footer { border-color:CanvasText; }
+  .private-menu-shade { background:transparent!important; }
+}
+@media (max-width:480px) {
+  body[data-private=true][data-role=user] .notice-filters .button { flex:0 0 auto!important;min-width:0;padding-inline:14px!important;font-size:13px;white-space:nowrap!important; }
+}

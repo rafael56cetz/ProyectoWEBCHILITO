@@ -1,0 +1,2 @@
+PASS frontend adapters: server refusal, CSRF, uncertain-write idempotency, exact support token, capabilities, crop/IDs/null, Unicode password bounds and secret-free reset URLs.
+Sintaxis: 27 archivos JavaScript comprobados.
