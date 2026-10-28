@@ -42,3 +42,8 @@ Los documentos de etapas conservan resultados de su fecha. Las notas antiguas de
 Push a main, pull request o ejecución manual ejecutan instalación limpia, PostgreSQL aislado, migraciones, validación Django, pruebas servidor y sintaxis JavaScript. Correo en memoria; sin secretos de producción. No equivale a auditoría completa ni ejecuta la revisión visual en dispositivos físicos.
 
 Estado remoto al 18/10: [CI inicial aprobado](https://github.com/rafael56cetz/ProyectoWEBCHILITO/actions/runs/39150814752), con 127 pruebas del servidor y revision de sintaxis del frontend. Ver [alcance y evidencia](docs/CI-Y-PUBLICACION.md#estado-verificado-de-github-actions).
+
+
+## Aplicación web integrada — preparación de entrega
+
+La copia integrada está en [web-integracion/](web-integracion/README.md). Véase [el estado de preparación y exclusiones](docs/PREPARACION-ENTREGA-WEB.md). El cierre de diseño y correo real continúa pendiente. Esta carpeta contiene la versión de trabajo preparada para compartir en GitHub; no acredita un despliegue de la web.

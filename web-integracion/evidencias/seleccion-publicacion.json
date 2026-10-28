@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-27",
+  "source_revision": "revision-codigo-verificado.json",
+  "base_commit": "1eb74e526f847124889b578eee18a92dac4b9709",
+  "branch": "entrega/integracion-web-etapa4",
+  "status": "draft-pending-final-design-and-real-mail",
+  "excluded": [
+    "local runtime metadata",
+    "credentials",
+    "mailboxes",
+    "cookies",
+    "real databases",
+    "temporary files",
+    "original absolute-path provenance",
+    "virtual environments",
+    "caches"
+  ],
+  "copy_changes": [
+    "Portable documentation paths only; application code copied without transformations."
+  ],
+  "push_performed": false,
+  "suite_total": 114,
+  "real_mail_verified": false,
+  "new_design_received": false,
+  "publication_phase": "snapshot-before-commit-and-push",
+  "publication_note": "Instantánea de comprobaciones previa a la publicación solicitada por el propietario; consultar el commit y la rama para identificar el código compartido."
+}

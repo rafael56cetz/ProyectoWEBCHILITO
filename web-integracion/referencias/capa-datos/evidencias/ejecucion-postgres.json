@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "version": "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checks": [
+    "Upgrade SQL: synthetic identity/hash/names/notice/read preserved; missing zones supplied.",
+    "Fresh migrate and SQL upgrade have equal constraint catalogs.",
+    "Django PostgreSQL suite completed successfully; stdout in evidencias/.",
+    "Runtime service operations passed; DDL, grant tables, membership changes, audit mutation and TRUNCATE denied.",
+    "Synthetic backup/restore: constraint catalogs and record counts agree."
+  ],
+  "dump_sha256": "a40dadb2145e66229cee6ba091d40e26b39ab7d18d4ea37202cb7252cc3df0e0"
+}

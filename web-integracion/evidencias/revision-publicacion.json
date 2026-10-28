@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-27",
+  "scope": "Contenido nuevo preparado, no auditoría del historial del repositorio.",
+  "branch": "entrega/integracion-web-etapa4",
+  "code_and_assets_byte_identical_to_tested_source": 112,
+  "markdown_broken_links": 0,
+  "personal_absolute_paths_in_new_application_texts": 0,
+  "selected_screenshots_visually_reviewed": 7,
+  "personal_emails_or_full_tokens_observed_in_selected_screenshots": false,
+  "suite_total": 114,
+  "real_smtp_received": false,
+  "new_design_comparison": "pending-input",
+  "commit_performed": false,
+  "push_performed": false,
+  "limits": "La búsqueda de patrones de secretos no es una certificación de ausencia. No se revisó ni reescribió el historial previo del equipo.",
+  "publication_phase": "snapshot-before-commit-and-push",
+  "publication_note": "Instantánea de comprobaciones previa a la publicación solicitada por el propietario; consultar el commit y la rama para identificar el código compartido."
+}

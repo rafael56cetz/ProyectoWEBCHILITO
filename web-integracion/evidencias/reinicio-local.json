@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-27",
+  "status": "passed",
+  "reproduced_failure": "El contenedor propio reiniciado publicó 32770; la configuración conservaba 32768 y Django recibió connection refused.",
+  "correction": "Resolver el puerto actual del contenedor propio, exigir loopback y esperar disponibilidad PostgreSQL antes de iniciar Django; misma resolución para herramienta de operador.",
+  "http_status": 200,
+  "origin": "http://127.0.0.1:8780/index.html",
+  "database_recreated": false,
+  "credentials_changed": false,
+  "real_smtp_sent": false,
+  "limits": "Comprobación del arranque local y GET de portada; no acredita registro, correo real ni despliegue Docker de producción."
+}

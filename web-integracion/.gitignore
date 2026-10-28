@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+*.dump
+*.log
+node_modules/
+
+evidencias/entorno-local.json
+*.eml
+*.session
+*.cookies
+smtp.json
+runtime.json
+owner.json
