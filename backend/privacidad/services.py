@@ -9,6 +9,7 @@ import hmac
 import ipaddress
 import re
 import secrets
+from datetime import timedelta
 
 from allauth.account.adapter import get_adapter
 from django.conf import settings
@@ -19,7 +20,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.utils import timezone
 
-from datos.services import aceptaciones_pendientes, auditar, identity
+from datos.services import DIAS_PARA_ELIMINAR, aceptaciones_pendientes, auditar, identity
 from huerto.models import Huerto
 
 from . import politicas
@@ -230,6 +231,48 @@ def aceptar_textos(actor, documentos, request):
     auditar(usuario, 'aceptar_legales', entidad='documento_legal',
             detalle={'tipos': sorted(pendientes[identificador]['type'] for identificador in documentos)})
     return {'status': 'accepted', 'pendingLegal': aceptaciones_pendientes(usuario)}
+
+
+MAXIMO_ACEPTACIONES = 50
+
+
+def aceptaciones(actor):
+    """Documentos que la cuenta aceptó: título, versión y fecha de cada decisión."""
+    usuario = identity(actor)
+    decisiones = (Decision.objects.filter(usuario=usuario, acto__in=ACTO_POR_TIPO.values())
+                  .select_related('documento').order_by('-registrada_en')[:MAXIMO_ACEPTACIONES])
+    return {'status': 'ready', 'items': [{'type': decision.documento.tipo, 'title': decision.documento.titulo,
+                                          'version': decision.documento.version, 'at': decision.registrada_en.isoformat()}
+                                         for decision in decisiones]}
+
+
+def _plazo(momento):
+    return (momento + timedelta(days=DIAS_PARA_ELIMINAR)).isoformat()
+
+
+@transaction.atomic
+def solicitar_eliminacion(actor, password):
+    """Pide borrar la cuenta; la base la anonimiza a los 15 días. Exige la contraseña y siempre fija `now()`."""
+    usuario = get_user_model().objects.select_for_update().get(pk=identity(actor).pk)
+    if not isinstance(password, str) or not 0 < len(password) <= 256 or not usuario.check_password(password):
+        raise ValidationError('Contraseña no válida')
+    if usuario.anonimizacion_solicitada_en is None:
+        usuario.anonimizacion_solicitada_en = timezone.now()
+        usuario.save(update_fields=['anonimizacion_solicitada_en'])
+        auditar(usuario, 'solicitar_eliminacion', entidad='cuenta', entidad_id=usuario.pk)
+    return {'status': 'accepted', 'deletionRequestedAt': usuario.anonimizacion_solicitada_en.isoformat(),
+            'deletionDate': _plazo(usuario.anonimizacion_solicitada_en)}
+
+
+@transaction.atomic
+def cancelar_eliminacion(actor):
+    usuario = get_user_model().objects.select_for_update().get(pk=identity(actor).pk)
+    if usuario.anonimizacion_solicitada_en is None or usuario.anonimizada_en is not None:
+        raise ValidationError('No hay una eliminación que cancelar')
+    usuario.anonimizacion_solicitada_en = None
+    usuario.save(update_fields=['anonimizacion_solicitada_en'])
+    auditar(usuario, 'cancelar_eliminacion', entidad='cuenta', entidad_id=usuario.pk)
+    return {'status': 'accepted'}
 
 
 def _limpiar(datos):

@@ -74,11 +74,25 @@ def leer_json(request, permitidos, *, vacio=False):
     return datos
 
 
+# Índices únicos que la persona puede provocar sin querer: un caso de soporte activo por huerto y una orden igual en curso.
+UNICOS_CON_CODIGO = {'caso_uno_activo_por_huerto': ('caso-activo', 'Ya tienes una solicitud de soporte abierta.'),
+                     'comando_uno_en_curso': ('orden-en-curso', 'Ya hay una orden igual esperando la respuesta de tu equipo.')}
+
+
+def _unico_repetido(diagnostico):
+    regla = UNICOS_CON_CODIGO.get(getattr(diagnostico, 'constraint_name', None))
+    if regla is None:
+        return None
+    return JsonResponse({'status': 409, 'code': regla[0], 'message': regla[1]}, status=409)
+
+
 def respuesta_de_base(fallo):
     """409 genérico si la base rechazó una regla de datos (23514); en otro caso, None.
 
     El detalle va solo al registro del servidor: tabla, regla y el mensaje fijo de la base, sin valores."""
     diagnostico = getattr(getattr(fallo, '__cause__', None), 'diag', None)
+    if getattr(getattr(fallo, '__cause__', None), 'sqlstate', None) == '23505':
+        return _unico_repetido(diagnostico)
     if getattr(getattr(fallo, '__cause__', None), 'sqlstate', None) != REGLA_DE_DATOS:
         return None
     logger.warning('regla-de-datos tabla=%s regla=%s mensaje=%s', diagnostico.table_name,

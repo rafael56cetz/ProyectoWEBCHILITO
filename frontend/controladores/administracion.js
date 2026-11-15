@@ -221,7 +221,7 @@ const AppController = (() => {
     const lifetime = new AbortController();
     let pageLifetime = new AbortController(), loadingTimer = null;
     const {page} = view;
-    let adminPanel = null, userGarden = null, auth = null, privacy = null, security = null, gardens = null, filter = 'all', data = null, sequence = 0, busy = false;
+    let adminPanel = null, userGarden = null, auth = null, privacy = null, security = null, gardens = null, filter = 'todos', noticePage = 1, data = null, sequence = 0, busy = false;
     async function request(action, payload = {}) {
       const controller = new AbortController();
       const abort = () => controller.abort();
@@ -271,7 +271,7 @@ const AppController = (() => {
         return;
       }
       if(['telemetria','mantenimiento','soporte'].includes(route.screen)) {
-        userGarden = UserGardenController.mount(route.screen,{root:page,detail:route.detail,onData:next=>{data=next.garden;}});
+        userGarden = GardenSectionController.mount(route.screen,{root:page,route});
         return;
       }
       if(route.screen === 'cuenta' && route.detail === 'huertos') {
@@ -286,7 +286,7 @@ const AppController = (() => {
       }
       if(route.screen === 'cuenta' && route.detail === 'privacidad') {
         privacy?.dispose();
-        privacy = PrivacyController.mount({root:page});
+        privacy = PrivacyController.mount({root:page,onDeletion:refreshDeletion});
         return;
       }
       if(route.screen === 'cuenta' && route.detail === 'contrasena') {
@@ -298,12 +298,73 @@ const AppController = (() => {
       // Si la respuesta es rápida se reemplaza el contenido directamente; si tarda, se muestra el estado de carga.
       if(view.isEmpty()) draw();
       else loadingTimer = setTimeout(() => { if(id === sequence && !lifetime.signal.aborted) draw(); }, 200);
-      const response = await request(route.screen === 'avisos' && route.detail ? 'notice' : {avisos:'notices', cuenta:'profile'}[route.screen], route.detail ? {id:route.detail} : {});
+      noticePage = 1;
+      const response = await request(route.screen === 'avisos' ? (route.detail ? 'notice' : 'notices') : 'profile', route.detail ? {id:route.detail} : {filter, page:1});
       if(lifetime.signal.aborted || id !== sequence) return;
       clearTimeout(loadingTimer);
       view.pageBusy(false);
-      data = route.screen === 'avisos' ? AppModel.notices(response) : AppModel.profile(response);
+      data = route.screen === 'avisos' ? response : AppModel.profile(response);
       draw();
+      if(route.screen === 'avisos' && route.detail && data.status === 'ready' && !data.item.read) { await request('mark-read', {id:route.detail}); refreshBell(); }
+    }
+    // Contador de la campana (3.4): al cargar cada pantalla y cada 60 s en segundo plano.
+    async function refreshBell() {
+      const response = await request('counter');
+      if(!lifetime.signal.aborted && response.status === 'ready') view.bell(response.unread);
+    }
+    async function openNotice(row) {
+      const {noticeOpen: noticeId, noticeLink: link} = row.dataset;
+      busy = true;
+      await request('mark-read', {id:noticeId});
+      busy = false;
+      if(lifetime.signal.aborted) return;
+      refreshBell();
+      location.hash = link || `#avisos/${noticeId}`;
+    }
+    async function markAllRead() {
+      busy = true;
+      const response = await request('mark-all-read');
+      busy = false;
+      if(lifetime.signal.aborted) return;
+      if(response.status !== 'accepted') { mostrarAviso('error', 'No se pudieron marcar los avisos como leídos.'); return; }
+      mostrarAviso('exito', 'Avisos marcados como leídos.');
+      await load();
+      refreshBell();
+    }
+    async function loadMore() {
+      busy = true;
+      const response = await request('notices', {filter, page:noticePage + 1});
+      busy = false;
+      if(lifetime.signal.aborted) return;
+      if(!['ready', 'empty'].includes(response.status)) { mostrarAviso('error', 'No se pudieron cargar más avisos.'); return; }
+      noticePage += 1;
+      data = {...data, items:[...data.items, ...response.items], total:response.total};
+      draw();
+    }
+    async function resolveNotice() {
+      busy = true;
+      const response = await request('mark-resolved', {id:route.detail});
+      busy = false;
+      if(lifetime.signal.aborted) return;
+      if(response.status !== 'accepted') { mostrarAviso('error', 'No se pudo marcar el aviso como resuelto.'); return; }
+      data = {status:'ready', item:response.item};
+      draw();
+      mostrarAviso('exito', 'Aviso marcado como resuelto.');
+    }
+    // Aviso fijo de eliminación pendiente (4.9): sale de la sesión y se vuelve a leer tras cada cambio.
+    const showDeletion = () => view.deletion(AppModel.deletionDate(authService.session));
+    async function refreshDeletion() {
+      await authService.restore();
+      if(!lifetime.signal.aborted) showDeletion();
+    }
+    async function cancelDeletion() {
+      if(!await confirmar(AppViews.confirmaciones.cancelarEliminacion)) return;
+      const response = await request('cancel-deletion');
+      if(lifetime.signal.aborted) return;
+      if(response.status !== 'accepted') { mostrarAviso('error', 'No se pudo cancelar la eliminación. Inténtalo de nuevo.'); return; }
+      await refreshDeletion();
+      mostrarAviso('exito', 'Eliminación cancelada. Tu cuenta se conserva.');
+      if(route.screen === 'cuenta' && route.detail === 'privacidad') await load();
     }
     async function logout() {
       if(busy || !await confirmar(AppViews.confirmaciones.cerrarSesion)) return;
@@ -332,16 +393,19 @@ const AppController = (() => {
       setMenuOpen(false);
       releasePage();
       route = nextRoute;
-      filter = 'all';
+      filter = 'todos';
       view.markCurrent('#' + (route.screen==='admin'?'admin/'+route.detail:route.screen));
       load();
+      refreshBell();
     }
     root.addEventListener('click', async event => {
+      const row = event.target.closest('[data-notice-open]');
+      if(row && !busy) { event.preventDefault(); await openNotice(row); return; }
       const target = event.target.closest('[data-filter],[data-app-action]');
       if(!target || busy) return;
       if(target.dataset.filter) {
         filter = target.dataset.filter;
-        draw();
+        await load();
         view.focusFilter(filter);
         return;
       }
@@ -350,24 +414,10 @@ const AppController = (() => {
       if(action === 'close-menu') { setMenuOpen(false,true); return; }
       if(action === 'reload') { await load(); if(!lifetime.signal.aborted) view.focusMain(); return; }
       if(action === 'logout') { await logout(); return; }
-      if(action !== 'mark-read') return;
-      const id = sequence;
-      busy = true;
-      view.actionBusy(target,true);
-      const response = await request(action, action === 'mark-read' ? {id:target.dataset.id} : {});
-      if(lifetime.signal.aborted || id !== sequence) return;
-      busy = false;
-      view.actionBusy(target,false);
-      if(response.status === 'unassigned' || response.status === 'not-found') {
-        data = AppModel.notices(response);
-        draw();
-        return;
-      }
-      if(response.status !== 'accepted') { view.message('failed', true); return; }
-      // Leer un aviso nunca cambia su estado activo o resuelto.
-      data.items = data.items.map(item => item.id === response.id ? response.item : item);
-      draw();
-      view.message('read');
+      if(action === 'cancel-deletion') { await cancelDeletion(); return; }
+      if(action === 'more') { await loadMore(); return; }
+      if(action === 'mark-all-read') { await markAllRead(); return; }
+      if(action === 'mark-resolved') await resolveNotice();
     }, {signal:lifetime.signal});
     const nav = view.sidebar, toggle = view.toggle;
     const mobileScreen=matchMedia('(max-width:768px)');
@@ -406,7 +456,11 @@ const AppController = (() => {
     root.addEventListener('focusin', keepFieldVisible, {signal:lifetime.signal});
     window.visualViewport?.addEventListener('resize', keepFieldVisible);
     load();
+    showDeletion();
+    refreshBell();
+    const bellTimer = setInterval(() => { if(!document.hidden) refreshBell(); }, 60000);
     return {update, dispose() {
+      clearInterval(bellTimer);
       setMenuOpen(false);
       view.sidebarHidden(false);
       releasePage();

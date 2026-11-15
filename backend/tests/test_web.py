@@ -15,8 +15,7 @@ from datos.models import Auditoria, ConsultaProducto, GuiaCuidado
 from tests import aceptar_vigentes, cuenta, publicar_textos
 from web.middleware import ActorDeBase
 
-ENDPOINTS_ACTUALIZACION = ['/api/huertos/actual/avisos', '/api/huertos/actual/mantenimiento', '/api/soporte',
-                           '/api/admin/vinculacion', '/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
+ENDPOINTS_ACTUALIZACION = ['/api/admin/vinculacion', '/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
 
 
 class BaseWeb(TestCase):
@@ -96,7 +95,7 @@ class PantallasEnActualizacion(BaseWeb):
                 self.assertEqual(respuesta.json(), {'status': 'error', 'code': 'en-actualizacion'})
 
     def test_tambien_las_escrituras(self):
-        respuesta = self.post('/api/huertos/actual/mantenimiento', {'type': 'refill'})
+        respuesta = self.post('/api/admin/mantenimientos', {'type': 'refill'})
         self.assertEqual((respuesta.status_code, respuesta.json()['code']), (503, 'en-actualizacion'))
 
 

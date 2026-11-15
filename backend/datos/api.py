@@ -1,4 +1,4 @@
-"""Legales, órdenes y vinculación del equipo."""
+"""Legales, órdenes, soporte, avisos y vinculación del equipo."""
 import logging
 
 from allauth.core import ratelimit
@@ -9,9 +9,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 
+from datos import services as datos
 from huerto import services as huerto
 from privacidad import services as privacidad
-from web.api import endpoint
+from web.api import bounds, endpoint
 from web.respuestas import EntradaInvalida, error, leer_json, respuesta_de_base
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,63 @@ def accept_legal(request, data):
 @endpoint()
 def command_state(request, data, comando_id):
     return huerto.estado_comando(request.user, comando_id)
+
+
+@endpoint(('GET', 'POST'), ('incident', 'note', 'diagnostic', 'consent'))
+def support(request, data, huerto_id):
+    if request.method == 'POST':
+        return datos.abrir_caso(request.user, huerto_id, data.get('incident'), data.get('note'), data.get('diagnostic'), data.get('consent'))
+    bounds(request, allowed=())
+    return datos.soporte(request.user, huerto_id)
+
+
+@endpoint(('POST',))
+def support_revoke(request, data, caso_id):
+    return datos.revocar_caso(request.user, caso_id)
+
+
+@endpoint(('POST',))
+def support_cancel(request, data, caso_id):
+    return datos.cancelar_caso(request.user, caso_id)
+
+
+@endpoint()
+def diagnostic(request, data, diagnostico_id):
+    bounds(request, allowed=())
+    return datos.autodiagnostico(request.user, diagnostico_id)
+
+
+@endpoint()
+def notices(request, data):
+    pagina = bounds(request, allowed=('filtro', 'page'))
+    return datos.avisos(request.user, request.GET.get('filtro', 'todos'), pagina)
+
+
+@endpoint()
+def notice(request, data, aviso_id):
+    bounds(request, allowed=())
+    return datos.aviso(request.user, aviso_id)
+
+
+@endpoint(('POST',))
+def notice_read(request, data, aviso_id):
+    return datos.marcar_leido(request.user, aviso_id)
+
+
+@endpoint(('POST',))
+def notice_resolved(request, data, aviso_id):
+    return datos.marcar_resuelto(request.user, aviso_id)
+
+
+@endpoint(('POST',))
+def notices_read_all(request, data):
+    return datos.leer_todos(request.user)
+
+
+@endpoint()
+def notice_count(request, data):
+    bounds(request, allowed=())
+    return datos.contador_avisos(request.user)
 
 
 @csrf_exempt

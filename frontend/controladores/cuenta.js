@@ -1,5 +1,5 @@
 // CONTROLADOR · Cuenta: acceso, segundo factor, perfil y privacidad personal.
-// Define: AuthController, SecondStepController, MfaController, ProfileController, WelcomeController, MyPrivacyController, PrivacyController, WebAuthnBrowser, LegalAcceptController.
+// Define: AuthController, SecondStepController, MfaController, ProfileController, WelcomeController, MyPrivacyController, PrivacyController, WebAuthnBrowser, LegalAcceptController, AccountDataController.
 
 // ── Mfa ──
 // allauth decide; aquí solo se pide lo que falta y se muestra el resultado.
@@ -246,9 +246,11 @@ const MyPrivacyController = (() => {
 })();
 
 const PrivacyController = (() => {
-  function mount({root}) {
-    const mine = MyPrivacyController.mount(PrivacyViews.mount(root));
-    return {dispose() { mine.dispose(); }};
+  function mount({root, onDeletion}) {
+    const host = PrivacyViews.mount(root);
+    const mine = MyPrivacyController.mount(host);
+    const account = AccountDataController.mount(root.querySelector('[data-account-data]'), {onDeletion});
+    return {dispose() { mine.dispose(); account.dispose(); }};
   }
   return {mount};
 })();
@@ -581,6 +583,57 @@ const LegalAcceptController = (() => {
     });
     view.logout.addEventListener('click', onLogout);
     return {dispose() { alive = false; }};
+  }
+  return {mount};
+})();
+
+// ── Eliminacion ──
+// Pedir o cancelar el borrado de la cuenta. El servidor guarda la fecha y lo confirma; aquí nunca se supone un éxito.
+const AccountDataController = (() => {
+  function mount(host, {onDeletion = async () => {}} = {}) {
+    const view = AccountDataViews.mount(host);
+    let alive = true, working = false;
+    const showDeletion = () => view.deletion(AppModel.deletionDate(AuthService.session));
+    async function request() {
+      const password = view.password();
+      if(working || !password) return;
+      working = true;
+      view.busy(true);
+      const result = await PrivacyData.requestDeletion(password);
+      working = false;
+      if(!alive) return;
+      view.busy(false);
+      if(result.status !== 'accepted') { view.fail(result.status); return; }
+      view.closeDialog();
+      await onDeletion();
+      if(!alive) return;
+      showDeletion();
+      mostrarAviso('exito', 'Pedimos eliminar tu cuenta. Puedes cancelarlo antes de la fecha indicada.');
+    }
+    async function cancel() {
+      if(working || !await confirmar(AppViews.confirmaciones.cancelarEliminacion)) return;
+      working = true;
+      const result = await PrivacyData.cancelDeletion();
+      working = false;
+      if(!alive) return;
+      if(result.status !== 'accepted') { mostrarAviso('error', 'No se pudo cancelar la eliminación. Inténtalo de nuevo.'); return; }
+      await onDeletion();
+      if(!alive) return;
+      showDeletion();
+      mostrarAviso('exito', 'Eliminación cancelada. Tu cuenta se conserva.');
+    }
+    view.panel.addEventListener('click', event => {
+      if(event.target.closest('[data-delete-open]')) view.openDialog();
+      else if(event.target.closest('[data-delete-cancel]')) cancel();
+    });
+    view.form.addEventListener('submit', event => { event.preventDefault(); request(); });
+    view.dialog.addEventListener('click', event => { if(event.target.closest('[data-delete-close]')) view.closeDialog(); });
+    showDeletion();
+    view.accepted({status:'loading', items:[]});
+    PrivacyData.acceptances().then(result => {
+      if(alive) view.accepted(result.status === 'ready' ? {status:'ready', items:result.items || []} : {status:'error', items:[]});
+    });
+    return {dispose() { alive = false; view.closeDialog(); }};
   }
   return {mount};
 })();

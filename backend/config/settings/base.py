@@ -76,7 +76,7 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE=False
 ACCOUNT_RATE_LIMITS={'signup':'10/m/ip','login':'30/m/ip','login_failed':'10/m/ip,5/300s/key',
  'confirm_email':'1/60s/key','reset_password':'10/m/ip,1/60s/key','reset_password_from_key':'20/m/ip','change_password':'5/m/user',
  'request_login_code':'20/m/ip,3/m/key','reauthenticate':'10/m/user',
- 'privacidad_cookies':'20/m/ip','estadistica_seccion':'60/m/ip','contacto_producto':'5/h/ip','vincular_dispositivo':'20/m/ip,5/m/key'}
+ 'privacidad_cookies':'20/m/ip','estadistica_seccion':'60/m/ip','contacto_producto':'5/h/ip','vincular_dispositivo':'20/m/ip,5/m/key','eliminar_cuenta':'5/m/user'}
 PASSWORD_RESET_TIMEOUT=600
 SESSION_ENGINE='django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE=28800

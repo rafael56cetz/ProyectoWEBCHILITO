@@ -263,7 +263,6 @@ const AuthService = (() => {
     if (result.http === 401 && result.body.status === 401 && result.body?.meta?.is_authenticated === false) {
       forgetSession();
       ChilitoHTTP.clearPending();
-      UserGardenService.reset();
       GardenModel.reset();
       AdminService.reset();
       return {status:'accepted'};

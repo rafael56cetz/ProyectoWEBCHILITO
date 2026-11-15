@@ -23,7 +23,7 @@ const suite = (titulo, ejecutar) => suites.push([titulo, ejecutar]);
 // ── Comercial: validaciones y borradores, sin red, DOM ni almacenamiento ──────────────────────
 suite('comercial', () => {
   const forbidden = () => { throw new Error('El modelo comercial no debe consultar red, DOM ni almacenamiento'); };
-  const context = vm.createContext({structuredClone, UserGardenService:{tasks:{}}, ChilitoHTTP:{request:forbidden}, fetch:forbidden,
+  const context = vm.createContext({structuredClone, ChilitoHTTP:{request:forbidden}, fetch:forbidden,
     get document() { return forbidden(); }, get localStorage() { return forbidden(); }, get sessionStorage() { return forbidden(); }});
   cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/huerto.js', 'modelos/administracion.js');
   const model = vm.runInContext('CommerceModel', context), app = vm.runInContext('AppModel', context);
@@ -88,7 +88,7 @@ suite('fechas', async () => {
   async function checkZone(TZ) {
     process.env.TZ = TZ;
     const calls = [];
-    const context = vm.createContext({URLSearchParams, UserGardenService:{tasks:{}}, ChilitoHTTP:{
+    const context = vm.createContext({URLSearchParams, ChilitoHTTP:{
       async request(path) { calls.push(path); return {http:200, body:{status:'ready'}}; }
     }});
     cargar(context, 'modelos/huerto.js');
@@ -139,15 +139,13 @@ suite('contrato de adaptadores', async () => {
   const evaluate = code => vm.runInContext(code, context);
   const reply = (http, body) => ({status:http, json:async () => body});
   respond = () => reply(403, {code:'forbidden'});
-  assert.equal((await evaluate("UserGardenService.recordTask('inspection')")).status, 'forbidden');
-  const p = calls.at(-1); assert.equal(p.path, '/api/huertos/actual/mantenimiento'); assert.equal(p.options.method, 'POST'); assert.equal(JSON.parse(p.options.body).type, 'inspection'); assert.match(p.options.headers['Idempotency-Key'], /^[0-9a-f-]{36}$/); assert.equal(p.options.headers['X-CSRFToken'], 'test-csrf');
+  assert.deepEqual({...await evaluate("GardenService.care('1',{type:'inspeccion'})")}, {status:'error', code:'forbidden'});
+  const p = calls.at(-1); assert.equal(p.path, '/api/huertos/1/cuidados'); assert.equal(p.options.method, 'POST'); assert.equal(JSON.parse(p.options.body).type, 'inspeccion'); assert.match(p.options.headers['Idempotency-Key'], /^[0-9a-f-]{36}$/);
+  // Tras un fallo de red la clave se conserva: reintentar no duplica el cuidado.
   let n = 0; respond = () => { if(n++ === 0) throw new Error('network'); return reply(200, {status:'accepted'}); };
-  await evaluate("UserGardenService.recordTask('harvest')"); await evaluate("UserGardenService.recordTask('harvest')");
+  await evaluate("GardenService.care('1',{type:'cosecha',plant:1})"); await evaluate("GardenService.care('1',{type:'cosecha',plant:1})");
   assert.equal(calls.at(-2).options.headers['Idempotency-Key'], calls.at(-1).options.headers['Idempotency-Key']);
-  const token = 'aB'.repeat(21) + '_'; const ticket = '4c0eb447-d16e-4ef6-89e5-127ab340c1b1';
-  respond = () => reply(200, {status:'accepted', permission:{token, ticket, createdAt:Date.now(), expiresAt:Date.now() + 60000}});
-  assert.equal((await evaluate("UserGardenService.issuePermission('connection',true)")).status, 'accepted');
-  assert.equal(evaluate('UserGardenService.permission().token'), token);
+  const token = 'aB'.repeat(21) + '_';
   const before = calls.length;
   assert.equal((await evaluate("AdminService.validateToken('case',' '+ 'a'.repeat(43))")).status, 'invalid-token'); assert.equal(calls.length, before);
   respond = (path, options) => { assert.equal(JSON.parse(options.body).token, token); return reply(200, {status:'accepted', session:{id:'session-id', expiresAt:Date.now() + 60000}}); };
@@ -190,15 +188,38 @@ suite('contrato de adaptadores', async () => {
   assert.notEqual((await evaluate("AuthService.request('reset',{token:'invalid-reset',password:'Una clave extensa y válida 2048'})")).status, 'reset-complete');
   respond = () => reply(400, {status:400, errors:[{param:'key', code:'invalid'}]});
   assert.equal((await evaluate("AuthService.request('reset',{token:'expired-reset',password:'Una clave extensa y válida 2048'})")).status, 'invalid-link');
-  const missing = {value:null, quality:'missing', at:null};
-  context.inputGarden = {status:'waiting', name:'Huerto', updatedAt:null, plants:[1, 2, 3].map(id => ({id, zoneId:String(BigInt(id) + 9007199254740992n), name:'Planta ' + id, crop:'Habanero propio', reading:missing})), temperature:missing, humidity:missing, tank:{state:'unknown', at:null}};
-  // Texto decimal largo y explícito: los identificadores de zona no se convierten a Number.
-  context.inputGarden.plants.forEach((p, i) => p.zoneId = String(9007199254740993n + BigInt(i)));
-  assert.equal(evaluate('AppModel.garden(inputGarden).plants[0].crop'), 'Habanero propio'); assert.equal(evaluate('AppModel.garden(inputGarden).plants[0].zoneId'), '9007199254740993'); assert.equal(evaluate('AppModel.garden(inputGarden).plants[0].reading.value'), null);
+  // Avisos: el servidor manda; el navegador valida la forma y no acepta enlaces fuera del patrón.
+  const raw = {id:'7', origin:'dispositivo', severity:'critico', title:'Sin agua', text:'<img src=x onerror=alert(1)>', garden:'Patio', link:'#huerto', createdAt:'2026-11-08T11:58:00+00:00', read:false, resolvedAt:null, resolvable:true};
+  context.rawNotice = raw;
+  assert.equal(evaluate('AppModel.notice(rawNotice).text'), raw.text, 'el texto es dato, no HTML');
+  for(const bad of [{id:'0'}, {id:'7x'}, {origin:'otro'}, {severity:'alta'}, {link:'javascript:alert(1)'}, {link:'#a b'}, {createdAt:'ayer'}, {read:'no'}, {title:' '}, {resolvedAt:'x'}]) {
+    context.badNotice = {...raw, ...bad};
+    assert.equal(evaluate('AppModel.notice(badNotice)'), null, JSON.stringify(bad));
+  }
+  context.noticePage = {status:'ready', items:[raw, {...raw, id:'8'}], page:1, total:2};
+  assert.equal(evaluate('AppModel.notices(noticePage).status'), 'ready');
+  context.noticePage = {status:'ready', items:[raw, raw], page:1, total:2}; assert.equal(evaluate('AppModel.notices(noticePage).status'), 'error');
+  assert.equal(evaluate("AppModel.notices({status:'ready', items:[]}).status"), 'empty');
+  // Servicio de avisos: ruta, método, filtro de lista blanca, id solo con dígitos y contador como sondeo.
+  respond = () => reply(200, {status:'accepted', notice:{...raw, read:true}});
+  assert.equal((await evaluate("AppService.request('mark-read',{id:'7'})")).status, 'accepted');
+  assert.equal(calls.at(-1).path, '/api/avisos/7/leido'); assert.equal(calls.at(-1).options.method, 'POST');
+  const sent = calls.length;
+  assert.equal((await evaluate("AppService.request('mark-read',{id:'7/../x'})")).status, 'not-found'); assert.equal(calls.length, sent);
+  respond = () => reply(200, {status:'ready', items:[], page:1, total:0});
+  await evaluate("AppService.request('notices',{filter:'<script>',page:1})"); assert.equal(calls.at(-1).path, '/api/avisos?filtro=todos');
+  await evaluate("AppService.request('notices',{filter:'no_leidos',page:3})"); assert.equal(calls.at(-1).path, '/api/avisos?filtro=no_leidos&page=3');
+  respond = () => reply(200, {status:'ready', unread:4});
+  assert.deepEqual({...await evaluate("AppService.request('counter')")}, {status:'ready', unread:4});
+  assert.equal(calls.at(-1).options.headers['X-Chilito-Sondeo'], '1');
+  respond = () => reply(200, {status:'ready', unread:-1}); assert.equal((await evaluate("AppService.request('counter')")).status, 'error');
   cargar(context, 'vistas/comun.js', 'vistas/publico.js', 'vistas/cuenta.js', 'vistas/huerto.js', 'vistas/administracion.js');
-  context.bad = '<img src=x onerror=alert(1)>'; context.inputGarden.name = context.bad; context.inputGarden.plants[0].name = context.bad; context.inputGarden.plants[0].crop = context.bad;
-  const markup = evaluate("UserGardenViews.render('huerto',{garden:AppModel.garden(inputGarden),soil:{moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null}})"); assert.ok(!markup.includes('<img src=x')); assert.ok(markup.includes('&lt;img'));
-  console.log('PASS frontend adapters: server refusal, CSRF, uncertain-write idempotency, exact support token, capabilities, crop/IDs/null, Unicode password bounds and secret-free reset URLs.');
+  context.bad = '<img src=x onerror=alert(1)>';
+  const list = evaluate("AppViews.notices({status:'ready', items:[Object.assign({}, rawNotice, {title:bad, garden:bad})], page:1, total:1}, 'todos', null, '')");
+  assert.ok(!list.includes('<img src=x') && list.includes('data-notice-open="7"') && list.includes('Marcar todo como leído'));
+  const detailMarkup = evaluate("AppViews.notices({status:'ready', item:Object.assign({}, rawNotice, {title:bad})}, 'todos', '7', '')");
+  assert.ok(!detailMarkup.includes('<img src=x') && detailMarkup.includes('Marcar como resuelto'));
+  console.log('PASS frontend adapters: server refusal, CSRF, uncertain-write idempotency, notices, capabilities, Unicode password bounds and secret-free reset URLs.');
 });
 
 // ── Tarjeta del huerto (diagnóstico) y retirada de despliegues ───────────────────────────────
@@ -232,7 +253,7 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.deepEqual({...await S.plant('abc', 1)}, {status:'error', code:'invalid-input'});
   assert.deepEqual({...await S.orderState('../x')}, {status:'error', code:'invalid-input'});
   // Vistas: tres versiones, selector solo con 2 o más huertos, y texto del servidor siempre escapado.
-  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-08', today:() => 0}, UserGardenViews:{chart:() => ''},
+  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-08', today:() => 0},
     AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
     AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title}});
   vm.runInContext('const GardenModelAlias = GardenModel;', views);
@@ -271,6 +292,57 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(V.myGardens({status:'ready', gardens:[detail(null).garden]}).includes('Archivar huerto'));
   assert.ok(V.newGarden().includes('Nombre del huerto (opcional)'));
   assert.ok(V.confirmations.desvincular('CHI-1').peligro && V.confirmations.archivar('Patio').accion === 'Archivar huerto');
+  // Fase 4 · cálculos puros: cuándo se hizo un cuidado, problemas de una revisión y tiempo de una autorización.
+  const full = vm.createContext({AppModel:{date:value => String(value)}, ChilitoHTTP:{request:async () => ({http:200, body:{}})}});
+  vm.runInContext(read('modelos/huerto.js'), full);
+  const model = code => vm.runInContext(code, full);
+  const day = ago => model(`MaintenanceDates.format(MaintenanceDates.shift(MaintenanceDates.today(), ${ago}))`);
+  assert.deepEqual({...model("GardenModel.careMoment('')")}, {valid:true, at:null});
+  assert.deepEqual({...model(`GardenModel.careMoment('${day(0)}')`)}, {valid:true, at:null});
+  const past = model(`GardenModel.careMoment('${day(-3)}')`); assert.equal(past.valid, true); assert.match(past.at, /^\d{4}-\d{2}-\d{2}T/);
+  for(const bad of [day(-8), day(1), 'ayer', '2026-02-30']) assert.equal(model(`GardenModel.careMoment('${bad}')`).valid, false, bad);
+  assert.equal(model("GardenModel.problems([{result:'falla'}, {result:'correcto'}, {result:'sin_respuesta'}, {result:'no_instalado'}])"), 2);
+  assert.equal(model("GardenModel.lapse('2026-11-09T06:42:00Z', Date.parse('2026-11-08T12:00:00Z'))"), '18 h 42 min');
+  assert.equal(model("GardenModel.lapse('2026-11-08T11:00:00Z', Date.parse('2026-11-08T12:00:00Z'))"), '0 h 0 min');
+  {
+  // Fase 4 · pantallas: Panel técnico, Mantenimiento y Soporte.
+  Object.assign(views, {});
+  vm.runInContext("var CareGuideService = {SUBSTRATE_KEY:'sustrato-perlita'}, CareGuideViews = {slot:() => '<section data-care-guides></section>'};", views);
+  vm.runInContext(bloque('vistas/huerto.js', 'Operacion'), views);
+  const T = vm.runInContext('TechnicalViews', views), Care = vm.runInContext('CareViews', views), Sp = vm.runInContext('SupportViews', views);
+  const dirty = '<img src=x onerror=alert(1)>';
+  const point = (at, value, min = null, max = null) => ({at, value, min, max});
+  const series = {plants:[1, 2, 3].map(number => ({number, points:[point('2026-11-08T10:00:00Z', 40 + number), point('2026-11-08T11:00:00Z', 42 + number)]})),
+    temperature:[point('2026-11-08T10:00:00Z', 25), point('2026-11-08T11:00:00Z', 27)], humidity:[], light:[]};
+  const online = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:'2026-11-08T11:58:00Z', linkedAt:null, firmware:'1.0.3', lastReadingAt:'2026-11-08T11:58:00Z'};
+  const garden = {id:'1', name:dirty, device:online};
+  const data = {range:'24h', garden, hasLight:false, latest:{temperature:26, airHumidity:60, light:null, tankHasWater:true}, series,
+    plants:[{number:1, name:dirty, moisture:41, adc:2001, measuredAt:'2026-11-08T11:00:00Z'}, {number:2, name:'Dos', moisture:null, adc:null, measuredAt:null}, {number:3, name:'Tres', moisture:43, adc:2003, measuredAt:'2026-11-08T11:00:00Z'}]};
+  const log = {type:'eventos', status:'ready', page:1, total:60, items:[{type:'reinicio', detail:'simulador', at:'2026-11-08T11:00:00Z'}]};
+  const technical = T.screen({status:'ready', gardens:[garden], garden, data, range:'24h', log});
+  assert.ok(technical.includes('ADC (0–4095)') && technical.includes('Regar una planta') && technical.includes('Página 1 de 3') && technical.includes('simulador'));
+  assert.ok(!technical.includes('Luz · BH1750'), 'sin lecturas de luz no se muestra la tarjeta');
+  assert.ok(technical.includes('Sin lectura') && !technical.includes('<img src=x'), 'sin lectura es «Sin lectura» y el texto del servidor va escapado');
+  assert.ok(T.screen({status:'ready', gardens:[garden], garden, data:{...data, hasLight:true, latest:{...data.latest, light:1200}}, range:'24h', log}).includes('Luz · BH1750'));
+  assert.ok(T.screen({status:'ready', gardens:[{...garden, device:null}], garden:{...garden, device:null}, data:null, range:'24h', log}).includes('Vincular equipo'));
+  assert.ok(T.screen({status:'ready', gardens:[], garden:null}).includes('Crear mi huerto'));
+  const careList = Care.list({status:'ready', page:1, total:2, items:[
+    {id:'a', type:'sustrato', plant:3, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:true, corrected:false, reason:dirty},
+    {id:'b', type:'cosecha', plant:null, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:true, reason:'Se anotó mal'}]});
+  assert.ok(careList.includes('<s>') && careList.includes('Anulado') && careList.includes('Corregido por soporte') && careList.includes('7 chiles') && !careList.includes('<img src=x'));
+  assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants}).includes('¿Qué hiciste?'));
+  const idle = {hasDevice:true, active:null, history:[], orders:[], lastDiagnostic:null};
+  const support = Sp.screen({status:'ready', gardens:[garden], garden, data:idle, diagnostic:null});
+  assert.ok(support.includes('Revisar mi equipo') && support.includes('Autorizo al equipo de soporte') && support.includes('disabled') && !/token/i.test(support));
+  const caso = {id:'c1', folio:'CS-1A2B3C4D', incident:'bomba', note:'', state:'en_atencion', createdAt:'2026-11-08T10:00:00Z', authorizedUntil:'2999-01-01T00:00:00Z', revokedAt:null, closedAt:null, result:null, resolutionNote:null, attendedBy:dirty, diagnosticId:null};
+  const active = Sp.screen({status:'ready', gardens:[garden], garden, data:{...idle, active:caso, orders:[{id:'o', type:'reiniciar', plant:null, duration:null, state:'confirmado', createdAt:'2026-11-08T10:30:00Z', error:null}]}, diagnostic:null});
+  assert.ok(active.includes('Revocar acceso') && active.includes('Cancelar solicitud') && active.includes('Autorización vigente') && active.includes('está revisando') && !active.includes('<img src=x'));
+  assert.ok(Sp.screen({status:'ready', gardens:[garden], garden, data:{...idle, active:{...caso, revokedAt:'2026-11-08T11:00:00Z'}}, diagnostic:null}).includes('Acceso revocado'));
+  assert.ok(Sp.diagnosticCard({state:'completado', startedAt:'x', checks:[{component:'bomba_2', result:'falla', detail:dirty}, {component:'conexion', result:'correcto', detail:''}]}).includes('Encontramos 1 problema'));
+  assert.ok(Sp.diagnosticCard({state:'completado', startedAt:'x', checks:[{component:'conexion', result:'correcto', detail:''}]}).includes('Todo funciona'));
+  assert.ok(Sp.diagnosticCard({state:'en_curso', startedAt:'x', checks:[]}).includes('Revisando tu equipo'));
+  assert.ok(Sp.confirmations.revoke.peligro && Sp.confirmations.cancel.accion === 'Cancelar solicitud');
+  }
   assert.ok(V.orderCard({type:'regar', plant:2, duration:8, state:'confirmado'}).includes('Confirmada'));
   assert.ok(V.orderCard({type:'autodiagnostico', state:'expirado'}).includes('Sin respuesta'));
   assert.ok(V.errorText('huerto-limite').includes('3 huertos'));
@@ -287,7 +359,9 @@ suite('Mi huerto y retirada de despliegues', async () => {
   // La vinculación de 26 caracteres y la ayuda por correo ya no existen en la parte de usuario.
   const equipos = ['modelos', 'vistas', 'controladores'].map(dir => read(`${dir}/equipos.js`)).join('\n');
   for(const gone of ['BindingHelp', 'BindingUserController', 'userPanel', 'mailto:', '26 caracteres', '/api/vinculacion\'']) assert.ok(!equipos.includes(gone), gone);
-  assert.ok(!bloque('vistas/huerto.js', 'Huerto usuario').includes('user-locked'));
+  const huertoSources = ['modelos', 'vistas', 'controladores'].map(dir => read(`${dir}/huerto.js`)).join('\n');
+  for(const gone of ['UserGardenService', 'UserGardenViews', 'UserGardenController', 'user-locked', 'supportMail', 'issuePermission', 'copy-token', '/api/huertos/actual']) assert.ok(!huertoSources.includes(gone), gone);
+  assert.ok(!/token/i.test(huertoSources), 'el token de soporte ya no existe');
   // Gobernanza y despliegues se retiraron del panel de administración.
   const admin = bloque('vistas/administracion.js', 'Administracion'), adminModel = bloque('modelos/administracion.js', 'Administracion'), adminControl = bloque('controladores/administracion.js', 'Administracion');
   for(const gone of ['Gobernanza de datos', 'Despliegues y parámetros', 'Comprobar formato', 'Registrar solicitud de despliegue', 'No está conectado a ningún asistente']) assert.ok(!admin.includes(gone), gone);

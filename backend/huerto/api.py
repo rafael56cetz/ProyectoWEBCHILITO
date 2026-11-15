@@ -63,6 +63,22 @@ def commands(request, data, huerto_id):
     return services.crear_comando(request.user, huerto_id, data.get('type'), data.get('plant'), data.get('duration'))
 
 
-@endpoint(('POST',), ('type', 'plant', 'chiles'))
+@endpoint(('GET', 'POST'), ('type', 'plant', 'chiles', 'doneAt'))
 def cares(request, data, huerto_id):
-    return services.registrar_cuidado(request.user, huerto_id, data.get('type'), data.get('plant'), data.get('chiles'))
+    if request.method == 'POST':
+        return services.registrar_cuidado(request.user, huerto_id, data.get('type'), data.get('plant'), data.get('chiles'), data.get('doneAt'))
+    pagina = bounds(request, allowed=('planta', 'tipo', 'desde', 'hasta', 'page'))
+    filtro = lambda nombre: request.GET.get(nombre) or None
+    return services.cuidados(request.user, huerto_id, filtro('planta'), filtro('tipo'), filtro('desde'), filtro('hasta'), pagina)
+
+
+@endpoint()
+def telemetry(request, data, huerto_id):
+    bounds(request, allowed=('rango',))
+    return services.telemetria(request.user, huerto_id, request.GET.get('rango', '24h'))
+
+
+@endpoint()
+def log(request, data, huerto_id):
+    pagina = bounds(request, allowed=('tipo', 'page'))
+    return services.bitacora(request.user, huerto_id, request.GET.get('tipo', 'ordenes'), pagina)

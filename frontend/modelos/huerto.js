@@ -1,5 +1,5 @@
 // MODELO · Huerto: huertos y plantas de la persona usuaria, panel técnico y soporte, guías de cuidado y mantenimientos.
-// Define: GardenService, GardenModel, UserGardenService, CareGuideService, MaintenanceService, MaintenanceDates.
+// Define: GardenService, GardenModel, CareGuideService, MaintenanceService, MaintenanceDates.
 
 // ── Huerto ──
 // Huertos, plantas, órdenes y vinculación del equipo. El servidor decide; cada llamada devuelve su cuerpo o {status:'error', code}.
@@ -7,6 +7,8 @@ const GardenService = (() => {
   const base = '/api/huertos';
   const background = {'X-Chilito-Sondeo':'1'};
   const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
+  const validUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
+  const query = values => { const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== '' && value != null)); return params.size ? `?${params}` : ''; };
   async function call(path, {method = 'GET', body, signal, headers} = {}) {
     try {
       const response = await ChilitoHTTP.request(path, {method, body, signal, headers});
@@ -32,8 +34,16 @@ const GardenService = (() => {
     plant: (id, number, range = '24h') => get(garden(id, `/plantas/${Number(number)}?rango=${encodeURIComponent(range)}`)),
     editPlant: (id, number, values) => post(garden(id, `/plantas/${Number(number)}`), values),
     order: (id, values) => post(garden(id, '/comandos'), values),
-    orderState: (orderId, signal) => get(typeof orderId === 'string' && /^[0-9a-f-]{36}$/.test(orderId) ? `/api/comandos/${orderId}` : null, {signal, headers:background}),
-    care: (id, values) => post(garden(id, '/cuidados'), values)
+    orderState: (orderId, signal) => get(validUuid(orderId) ? `/api/comandos/${orderId}` : null, {signal, headers:background}),
+    care: (id, values) => post(garden(id, '/cuidados'), values),
+    telemetry: (id, range, signal) => get(garden(id, `/telemetria${query({rango:range})}`), {signal}),
+    log: (id, type, page) => get(garden(id, `/bitacora${query({tipo:type, page:Number(page) || 1})}`)),
+    cares: (id, filters, page) => get(garden(id, `/cuidados${query({...filters, page:Number(page) || 1})}`)),
+    support: (id, {signal, quiet = false} = {}) => get(garden(id, '/soporte'), {signal, headers:quiet ? background : undefined}),
+    openCase: (id, values) => post(garden(id, '/soporte'), values),
+    revokeCase: caseId => post(validUuid(caseId) ? `/api/soporte/${caseId}/revocar` : null),
+    cancelCase: caseId => post(validUuid(caseId) ? `/api/soporte/${caseId}/cancelar` : null),
+    diagnostic: (diagnosticId, signal) => get(validUuid(diagnosticId) ? `/api/autodiagnosticos/${diagnosticId}` : null, {signal, headers:background})
   });
 })();
 
@@ -44,6 +54,12 @@ const GardenModel = (() => {
   const WATERING_SECONDS = [5, 8, 10, 15, 20];
   const STAGES = ['sin_sembrar', 'germinacion', 'plantula', 'crecimiento', 'floracion', 'fructificacion'];
   const RANGES = ['1h', '24h', '7d', '30d'];
+  const INCIDENTS = Object.freeze({bomba:'La bomba no responde', humedad:'Lectura de humedad inconsistente', lampara:'La lámpara no enciende',
+    conexion:'Conexión inestable', otro:'Otro problema'});
+  const CARE_TYPES = ['rellenar_deposito', 'sustrato', 'germinacion', 'cosecha', 'inspeccion'];
+  const CARE_NEEDS_PLANT = ['sustrato', 'germinacion', 'cosecha'];
+  const LOG_TYPES = ['ordenes', 'actuaciones', 'eventos'];
+  const CARE_WINDOW_DAYS = 7;
   let chosen = null;
   function ago(value, now = Date.now()) {
     const minutes = Math.floor((now - Date.parse(value)) / 60000);
@@ -75,106 +91,25 @@ const GardenModel = (() => {
   const reset = () => { chosen = null; };
   // El código se escribe en el equipo como XXXX-XXXX; aquí solo se agrupa para mostrarlo.
   const groupCode = code => typeof code === 'string' ? code.replace(/^(.{4})(.{4})$/, '$1-$2') : '';
+  // «Cuándo» del cuidado: vacío o hoy es ahora (lo fija el servidor); otro día, a mediodía. Hasta 7 días atrás y nunca futuro.
+  function careMoment(value) {
+    if(!value) return {valid:true, at:null};
+    const day = MaintenanceDates.parse(value), today = MaintenanceDates.today();
+    if(!day || day > today || day < MaintenanceDates.shift(today, -CARE_WINDOW_DAYS)) return {valid:false, at:null};
+    if(value === MaintenanceDates.format(today)) return {valid:true, at:null};
+    const [year, month, date] = value.split('-').map(Number);
+    return {valid:true, at:new Date(year, month - 1, date, 12).toISOString()};
+  }
+  const problems = checks => checks.filter(check => ['falla', 'sin_respuesta'].includes(check.result)).length;
+  // Tiempo que queda de una autorización: «18 h 42 min».
+  function lapse(until, now = Date.now()) {
+    const minutes = Math.max(0, Math.floor((Date.parse(until) - now) / 60000));
+    return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+  }
   const remainingSeconds = (expiresAt, now = Date.now()) => Math.max(0, Math.floor((Date.parse(expiresAt) - now) / 1000));
   const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, ago, connection, averageMoisture, pick, remember, reset, groupCode, remainingSeconds, clock});
-})();
-
-// ── Huerto usuario ──
-// Operaciones de la persona usuaria guardadas en el servidor (mismo origen). Los datos en memoria solo muestran respuestas del servidor.
-const UserGardenService = (() => {
-  const base='/api/huertos/actual';
-  const tasks=Object.freeze({refill:'Recarga del depósito',substrate:'Revisión de sustrato y perlita',germination:'Germinación externa',harvest:'Cosecha',inspection:'Inspección visual de conexiones'});
-  const incidents=Object.freeze({pump:'La bomba no responde',humidity:'Lectura de humedad inconsistente',lamp:'La lámpara no enciende',connection:'Conexión inestable',other:'Otro problema de hardware'});
-  let active=null,reports=[];
-  const failure=response=>response.http===401?'unauthenticated':response.http===403?'forbidden':response.http===429?'limited':'error';
-  async function read(path,signal) {
-    const response=await ChilitoHTTP.request(path,{signal});
-    if(response.http!==200) {
-      if(response.http===401)ChilitoHTTP.sessionExpired();
-      throw new Error(response.body?.code||'unavailable');
-    }
-    const body=response.body;
-    if(Array.isArray(body.items)) {
-      // Todo el historial se pide por páginas con límite; nunca se inventan registros.
-      const items=[...body.items];let page=body.page||1;
-      while(body.total>items.length && page<100) {
-        const next=await ChilitoHTTP.request(path+(path.includes('?')?'&':'?')+'page='+(++page),{signal});
-        if(next.http!==200||!Array.isArray(next.body.items))throw new Error('unavailable');
-        if(!next.body.items.length)break;
-        items.push(...next.body.items);
-      }
-      return {...body,items};
-    }
-    return body;
-  }
-  async function write(path,body={},signal) {
-    try {
-      const response=await ChilitoHTTP.request(path,{method:'POST',body,signal});
-      if(response.http===401)ChilitoHTTP.sessionExpired();
-      return [200,201].includes(response.http)&&response.body.status==='accepted'?response.body:{status:failure(response)};
-    }catch{return {status:'error'};}
-  }
-  const empty=range=>({range,soil:{adc:null,moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null},history:{soil:[],temperature:[],humidity:[]},maintenance:[],commands:[],permission:null,permissionState:'closed',supportAvailable:false,reports:[],lampRequest:null});
-  function permission() {
-    return active&&active.expiresAt>Date.now()?{...active}:null;
-  }
-  return {
-    tasks,incidents,get supportAvailable(){return true;},permission,
-    async load(range='1h',{signal}={}) {
-      const raw=await ChilitoHTTP.request(base,{signal});
-      if(raw.http===401)ChilitoHTTP.sessionExpired();
-      if(raw.http!==200) {
-        const status=raw.body?.code==='garden-unassigned'?'unassigned':'error';
-        if(status==='error')return {garden:AppModel.garden({status})};
-        // Sin huerto se conserva la estructura completa y vacía: ninguna lectura ni registro inventado.
-        reports=[];active=null;
-        return {...empty(range),garden:AppModel.garden({status})};
-      }
-      const g=raw.body.garden||raw.body;
-      const [maintenance,commands,support]=await Promise.all([read(base+'/mantenimiento',signal),read(base+'/solicitudes',signal),read('/api/soporte',signal)]);
-      reports=support.items||[];
-      const latest=reports.find(r=>r.permissionState==='active'&&r.expiresAt>Date.now());
-      if(!latest)active=null;
-      else active={ticket:latest.id,folio:latest.folio,incident:incidents[latest.incident]||latest.incident,createdAt:Date.parse(latest.createdAt),expiresAt:latest.expiresAt,token:active?.ticket===latest.id?active.token:null};
-      const records=(maintenance.items||[]).map(r=>({id:r.id,task:r.type,label:tasks[r.type]||r.type,at:r.at}));
-      const orders=(commands.items||[]).map(r=>({id:r.id,at:r.at,actuator:r.type==='water'?'Bomba de riego':'Lámpara',action:{water:'Solicitud de riego puntual','lamp-off':'Solicitud de apagado de lámpara','lamp-auto':'Restaurar control de lámpara'}[r.type],origin:'Usuario',status:'Sin confirmación'}));
-      const lamp=(commands.items||[]).find(r=>r.type==='lamp-off'||r.type==='lamp-auto');
-      return {garden:AppModel.garden(g),range,soil:{adc:null,moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null},history:{soil:[],temperature:[],humidity:[]},maintenance:records,commands:orders,permission:permission(),permissionState:latest?'active':reports[0]?.permissionState||'closed',supportAvailable:true,reports:structuredClone(reports),lampRequest:lamp?.type||null};
-    },
-    async recordTask(task,{signal}={}) {
-      if(!Object.hasOwn(tasks,task))return {status:'invalid'};
-      const result=await write(base+'/mantenimiento',{type:task},signal);
-      return {...result,label:tasks[task]};
-    },
-    async command(type,snapshot,{signal}={}) {
-      if(!['water','lamp-off','lamp-auto'].includes(type))return {status:'invalid'};
-      return write(base+'/solicitudes',{type},signal);
-    },
-    async issuePermission(incident,consent,{signal}={}) {
-      if(consent!==true||!Object.hasOwn(incidents,incident))return {status:'invalid'};
-      const result=await write('/api/soporte',{incident,consent:true},signal);
-      if(result.status!=='accepted')return result;
-      const p=result.permission;
-      if(!p||!Number.isFinite(p.expiresAt)||typeof p.ticket!=='string'||(p.token!==null&&!/^[A-Za-z0-9_-]{43}$/.test(p.token)))return {status:'error'};
-      active={...p,incident:incidents[incident]};
-      return {status:'accepted',tokenAvailable:typeof p.token==='string'};
-    },
-    async revokePermission({signal}={}) {
-      const p=permission();if(!p)return {status:'not-found'};
-      const result=await write('/api/soporte/'+encodeURIComponent(p.ticket)+'/revocar',{},signal);
-      if(result.status==='accepted')active=null;
-      return result;
-    },
-    reset(){active=null;reports=[];},
-    // Correo a soporte con destinatario y asunto preparados. El token nunca va en la URL: se pega a mano.
-    supportMail(folio){
-      const contact=ChilitoHTTP.configuration?.supportContact;
-      if(typeof contact!=='string'||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)||!/^CS-[0-9A-F]{8}$/.test(folio||''))return null;
-      const body=`Folio: ${folio}\n\nPega aquí tu token de soporte:\n\n\nNunca incluyas tu contraseña ni tus códigos de acceso.`;
-      return {address:contact,href:`mailto:${contact}?subject=${encodeURIComponent('[El Chilito] Caso de soporte '+folio)}&body=${encodeURIComponent(body)}`};
-    },
-  };
+  return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_TYPES, CARE_NEEDS_PLANT, LOG_TYPES, ago, connection, averageMoisture,
+    pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock});
 })();
 
 // ── Guias ──
@@ -250,7 +185,7 @@ const CareGuideService = (() => {
 // ── Mantenimientos ──
 // Solo respuestas autorizadas por Django. El estado vigente lo calcula el servidor.
 const MaintenanceService = (() => {
-  const tasks = UserGardenService.tasks;
+  const tasks = Object.freeze({refill:'Recarga del depósito', substrate:'Revisión de sustrato y perlita', germination:'Germinación externa', harvest:'Cosecha', inspection:'Inspección visual de conexiones'});
   const base = '/api/admin/mantenimientos';
   async function send(path, options = {}) {
     try {

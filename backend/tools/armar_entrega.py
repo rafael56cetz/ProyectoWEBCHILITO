@@ -25,7 +25,7 @@ INCLUIR = ['README.md', '.gitignore',
                                                 'soporte_local', 'generar_sql_instalacion')]]
 EXCLUIR = ['*/__pycache__/*', '*.pyc']
 PROHIBIDOS = ['.env', 'CLAUDE.md', 'REGISTRO-DE-CAMBIOS.md', 'CONTEXTO-COMPARTIDO-EL-CHILITO.md', 'flujo actual a 7 de noviembre del 2026.md',
-              'operador.py', 'local.py', 'entorno.py', 'verificar_integracion.py', 'seed_runtime.py', 'probar_runtime.py', 'armar_entrega.py']
+              'operador.py', 'local.py', 'entorno.py', 'verificar_integracion.py', 'seed_runtime.py', 'probar_runtime.py', 'armar_entrega.py', 'simular_equipo.py']
 PATRONES = {'clave privada': rb'-----BEGIN [A-Z ]*PRIVATE KEY', 'token Google': rb'AIza[0-9A-Za-z_-]{30,}', 'token GitHub': rb'gh[pousr]_[A-Za-z0-9]{30,}',
             'clave AWS': rb'AKIA[0-9A-Z]{16}', 'cadena de conexión': rb'postgres(?:ql)?://[^\s\'"]+:[^\s\'"@]+@'}
 

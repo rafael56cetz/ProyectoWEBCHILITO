@@ -159,10 +159,8 @@ body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.contai
 
 /* Ajustes tras revisar cada pantalla */
 html:has(.auth-layout) { background:#0e1c14; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .user-support-callout { border-radius:var(--radio-tarjeta);padding:22px 24px; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .notices-grid { gap:18px; }
+
 @media (min-width:769px) { html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { width:100%; } }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .notices-grid { display:grid!important;gap:18px!important; }
 
 body[data-private=true][data-role=admin] #app-page > .bento-panel + .bento-panel { margin-top:24px; }
 
@@ -280,18 +278,11 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .privacy-uns
 
 /* Insignias del panel (C4): cápsula de vidrio con cuatro tonos (verde, ámbar, rojo y gris) y siempre con texto.
    Sin desenfoque propio: son elementos internos de una tarjeta. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.badge,.inquiry-state,.care-admin-state,.notice-condition):not(#_) {
-  --insignia-fondo:var(--insignia-gris-fondo);--insignia-texto:var(--insignia-gris-texto);--insignia-borde:var(--insignia-gris-borde);
-  display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:3px 10px;border-radius:var(--radio-insignia);
-  border:1px solid var(--insignia-borde);background:var(--insignia-fondo);color:var(--insignia-texto)!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);font-size:12px!important;font-weight:700;line-height:1.4;white-space:nowrap;
-}
+
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-atendida,.care-admin-state.is-publicada,.badge.tone-verde):not(#_) {
   --insignia-fondo:var(--insignia-verde-fondo);--insignia-texto:var(--insignia-verde-texto);--insignia-borde:var(--insignia-verde-borde);
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-nueva,.care-admin-state.is-borrador,.notice-condition.active,.badge.tone-ambar):not(#_) {
-  --insignia-fondo:var(--insignia-ambar-fondo);--insignia-texto:var(--insignia-ambar-texto);--insignia-borde:var(--insignia-ambar-borde);
-}
+
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.care-admin-state.is-retirada,.badge.error,.badge.tone-rojo):not(#_) {
   --insignia-fondo:var(--insignia-rojo-fondo);--insignia-texto:var(--insignia-rojo-texto);--insignia-borde:var(--insignia-rojo-borde);
 }
@@ -434,7 +425,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 .sidebar-home .icon { width:18px;height:18px; }
 .sidebar-home:focus-visible { outline:3px solid #fff;outline-offset:3px; }
 
-
 /* Mi cuenta: datos de la cuenta y datos personales lado a lado; la sesión debajo. */
 @media (min-width:1000px) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px;align-items:start; }
@@ -444,16 +434,15 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 }
 
 /* Componentes del usuario sobre el fondo claro */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:var(--radio-tarjeta)!important;box-shadow:var(--claro-filo)!important; }
+
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta)!important;-webkit-backdrop-filter:var(--claro-desenfoque)!important;backdrop-filter:var(--claro-desenfoque)!important; }
+  
 }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-pedestal { background:rgba(255,255,255,.6)!important;border:1px solid var(--claro-borde)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track { background:rgba(70,40,20,.12); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track span { background:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .skeleton-line { background:rgba(70,40,20,.12); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1 { font-weight:800;color:var(--claro-titulo)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-token-code { color:var(--claro-tinta)!important;background:rgba(255,255,255,.7);border:1px solid var(--claro-linea); }
 
 /* Gráfica sin datos: el marco ocupa su espacio real y el aviso queda centrado. */
 .user-chart-frame { position:relative; }
@@ -482,7 +471,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .k
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { position:absolute;left:14px;top:50%;translate:0 -50%;z-index:1;color:var(--claro-suave);pointer-events:none; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon .icon { width:18px;height:18px; }
 @media (max-width:520px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row { flex-wrap:wrap; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row .button { width:100%; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { top:23px; } }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-diagnosis-mark,.user-support-callout>div>.icon,.user-support-callout .icon) { color:var(--claro-titulo)!important;background:transparent!important; }
+
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-mark .icon { color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > .account-session { max-width:none;width:100%; }
 /* El texto de los botones hereda su color: gana a la regla general de texto suave. */
@@ -518,7 +507,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 .admin-resolve-form { margin-top:28px;padding-top:22px;border-top:1px solid var(--claro-linea); }
 .admin-resolve-form h3 { margin:0 0 4px;font-size:18px; }
 .admin-resolve-form textarea { width:100%; }
-.user-token-steps { margin:12px 0;padding-left:20px;display:grid;gap:6px;font-size:14px; }
 
 /* Solo las fechas Desde/Hasta de Registros. El icono SVG sustituye al indicador nativo. */
 html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-control { display:flex;flex-direction:column;gap:6px;min-width:0; }

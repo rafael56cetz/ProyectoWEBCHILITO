@@ -119,7 +119,7 @@ const AppViews = (() => {
     const link=item=>`<a class="button btn-liquid-sidebar" href="#${item.id}"${selected===item.id?' aria-current="page"':''}>${icon(item.icon)}<span>${item.label}</span></a>`;
     const accountLink=`<a class="button compact btn-liquid-nav account-icon-link" href="#cuenta" aria-label="Mi cuenta" title="Mi cuenta">${icon('user')}</a>`;
     // Encabezado limpio en ambos roles: a la portada se vuelve con el logotipo.
-    const noticesLink=`<a class="button compact btn-liquid-nav account-icon-link" href="#avisos" aria-label="Avisos" title="Avisos"${selected==='avisos'?' aria-current="page"':''}>${icon('bell')}</a>`;
+    const noticesLink=`<a class="button compact btn-liquid-nav account-icon-link bell-link" href="#avisos" aria-label="Avisos" title="Avisos"${selected==='avisos'?' aria-current="page"':''}>${icon('bell')}<span class="bell-badge" data-bell-count hidden></span></a>`;
     const menuButton=`<button class="button compact btn-liquid-nav private-menu-toggle" type="button" data-app-action="toggle-menu" aria-controls="garden-navigation" aria-expanded="false" aria-label="Abrir menú de navegación"><span class="private-menu-open-icon">${icon('menu')}</span><span class="private-menu-close-icon">${icon('close')}</span><span>Menú</span></button>`;
     // Sin barra superior: logotipo y botón de ocultar viven en el panel; perfil, avisos (solo usuario) y menú flotan arriba.
     const topbar=`<div class="private-topbar"><div class="topbar-start">${brand('#inicio','El Chilito, inicio','topbar-brand')}</div><div class="topbar-actions">${accountLink}${noticesLink}${menuButton}</div></div>`;
@@ -134,29 +134,34 @@ const AppViews = (() => {
     const navigation=isAdmin?links.filter(item=>item!==account&&item!==inbox&&item!==guides).map(link).join('')+adminGroup+link(account):links.map(link).join('');
     // La página principal ya tiene acceso fijo bajo el logotipo, también en móvil.
     const menuFooter=`<div class="private-menu-footer"><button class="button private-menu-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></div>`;
-    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
+    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="deletion-banner" class="deletion-banner" data-deletion-banner hidden></div><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
   }
-  function noticeCard(item) {
-    const importance={high:'Alta',medium:'Media',info:'Informativa'}[item.importance];
-    return `<article class="bento-panel notice-card" data-notice-id="${escaparHTML(item.id)}"><div class="notice-meta"><span class="notice-condition ${item.condition}">${item.condition==='active'?'Activo':'Resuelto'}</span><span class="read-state">${item.read?'Leído':'No leído'}</span></div><h2>${escaparHTML(item.title)}</h2><p>${escaparHTML(item.description)}</p><dl class="notice-facts"><div><dt>Zona</dt><dd>${escaparHTML(item.zone)}</dd></div><div><dt>Importancia</dt><dd>${importance}</dd></div><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div></dl><a class="button btn-liquid-light" href="#avisos/${encodeURIComponent(item.id)}">Ver detalle<span class="sr-only">: ${escaparHTML(item.title)}</span></a></article>`;
+  const FILTERS = [['todos', 'Todos'], ['no_leidos', 'No leídos'], ['equipo', 'Mi equipo'], ['ia', 'IA'], ['soporte', 'Soporte'], ['legales', 'Legales']];
+  const SEVERITIES = {critico:['Crítico', 'rojo'], advertencia:['Advertencia', 'ambar'], informacion:['Información', 'gris']};
+  const severity = item => { const [label, tone] = SEVERITIES[item.severity]; return `<span class="badge tone-${tone}">${label}</span>`; };
+  function noticeRow(item) {
+    return `<li><a class="notice-row${item.read ? '' : ' is-unread'}" href="#avisos/${item.id}" data-notice-open="${item.id}"${item.link ? ` data-notice-link="${escaparHTML(item.link)}"` : ''}>
+      <span class="notice-dot" aria-hidden="true"></span><span class="sr-only">${item.read ? 'Leído' : 'No leído'}</span>${severity(item)}
+      <strong>${escaparHTML(item.title)}</strong>${item.garden ? `<span class="notice-garden">${escaparHTML(item.garden)}</span>` : ''}<span class="notice-when">${escaparHTML(GardenModel.ago(item.createdAt) || '')}</span></a></li>`;
   }
-  function notices(data, filter='all', detail=null, name='') {
-    if(data.status==='unassigned')return heading('Avisos')+state('Sin huerto asignado','Tu cuenta todavía no tiene un huerto asignado.');
-    if(detail) {
-      const item=data.items.find(item=>item.id===detail);
-      if(data.status==='loading')return heading('Avisos')+state('Cargando aviso','Consultando su información.',true);
-      if(data.status==='error')return heading('Avisos')+state('Esta sección se está actualizando.','Vuelve a intentarlo más tarde.',false,true);
-      if(!item)return heading('Aviso no disponible')+`<div class="bento-panel"><p>Este aviso no está disponible.</p><a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div>`;
-      return heading('Detalle del aviso')+`<article class="bento-panel notice-detail"><div class="notice-meta"><span class="notice-condition ${item.condition}">${item.condition==='active'?'Activo':'Resuelto'}</span><span class="read-state">${item.read?'Leído':'No leído'}</span></div><h2>${escaparHTML(item.title)}</h2><p>${escaparHTML(item.description)}</p><dl class="notice-facts"><div><dt>Zona</dt><dd>${escaparHTML(item.zone)}</dd></div><div><dt>Importancia</dt><dd>${{high:'Alta',medium:'Media',info:'Informativa'}[item.importance]}</dd></div><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div>${item.resolvedAt?`<div><dt>Resolución</dt><dd>${date(item.resolvedAt)}</dd></div>`:''}</dl><div class="notice-recommendation"><h3>Recomendación</h3><p>${escaparHTML(item.recommendation)}</p></div><div class="app-actions">${!item.read?`<button class="button btn-liquid-brand" data-app-action="mark-read" data-id="${escaparHTML(item.id)}" type="button">Marcar como leído</button>`:''}<a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div></article>`;
-    }
-    const filters=`<div class="notice-filters" role="group" aria-label="Filtrar avisos">${[['all','Todos'],['active','Activos'],['resolved','Resueltos']].map(([id,label])=>`<button class="button ${filter===id?'btn-liquid-brand':'btn-liquid-light'}" type="button" data-filter="${id}" aria-pressed="${filter===id}">${label}</button>`).join('')}</div>`;
-    const items=AppModel.filterNotices(data.items,filter);
+  function noticeDetail(data) {
+    if(data.status === 'loading') return heading('Avisos')+state('Cargando aviso','Consultando su información.',true);
+    if(data.status === 'error') return heading('Avisos')+state('No pudimos cargar el aviso','Inténtalo de nuevo.',false,true);
+    if(data.status === 'not-found' || !data.item) return heading('Aviso no disponible')+'<div class="bento-panel"><p>Este aviso no está disponible.</p><a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div>';
+    const item = data.item;
+    return heading('Detalle del aviso')+`<article class="bento-panel notice-detail"><div class="notice-meta">${severity(item)}${item.resolvedAt ? '<span class="badge tone-verde">Resuelto</span>' : ''}</div><h2>${escaparHTML(item.title)}</h2>${item.text ? `<p>${escaparHTML(item.text)}</p>` : ''}
+      <dl class="notice-facts"><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div>${item.garden ? `<div><dt>Huerto</dt><dd>${escaparHTML(item.garden)}</dd></div>` : ''}${item.resolvedAt ? `<div><dt>Resolución</dt><dd>${date(item.resolvedAt)}</dd></div>` : ''}</dl>
+      <div class="app-actions">${item.link ? `<a class="button btn-liquid-brand" href="${escaparHTML(item.link)}">Ir</a>` : ''}${item.resolvable ? '<button class="button btn-liquid-light" type="button" data-app-action="mark-resolved">Marcar como resuelto</button>' : ''}<a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div></article>`;
+  }
+  function notices(data, filter='todos', detail=null, name='') {
+    if(detail) return noticeDetail(data);
+    const filters = `<div class="notice-filters" role="group" aria-label="Filtrar avisos">${FILTERS.map(([id, label]) => `<button class="button ${filter===id?'btn-liquid-brand':'btn-liquid-light'}" type="button" data-filter="${id}" aria-pressed="${filter===id}">${label}</button>`).join('')}</div>`;
     let body;
-    if(data.status==='loading')body=state('Cargando avisos','Consultando los avisos del huerto.',true);
-    else if(data.status==='error')body=state('Esta sección se está actualizando.','Vuelve a intentarlo más tarde.',false,true);
-    else if(!items.length)body=state(filter==='all'?'No hay avisos para mostrar':'No hay avisos en este filtro','Los avisos de cultivo y comunicación aparecerán aquí cuando estén disponibles.');
-    else body=`<div class="notices-grid">${items.map(noticeCard).join('')}</div>`;
-    return heading('Avisos',AppModel.addressed(name,'Revisa lo que necesita atención en tu huerto.'))+filters+`<p class="sr-only" role="status">${data.status==='ready'?`${items.length} avisos en este filtro.`:''}</p>`+body;
+    if(data.status === 'loading') body = state('Cargando avisos','Consultando tus avisos.',true);
+    else if(data.status === 'error') body = state('No pudimos cargar tus avisos','Inténtalo de nuevo.',false,true);
+    else if(!data.items.length) body = state(filter === 'todos' ? 'No tienes avisos' : 'No hay avisos en este filtro','Los avisos de tu equipo, de soporte y de tu cuenta aparecerán aquí.');
+    else body = `<ul class="notice-list bento-panel">${data.items.map(noticeRow).join('')}</ul>${data.items.length < data.total ? '<button class="button btn-liquid-light" type="button" data-app-action="more">Cargar más</button>' : ''}`;
+    return heading('Avisos',AppModel.addressed(name,'Revisa lo que necesita atención.'))+`<div class="app-actions"><button class="button btn-liquid-light" type="button" data-app-action="mark-all-read">Marcar todo como leído</button></div>`+filters+body;
   }
   // Salida al pie de Mi cuenta. Sigue disponible aunque el perfil no haya podido cargarse.
   const signOut = () => `<section class="bento-panel account-session" aria-labelledby="session-title"><div><h2 id="session-title">Tu sesión</h2><p>Saldrás de tu cuenta en este navegador.</p></div><button class="button btn-liquid-light account-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></section>`;
@@ -171,10 +176,17 @@ const AppViews = (() => {
     root.innerHTML=shell(route,nav);
     const page=root.querySelector('#app-page'),feedback=root.querySelector('#app-feedback');
     const sidebar=root.querySelector('.sidebar'),toggle=root.querySelector('.private-menu-toggle'),shade=root.querySelector('.private-menu-shade');
-    const messages={failed:'No se pudo completar la solicitud. Inténtalo de nuevo.',read:'Aviso marcado como leído. Su condición no ha cambiado.'};
+    const messages={failed:'No se pudo completar la solicitud. Inténtalo de nuevo.'};
     return {page,sidebar,toggle,
       message(code,error=false){feedback.hidden=false;feedback.textContent=messages[code];feedback.setAttribute('role',error?'alert':'status');feedback.focus();},
       hideMessage(){feedback.hidden=true;},
+      // Contador de la campana: «9+» a partir de 10; sin avisos sin leer no se muestra.
+      bell(unread){const badge=root.querySelector('[data-bell-count]'),link=badge?.closest('a');if(!badge)return;
+        badge.hidden=!unread;badge.textContent=unread>9?'9+':String(unread||'');
+        link.setAttribute('aria-label',unread?`Avisos, ${unread} sin leer`:'Avisos');},
+      // Aviso fijo mientras haya una eliminación de cuenta pendiente (4.9).
+      deletion(deletionDate){const banner=root.querySelector('[data-deletion-banner]');banner.hidden=!deletionDate;
+        banner.innerHTML=deletionDate?`<p>Tu cuenta se eliminará el ${date(deletionDate)}.</p><button class="button btn-liquid-light compact" type="button" data-app-action="cancel-deletion">Cancelar eliminación</button>`:'';},
       pageBusy(on){page.inert=on;if(on)page.setAttribute('aria-busy','true');else page.removeAttribute('aria-busy');},
       // Devuelve el contenedor del perfil cuando la cuenta está lista; el controlador monta su formulario.
       draw(screen,data,filter,detail,alias){
@@ -211,11 +223,9 @@ const AppViews = (() => {
         if(focused.getBoundingClientRect().bottom>available-16)focused.scrollIntoView({block:'center'});
       }};
   }
-  const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'}};
-  return {shell,frame,heading,state,date,notices,account,accountGreeting,accountTabs,confirmaciones,
-    assistant(){return heading('Asistente')+`<section class="bento-panel assistant-panel" aria-label="Disponibilidad del asistente"><span class="icon-medallion">${icon('sparkle')}</span><p>Aquí podrás consultar orientación para cuidar tu huerto y comprender sus avisos. La asistencia con inteligencia artificial se incorporará en una próxima etapa.</p></section>`;},
-    reading(raw,unit){return `<strong class="${raw.value==null?'absent':''}">${raw.value==null?'—':escaparHTML(AppModel.number(raw.value))}${raw.value==null?'':`<small>${unit}</small>`}</strong>`;},
-    readingNote(raw){return raw.quality==='invalid'?'Lectura inválida. Revisa este sensor.':raw.value==null?'Aún no hay lecturas disponibles.':`Última lectura: ${date(raw.at)}`;}
+  const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},
+    cancelarEliminacion:{titulo:'¿Cancelar la eliminación de tu cuenta?',texto:'Tu cuenta y tus datos se conservarán.',accion:'Cancelar eliminación'}};
+  return {shell,frame,heading,state,date,notices,account,accountGreeting,accountTabs,confirmaciones
   };
 })();
 

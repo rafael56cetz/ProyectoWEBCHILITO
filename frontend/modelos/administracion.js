@@ -8,7 +8,7 @@ const AdminService = (() => {
   // Estado real del aviso: aceptado por SMTP no significa entregado en la bandeja.
   const noticeLabels=Object.freeze({pendiente:'Pendiente de envío',aceptado_smtp:'Aceptado por el servidor de correo',fallido:'Envío fallido; se reintentará'});
   let remote=null,diagnosis=null;
-  const incidents=UserGardenService.incidents;
+  const incidents=GardenModel.INCIDENTS;
   const statusOf=response=>response.body?.code==='stale-record'?'stale':response.http===403?'forbidden':response.http===401?'unauthenticated':response.http===429?'limited':'error';
   async function request(path,body) {
     try {

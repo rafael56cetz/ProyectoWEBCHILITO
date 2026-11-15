@@ -1,5 +1,5 @@
 // VISTA · Cuenta: pantallas de acceso, segundo factor, perfil y privacidad personal.
-// Define: AuthViews, MfaViews, ProfileViews, PrivacyViews, LegalAcceptViews.
+// Define: AuthViews, MfaViews, ProfileViews, PrivacyViews, LegalAcceptViews, AccountDataViews.
 
 // ── Acceso ──
 const AuthViews = (() => {
@@ -444,7 +444,7 @@ const PrivacyViews = Object.freeze({
   account() {
     const tabs = AppViews.accountTabs('privacidad');
     const documents = '<nav class="doc-links" aria-label="Documentos legales"><span>Documentos legales</span><a href="#privacidad">Aviso de privacidad</a><a href="#cookies">Política de cookies</a><a href="#terminos">Términos y condiciones</a></nav>';
-    return `<div class="privacy-flow">${AppViews.heading('Privacidad','Consulta tus datos y decide sobre las estadísticas de este navegador.')}${tabs}<div data-my-privacy></div>${documents}</div>`;
+    return `<div class="privacy-flow">${AppViews.heading('Privacidad','Consulta tus datos y decide sobre las estadísticas de este navegador.')}${tabs}<div data-my-privacy></div><div data-account-data></div>${documents}</div>`;
   },
   // Pinta el apartado y devuelve el contenedor donde se monta «Mis datos».
   mount(root) {
@@ -481,4 +481,42 @@ const LegalAcceptViews = (() => {
       fail() { feedback.hidden = false; }};
   }
   return Object.freeze({screen});
+})();
+
+// ── Eliminacion ──
+// «Documentos que aceptaste» y «Eliminar mi cuenta» (4.9). Los datos del servidor entran escapados.
+const AccountDataViews = (() => {
+  const TYPES = {terminos:'Términos y condiciones', aviso_privacidad:'Aviso de privacidad'};
+  const WRONG = {'wrong-password':'La contraseña no es correcta.', limited:'Demasiados intentos. Espera un momento.', unauthenticated:'Tu sesión venció. Inicia sesión de nuevo.',
+    unavailable:'No se pudo completar. Inténtalo de nuevo.'};
+  const accepted = state => {
+    if(state.status === 'error') return '<p role="alert">No se pudieron consultar tus documentos.</p>';
+    if(state.status === 'loading') return '<p role="status">Consultando…</p>';
+    if(!state.items.length) return '<p>Aún no hay documentos aceptados.</p>';
+    return `<ul class="user-history-list">${state.items.map(item => `<li><span>${icon('check')}</span><div><h3>${escaparHTML(TYPES[item.type] || item.type)}</h3><p>Versión ${escaparHTML(item.version)} · ${AppViews.date(item.at)}</p></div></li>`).join('')}</ul>`;
+  };
+  const deletionPanel = date => date
+    ? `<h2 id="delete-title">Eliminación de tu cuenta solicitada</h2><p>Tu cuenta se eliminará el ${AppViews.date(date)}. Hasta entonces puedes cancelarlo.</p><button class="button btn-liquid-light" type="button" data-delete-cancel>Cancelar eliminación</button>`
+    : '<h2 id="delete-title">Eliminar mi cuenta</h2><p>Borraremos tus datos personales 15 días después de pedirlo. Tus equipos quedarán libres y tus huertos se archivarán. Puedes cancelarlo antes de que pase el plazo.</p><button class="button btn-liquid-light" type="button" data-danger="true" data-delete-open>Eliminar mi cuenta</button>';
+
+  function mount(host) {
+    host.innerHTML = `<section class="bento-panel privacy-panel" aria-labelledby="accepted-title"><h2 id="accepted-title">Documentos que aceptaste</h2><div data-accepted-list></div></section>
+      <section class="bento-panel privacy-panel deletion-panel" aria-labelledby="delete-title" data-deletion-panel></section>
+      <dialog class="bento-panel app-dialog" aria-labelledby="delete-dialog-title" data-delete-dialog><form data-delete-form novalidate>
+        <h2 id="delete-dialog-title">¿Eliminar tu cuenta?</h2><p>Borraremos tus datos personales 15 días después de confirmar. Escribe tu contraseña para continuar.</p>
+        <label for="delete-password">Contraseña</label><input id="delete-password" name="password" type="password" autocomplete="current-password" required>
+        <p class="auth-feedback is-error" role="alert" data-delete-error hidden></p>
+        <div class="app-dialog-actions"><button class="button btn-liquid-light" type="button" data-delete-close>Cancelar</button><button class="button" type="submit" data-danger="true">Eliminar mi cuenta</button></div></form></dialog>`;
+    const list = host.querySelector('[data-accepted-list]'), panel = host.querySelector('[data-deletion-panel]');
+    const dialog = host.querySelector('[data-delete-dialog]'), form = host.querySelector('[data-delete-form]'), error = form.querySelector('[data-delete-error]');
+    return {panel, dialog, form,
+      accepted(state) { list.innerHTML = accepted(state); },
+      deletion(date) { panel.innerHTML = deletionPanel(date); },
+      password: () => form.elements.password.value,
+      openDialog() { form.reset(); error.hidden = true; dialog.showModal(); form.elements.password.focus(); },
+      closeDialog() { form.reset(); if(dialog.open) dialog.close(); },
+      busy(on) { form.querySelector('[type=submit]').disabled = on; },
+      fail(code) { error.textContent = WRONG[code] || WRONG.unavailable; error.hidden = false; form.elements.password.focus(); }};
+  }
+  return Object.freeze({mount});
 })();

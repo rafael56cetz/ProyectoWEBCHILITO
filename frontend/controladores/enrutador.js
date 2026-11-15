@@ -46,8 +46,7 @@ const SiteController = (() => {
       }
       if(AuthModel.screens.includes(part)) return {screen:part};
       if(Object.hasOwn(PrivacyModel.documents, part) && !encodedDetail) return {screen:part};
-      if(part === 'huerto') return {screen:'huerto',detail:'',gardenId:new URLSearchParams(query).get('h')};
-      if(AppModel.destinations.some(item => item.id === part)) return {screen:part,detail};
+      if(AppModel.destinations.some(item => item.id === part)) return {screen:part,detail,gardenId:new URLSearchParams(query).get('h')};
       return {screen:'inicio',anchor:sections.includes(part) ? part : null};
     }
     // La sesión conocida evita el parpadeo; la del servidor decide. Quien está en el segundo paso no cuenta.
@@ -107,7 +106,7 @@ const SiteController = (() => {
           if(route.screen !== 'aceptar-legales') legalTarget = location.hash || '#huerto';
           route = {screen:'aceptar-legales'};
           replaceHash('#aceptar-legales');
-        } else if((session.role==='admin') !== (route.screen==='admin') && !(session.role==='admin' && route.screen==='cuenta')) {
+        } else if((session.role==='admin') !== (route.screen==='admin') && !(session.role==='admin' && ['cuenta','avisos'].includes(route.screen))) {
           route=session.role==='admin'?{screen:'admin',detail:AppModel.adminHome(session).split('/')[1]}:{screen:'huerto'};
           history.replaceState(null,'',location.pathname+location.search+'#'+(route.screen==='admin'?'admin/'+route.detail:'huerto'));
         }

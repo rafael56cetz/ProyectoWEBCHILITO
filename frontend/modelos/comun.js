@@ -40,7 +40,17 @@ const PrivacyData = (() => {
     myData: () => post('/api/privacidad/mis-datos', {}),
     saveProfile: values => post('/api/cuenta/perfil', values),
     welcome: values => post('/api/cuenta/bienvenida', values),
-    acceptLegal: documents => post('/api/legales/aceptar', {documents})
+    acceptLegal: documents => post('/api/legales/aceptar', {documents}),
+    acceptances: () => send('/api/cuenta/aceptaciones'),
+    cancelDeletion: () => post('/api/cuenta/eliminar/cancelar', {}),
+    // Pide borrar la cuenta con la contraseña: una contraseña incorrecta es 400 y se distingue de un fallo del servicio.
+    async requestDeletion(password) {
+      try {
+        const response = await ChilitoHTTP.request('/api/cuenta/eliminar', {method:'POST', body:{password}});
+        if(response.http === 200) return response.body;
+        return {status:{400:'wrong-password', 401:'unauthenticated', 429:'limited'}[response.http] || 'unavailable'};
+      } catch { return {status:'unavailable'}; }
+    }
   });
 })();
 
@@ -76,76 +86,32 @@ const AppModel = (() => {
   const gardenPhrases=['Cada pequeño cuidado cuenta.','Cultivar es aprender un poco cada día.','Lo bueno de un huerto es que se cuida poco a poco.','Aquí tienes lo de tu huerto en un mismo lugar.','Un rato con tus plantas también es tiempo bien empleado.'];
   const gardenPhrase=gardenPhrases[Math.floor(Math.random()*gardenPhrases.length)];
   const gardenGreeting=name=>({title:name?`Hola, ${name}`:'Te damos la bienvenida a tu huerto',lead:name?'Te damos la bienvenida a tu huerto.':'',phrase:gardenPhrase});
-  const states = {
-    loading:['Consultando el huerto','Espera un momento.','clock'],
-    waiting:['Huerto vinculado · Sin lecturas recibidas','Las mediciones aparecerán cuando el equipo empiece a enviarlas.','clock'],
-    ready:['Datos disponibles','Consulta la fecha de cada lectura.','wifi'],
-    stale:['Datos desactualizados','Las últimas lecturas se conservan como referencia; no describen necesariamente el estado actual.','clock'],
-    offline:['Dispositivo sin conexión','No se están recibiendo nuevas lecturas. Se conserva la última información disponible.','off'],
-    error:['No se pudo consultar el huerto','Inténtalo de nuevo para consultar su estado.','info'],
-    invalid:['Hay una lectura inválida','Revisa el sensor indicado. Las otras lecturas mantienen su propia fecha y validez.','info'],
-    unassigned:['Sin huerto asignado','Tu cuenta todavía no tiene un huerto asignado.','leaf']
-  };
   const text = value => typeof value === 'string' && value.trim().length > 0;
   const dateValid = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
   const idValid = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
-  function validReading(raw, kind='humidity') {
-    if(!raw || !['missing','valid','invalid'].includes(raw.quality) || raw.at !== null && !dateValid(raw.at)) return false;
-    if(raw.quality === 'missing') return raw.value === null && raw.at === null;
-    if(raw.quality === 'invalid') return raw.value === null;
-    return typeof raw.value === 'number' && Number.isFinite(raw.value) && dateValid(raw.at)
-      && (kind !== 'humidity' || raw.value >= 0 && raw.value <= 100);
-  }
-  function reading(raw, kind='humidity') {
-    if (!validReading(raw,kind)) return {value:null,quality:'invalid',at:null};
-    return {value:raw.value,quality:raw.quality,at:raw.at};
-  }
-  function garden(data={}) {
-    let status = Object.hasOwn(states,data.status) ? data.status : 'error';
-    if(!['loading','error','unassigned'].includes(status)) {
-      const plants = data.plants;
-      if(!text(data.name) || data.updatedAt !== null && !dateValid(data.updatedAt)
-        || !Array.isArray(plants) || plants.length !== 3 || ![1,2,3].every(id=>plants.filter(p=>p?.id===id).length===1)
-        || plants.some(p=>!text(p.name) || !validReading(p.reading))
-        || !validReading(data.temperature,'temperature') || !validReading(data.humidity)
-        || !data.tank || !['low','not-low','unknown'].includes(data.tank.state)
-        || data.tank.at !== null && !dateValid(data.tank.at)
-        || data.tank.state === 'unknown' && data.tank.at !== null
-        || data.tank.state !== 'unknown' && !dateValid(data.tank.at)) status = 'error';
-    }
-    const usable = !['loading','error','unassigned'].includes(status);
-    const missing = () => ({value:null,quality:'missing',at:null});
-    return {
-      status,name:usable ? data.name : 'Mi huerto',
-      updatedAt:usable ? data.updatedAt : null,
-      plants:[1,2,3].map(id=>{ const plant=usable ? data.plants.find(p=>p.id===id) : null;
-        return {id,zoneId:plant?.zoneId || null,name:plant?.name || `Planta ${id}`,crop:plant?.crop || '',reading:plant ? reading(plant.reading) : missing()}; }),
-      temperature:usable ? reading(data.temperature,'temperature') : missing(),humidity:usable ? reading(data.humidity) : missing(),
-      tank:usable ? {state:data.tank.state,at:data.tank.at} : {state:'unknown',at:null}
-    };
-  }
+  const NOTICE_ORIGINS = ['dispositivo', 'ia', 'legal', 'soporte', 'vinculacion', 'sistema'];
+  const NOTICE_SEVERITIES = ['informacion', 'advertencia', 'critico'];
+  const NOTICE_FILTERS = ['todos', 'no_leidos', 'equipo', 'ia', 'soporte', 'legales'];
+  const linkValid = value => value === null || typeof value === 'string' && /^#[A-Za-z0-9/_-]{1,119}$/.test(value);
   function notice(raw) {
-    if(!raw || !idValid(raw.id) || !text(raw.title) || !text(raw.description) || !text(raw.zone)
-      || typeof raw.recommendation !== 'string' || !dateValid(raw.createdAt)
-      || !['high','medium','info'].includes(raw.importance) || !['active','resolved'].includes(raw.condition)
-      || typeof raw.read !== 'boolean') return null;
-    if(raw.condition === 'active' && raw.resolvedAt !== null) return null;
-    if(raw.condition === 'resolved' && (!dateValid(raw.resolvedAt) || Date.parse(raw.resolvedAt) < Date.parse(raw.createdAt))) return null;
-    return {id:raw.id,title:raw.title,description:raw.description,recommendation:raw.recommendation,
-      zone:raw.zone,createdAt:raw.createdAt,resolvedAt:raw.resolvedAt,importance:raw.importance,condition:raw.condition,read:raw.read};
+    if(!raw || !idValid(raw.id) || !text(raw.title) || typeof raw.text !== 'string' || !NOTICE_ORIGINS.includes(raw.origin)
+      || !NOTICE_SEVERITIES.includes(raw.severity) || !dateValid(raw.createdAt) || typeof raw.read !== 'boolean' || typeof raw.resolvable !== 'boolean'
+      || !linkValid(raw.link) || raw.garden !== null && typeof raw.garden !== 'string' || raw.resolvedAt !== null && !dateValid(raw.resolvedAt)) return null;
+    return {id:raw.id, origin:raw.origin, severity:raw.severity, title:raw.title, text:raw.text, garden:raw.garden, link:raw.link,
+      createdAt:raw.createdAt, read:raw.read, resolvedAt:raw.resolvedAt, resolvable:raw.resolvable};
   }
-  function notices(data={}) {
-    if(['loading','error','unassigned','not-found'].includes(data.status)) return {status:data.status,items:[]};
-    if(!['ready','empty'].includes(data.status) || !Array.isArray(data.items)) return {status:'error',items:[]};
-    const items=data.items.map(notice);
-    if(items.some(item=>!item) || new Set(items.map(item=>item.id)).size !== items.length
-      || data.status==='empty' && items.length) return {status:'error',items:[]};
-    return {status:items.length ? 'ready' : 'empty',items};
+  function notices(data = {}) {
+    if(['loading', 'error', 'not-found'].includes(data.status)) return {status:data.status, items:[], page:1, total:0};
+    if(data.status !== 'ready' || !Array.isArray(data.items)) return {status:'error', items:[], page:1, total:0};
+    const items = data.items.map(notice);
+    if(items.some(item => !item) || new Set(items.map(item => item.id)).size !== items.length) return {status:'error', items:[], page:1, total:0};
+    return {status:items.length ? 'ready' : 'empty', items, page:Number.isInteger(data.page) ? data.page : 1, total:Number.isInteger(data.total) ? data.total : items.length};
   }
+  // Fecha en que se borrará la cuenta, si la persona la pidió (la fija el servidor).
+  const deletionDate = session => dateValid(session?.profile?.deletionDate) ? session.profile.deletionDate : null;
   return {
-    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminHome,panelHome,alias,addressed,gardenGreeting,states,garden,notices,notice,reading,idValid,
+    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminHome,panelHome,alias,addressed,gardenGreeting,notices,notice,idValid,deletionDate,NOTICE_FILTERS,
     isPrivate(screen) { return screen === 'admin' || destinations.some(item=>item.id===screen); },
-    filterNotices(items,filter) { return items.filter(item=>filter==='all' || item.condition===filter); },
     profile(data={}) { return data.status==='ready' && text(data.email) && data.verified===true
       ? {email:data.email,verified:true,status:'ready',firstName:(data.profile||data).firstName||'',lastName:(data.profile||data).lastName||'',alias:(data.profile||data).alias||'',greeting:(data.profile||data).greeting||''} : {email:null,verified:null,status:'error'}; },
     date(value) { const d = new Date(value); return value && Number.isFinite(d.getTime()) ? d.toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}) : 'Sin registro'; },
@@ -154,49 +120,49 @@ const AppModel = (() => {
 })();
 
 // Datos guardados de cuenta, huerto y avisos, pedidos al mismo origen. Sin colecciones de respaldo.
-const AppService = Object.freeze({
-  async request(action, payload={}, {signal}={}) {
-    if (signal?.aborted) throw new DOMException('Cancelled','AbortError');
-    if (action === 'logout') return AuthService.logout({signal});
-    const base='/api/huertos/actual';
-    const path={profile:'/api/cuenta',notices:base+'/avisos'}[action];
-    if(['notice','mark-read'].includes(action) && !AppModel.idValid(payload.id)) return {status:'not-found'};
-    const endpoint=path || (action === 'notice' ? base+'/avisos/'+encodeURIComponent(payload.id)
-      : action === 'mark-read' ? base+'/avisos/'+encodeURIComponent(payload.id)+'/lectura' : null);
-    if(!endpoint) return {status:'unavailable'};
-    const response=await ChilitoHTTP.request(endpoint,{signal,
-      ...(action === 'mark-read' ? {method:'POST',body:{}} : {})});
-    if(response.http === 401 || response.body?.code === 'verification-required') {
-      AuthService.forgetSession();
-      ChilitoHTTP.sessionExpired();
-      return {status:'unauthenticated'};
+const AppService = (() => {
+  const background = {'X-Chilito-Sondeo':'1'};
+  const query = values => { const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value)); return params.size ? `?${params}` : ''; };
+  // Cada acción: ruta, método y qué acepta como respuesta. El contador va como sondeo: no alarga la sesión.
+  const actions = {
+    profile:() => ({path:'/api/cuenta'}),
+    notices:p => ({path:`/api/avisos${query({filtro:AppModel.NOTICE_FILTERS.includes(p.filter) ? p.filter : 'todos', page:p.page > 1 ? p.page : ''})}`}),
+    notice:p => ({path:`/api/avisos/${p.id}`, needsId:true}),
+    'mark-read':p => ({path:`/api/avisos/${p.id}/leido`, method:'POST', needsId:true}),
+    'mark-resolved':p => ({path:`/api/avisos/${p.id}/resuelto`, method:'POST', needsId:true}),
+    'mark-all-read':() => ({path:'/api/avisos/leer-todos', method:'POST'}),
+    counter:() => ({path:'/api/avisos/contador', headers:background}),
+    'cancel-deletion':() => ({path:'/api/cuenta/eliminar/cancelar', method:'POST'})
+  };
+  function adapt(action, body) {
+    if(action === 'profile') return AppModel.profile(body);
+    if(action === 'notices') return AppModel.notices(body);
+    if(['notice', 'mark-read', 'mark-resolved'].includes(action)) {
+      const item = AppModel.notice(body.notice);
+      return item ? {status:action === 'notice' ? 'ready' : 'accepted', item} : {status:'error'};
     }
-    if(response.http === 403 && response.body?.code === 'garden-unassigned') return {status:'unassigned'};
-    if(response.http === 404) return {status:'not-found'};
-    if(![200,201].includes(response.http)) return {status:'error'};
-    if(action === 'profile') return AppModel.profile(response.body);
-    if(action === 'notices') {
-      const items=[...(response.body.items||[])];let page=response.body.page||1;
-      while(response.body.total>items.length&&page<100) {
-        const next=await ChilitoHTTP.request(endpoint+'?page='+(++page),{signal});
-        if(next.http!==200||!Array.isArray(next.body.items))return {status:'error',items:[]};
-        if(!next.body.items.length)break;items.push(...next.body.items);
-      }
-      return AppModel.notices({...response.body,items});
-    }
-    if(action === 'notice') {
-      const item=AppModel.notice((response.body?.item || response.body?.notice));
-      return response.body?.status === 'ready' && item?.id === payload.id ? {status:'ready',items:[item]} : {status:'error'};
-    }
-    if(action === 'mark-read') {
-      const item=AppModel.notice((response.body?.item || response.body?.notice));
-      return response.body?.status === 'accepted' && response.body.id === payload.id
-        && response.body.read === true && item?.id === payload.id && item.read === true
-        ? {status:'accepted',id:item.id,item} : {status:'error'};
-    }
-    return {status:'error'};
+    if(action === 'counter') return Number.isInteger(body.unread) && body.unread >= 0 ? {status:'ready', unread:body.unread} : {status:'error'};
+    return body.status === 'accepted' ? {status:'accepted', updated:body.updated ?? 0} : {status:'error'};
   }
-});
+  return Object.freeze({
+    async request(action, payload = {}, {signal} = {}) {
+      if (signal?.aborted) throw new DOMException('Cancelled','AbortError');
+      if (action === 'logout') return AuthService.logout({signal});
+      const plan = actions[action]?.(payload);
+      if(!plan) return {status:'unavailable'};
+      if(plan.needsId && !AppModel.idValid(payload.id)) return {status:'not-found'};
+      const response = await ChilitoHTTP.request(plan.path, {signal, method:plan.method, body:plan.method === 'POST' ? {} : undefined, headers:plan.headers});
+      if(response.http === 401 || response.body?.code === 'verification-required') {
+        AuthService.forgetSession();
+        ChilitoHTTP.sessionExpired();
+        return {status:'unauthenticated'};
+      }
+      if(response.http === 404) return {status:'not-found'};
+      if(response.http === 429) return {status:'limited'};
+      return response.http === 200 ? adapt(action, response.body) : {status:'error'};
+    }
+  });
+})();
 
 // ── Avisos ──
 // Reglas del aviso flotante (3.5): tipos permitidos, ícono y permanencia. El error no se oculta solo (ms: 0).

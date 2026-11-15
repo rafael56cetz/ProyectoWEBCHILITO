@@ -6,6 +6,7 @@
 - `entorno_local.py`: carga los `.env` sin mostrar sus valores.
 - `destino_temporal.py`: comprueba que los flujos apunten a la base temporal antes de escribir.
 - `probar_seguridad.py`, `probar_mfa.py`, `probar_privacidad.py`: flujos con el rol limitado.
+- `simular_equipo.py`: simula un equipo vinculado (mediciones, órdenes, autodiagnóstico, conexión) con el rol `chilito_pkg_iot`. Solo desarrollo: exige `CHILITO_ENV=local|testing` y `CHILITO_DEBUG=1`, usa sus propias variables `CHILITO_SIM_DB`, `CHILITO_SIM_HOST`, `CHILITO_SIM_PUERTO` y `CHILITO_SIM_CLAVE_IOT`, y deja un evento «reinicio» con detalle «simulador». Nunca se entrega a la nube.
 - `configurar_correo.py`, `correo_config.py`, `probar_correo.py`: configuración y prueba de SMTP.
 - `probar_cuota_contacto.py`: comprueba el límite de «Consíguelo» en un entorno de pruebas desplegado.
 - `soporte_local.py`: recuperación de acceso sin métodos.

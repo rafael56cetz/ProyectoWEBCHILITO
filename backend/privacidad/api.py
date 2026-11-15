@@ -10,7 +10,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods
 
 from privacidad import politicas, services
-from web.api import InputError, body, endpoint, failure
+from web.api import InputError, body, bounds, endpoint, failure
 from web.respuestas import respuesta_de_base
 
 logger = logging.getLogger(__name__)
@@ -94,3 +94,26 @@ def section(request):
     if contada and nuevo:
         _cookie(respuesta, services.COOKIE_ESTADISTICA, nuevo, politicas.IDENTIFICADOR_ESTADISTICAS_SEGUNDOS)
     return respuesta
+
+
+@endpoint()
+def acceptances(request, data):
+    bounds(request, allowed=())
+    return services.aceptaciones(request.user)
+
+
+@endpoint(('POST',), ('password',))
+def _delete_account(request, data):
+    return services.solicitar_eliminacion(request.user, data.get('password'))
+
+
+def delete_account(request):
+    """La cuota se gasta antes de la transacción de la escritura: si no, un intento fallido se revertiría con ella y no contaría."""
+    if request.method == 'POST' and request.user.is_authenticated and not ratelimit.consume(request, action='eliminar_cuenta', user=request.user):
+        return failure(429, 'rate-limited')
+    return _delete_account(request)
+
+
+@endpoint(('POST',))
+def cancel_deletion(request, data):
+    return services.cancelar_eliminacion(request.user)

@@ -28,8 +28,8 @@ const AdminViews = (() => {
     </section>
     ${section('Tendencias ambientales agregadas','Últimos 7 días. Sin series de un hogar individual.')}
     <section class="user-chart-grid-layout" aria-label="Tendencias agregadas">
-      ${UserGardenViews.chart('Humedad media del sustrato',series(data.trends.soil),'%','7d','fleet-soil')}
-      ${UserGardenViews.chart('Humedad relativa media',series(data.trends.humidity),'%','7d','fleet-rh')}
+      ${GardenViews.chart('Humedad media del sustrato',series(data.trends.soil),'%','7d','fleet-soil')}
+      ${GardenViews.chart('Humedad relativa media',series(data.trends.humidity),'%','7d','fleet-rh')}
     </section>
     <div class="user-section-heading"><div><h2>Identidades y dispositivos vinculados</h2><p>Identificadores operativos y conexión al broker Mosquitto.</p></div>${button('refresh',icon('refresh')+'<span>Actualizar dispositivos</span>')}</div>
     <section class="bento-panel admin-table-panel">${table('Dispositivos vinculados',['Device_ID','User_ID','Mosquitto','Último heartbeat'],data.nodes.map(n=>`<tr><th scope="row">${escaparHTML(n.device)}</th><td>${available(n.user,'Sin vínculo de usuario en esta proyección')}</td><td><span class="admin-connection ${n.connected?'online':'offline'}">${n.connected==null?'Sin información':n.connected?'En línea':'Sin conexión'}</span></td><td>${available(n.heartbeat,'Sin registro')}</td></tr>`))}<p class="admin-caption">Se muestra el vínculo operativo mínimo. No se incluyen contraseñas ni ubicación.</p></section>

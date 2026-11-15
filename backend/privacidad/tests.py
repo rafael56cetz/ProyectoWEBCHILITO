@@ -191,3 +191,60 @@ class DocumentosHTML(SimpleTestCase):
         html, texto = sanear_html('<!-- Instrucciones de edición: <p>Ejemplo</p> -->\n')
         self.assertFalse(html.strip())
         self.assertEqual(texto, '')
+
+
+class EliminarCuenta(TestCase):
+    CLAVE = 'Clave-de-prueba-123'
+
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
+
+    def setUp(self):
+        from django.core.cache import cache
+        import uuid
+        cache.clear()
+        self.usuaria = cuenta('eliminar-usuaria@example.test', password=self.CLAVE)
+        self.client = Client(HTTP_HOST='127.0.0.1')
+        self.client.force_login(self.usuaria, backend='django.contrib.auth.backends.ModelBackend')
+        self.nueva_clave = lambda: {'HTTP_IDEMPOTENCY_KEY': str(uuid.uuid4())}
+
+    def post(self, ruta, datos=None):
+        return self.client.post(ruta, json.dumps(datos or {}), content_type='application/json', **self.nueva_clave())
+
+    def test_documentos_que_acepto(self):
+        datos = self.client.get('/api/cuenta/aceptaciones').json()
+        self.assertEqual(sorted(item['type'] for item in datos['items']), ['aviso_privacidad', 'terminos'])
+        self.assertTrue(all(item['version'] == '1.0' and item['at'] for item in datos['items']))
+        otra = Client(HTTP_HOST='127.0.0.1')
+        otra.force_login(cuenta('eliminar-otra@example.test'), backend='django.contrib.auth.backends.ModelBackend')
+        self.assertEqual(len(otra.get('/api/cuenta/aceptaciones').json()['items']), 2)
+
+    def test_exige_la_contrasena(self):
+        for clave in ('otra-clave', '', None, 5):
+            with self.subTest(clave=clave):
+                self.assertEqual(self.post('/api/cuenta/eliminar', {'password': clave}).status_code, 400)
+        self.usuaria.refresh_from_db()
+        self.assertIsNone(self.usuaria.anonimizacion_solicitada_en)
+        self.assertEqual(self.post('/api/cuenta/eliminar', {}).status_code, 400)
+
+    def test_solicitar_y_cancelar(self):
+        respuesta = self.post('/api/cuenta/eliminar', {'password': self.CLAVE})
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        cuerpo = respuesta.json()
+        self.assertTrue(cuerpo['deletionRequestedAt'] and cuerpo['deletionDate'])
+        perfil = self.client.get('/api/cuenta').json()
+        self.assertEqual((perfil['deletionRequestedAt'], perfil['deletionDate']), (cuerpo['deletionRequestedAt'], cuerpo['deletionDate']))
+        self.assertEqual(self.post('/api/cuenta/eliminar/cancelar').status_code, 200)
+        despues = self.client.get('/api/cuenta').json()
+        self.assertEqual((despues['deletionRequestedAt'], despues['deletionDate']), (None, None))
+        self.assertEqual(self.post('/api/cuenta/eliminar/cancelar').status_code, 400)
+        acciones = list(Auditoria.objects.filter(actor=self.usuaria).values_list('accion', flat=True))
+        self.assertIn('solicitar_eliminacion', acciones)
+        self.assertIn('cancelar_eliminacion', acciones)
+        self.assertFalse(Auditoria.objects.filter(detalle__icontains=self.CLAVE).exists())
+
+    def test_cuota_de_intentos(self):
+        estados = [self.post('/api/cuenta/eliminar', {'password': 'mala-%d' % n}).status_code for n in range(7)]
+        self.assertEqual(estados[:5], [400] * 5)
+        self.assertEqual(estados[5:], [429, 429])
