@@ -1,6 +1,7 @@
 """Frontera de persistencia de confianza (no es una API HTTP): se llama con el `request.user` ya autenticado.
 
 Los ID del navegador solo identifican recursos; el actor y el rol nunca se toman de lo que envía el cliente."""
+import logging
 from datetime import timedelta
 
 from allauth.account.models import EmailAddress
@@ -8,16 +9,21 @@ from allauth.mfa.models import Authenticator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection, transaction
+from django.db import DatabaseError, connection, transaction
+from django.db.models import Count
 from django.db.models.functions import Now
 from django.http import Http404
 from django.utils import timezone
 
 from huerto.models import Huerto
+from web.respuestas import ReglaDeNegocio
 
 from . import avisos_correo
-from .models import (Auditoria, Autodiagnostico, AutodiagnosticoRevision, Comando, ConsultaProducto, Dispositivo, Notificacion, SoporteCaso)
+from .models import (Auditoria, Autodiagnostico, AutodiagnosticoRevision, Comando, ConsultaProducto, Dispositivo, DispositivoEvento,
+                     Medicion, MedicionPlanta, Notificacion, SoporteCaso, SoporteSesion)
 from .paginacion import paginar
+
+logger = logging.getLogger(__name__)
 
 CAPS = {'ver_flota', 'atender_soporte', 'gestionar_mantenimientos', 'atender_consultas', 'gestionar_dispositivos',
         'gestionar_ventas', 'gestionar_guias', 'gestionar_legales', 'ver_consentimientos', 'gestionar_administradores'}
@@ -25,6 +31,14 @@ ESTADOS_CONSULTA = {'nueva', 'atendida', 'archivada'}
 INCIDENTES = ('bomba', 'humedad', 'lampara', 'conexion', 'otro')
 CASOS_ACTIVOS = ('abierto', 'en_atencion')
 HISTORIAL_CASOS = 20
+ESTADOS_BANDEJA = ('abierto', 'en_atencion', 'resuelto')
+RESULTADOS_SOPORTE = ('solucionado', 'sin_falla', 'sin_respuesta', 'otro')
+# Órdenes que soporte puede dar dentro de una sesión técnica; `probar_bomba` pide planta y de 1 a 5 s.
+ACCIONES_SOPORTE = ('lectura_inmediata', 'autodiagnostico', 'probar_bomba', 'lampara_apagar', 'lampara_automatico',
+                    'ventilador_encender', 'ventilador_apagar', 'reiniciar')
+SEGUNDOS_PRUEBA_BOMBA = (1, 5)
+EVENTOS_DE_SESION = timedelta(hours=24)
+MAXIMO_LISTA_SESION = 50
 # La base anonimiza a los 15 días de la solicitud; aquí solo se usa para mostrar la fecha.
 DIAS_PARA_ELIMINAR = 15
 # Orden de las revisiones del autodiagnóstico en pantalla (3.7).
@@ -288,6 +302,232 @@ def autodiagnostico(actor, diagnostico_id):
     if diagnostico is None:
         raise Http404
     return {'status': 'ready', 'diagnostic': autodiagnostico_dto(diagnostico)}
+
+
+# Consola remota (`atender_soporte`). Atiende quien toma el caso, y solo esa cuenta se conecta, da órdenes y lo resuelve.
+# Cada acción vuelve a leer la autorización: si la persona la revocó o venció, la siguiente orden falla.
+CAPACIDAD_SOPORTE = 'atender_soporte'
+
+
+def _autorizacion(caso):
+    if caso.autorizacion_revocada_en is not None:
+        return 'revocada'
+    return 'vencida' if timezone.now() >= caso.autorizacion_vence_en else 'vigente'
+
+
+def _nombre_de_persona(usuario):
+    return f'{usuario.first_name} {usuario.last_name}'.strip() or usuario.alias or None
+
+
+def _caso_admin_dto(caso, admin):
+    return {'id': str(caso.pk), 'folio': caso.folio, 'incident': caso.incidente, 'state': caso.estado, 'createdAt': _fecha(caso.creado_en),
+            'person': _nombre_de_persona(caso.solicitante), 'email': caso.solicitante.email,
+            'garden': caso.huerto.nombre, 'device': caso.dispositivo.identificador, 'note': caso.nota or None,
+            'authorization': _autorizacion(caso), 'authorizedUntil': _fecha(caso.autorizacion_vence_en),
+            'revokedAt': _fecha(caso.autorizacion_revocada_en), 'attendedBy': caso.atendido_por.email if caso.atendido_por_id else None,
+            'mine': caso.atendido_por_id == admin.pk, 'result': caso.resultado, 'resolutionNote': caso.nota_resolucion or None,
+            'closedAt': _fecha(caso.cerrado_en)}
+
+
+def _casos_admin():
+    return SoporteCaso.objects.select_related('solicitante', 'huerto', 'dispositivo', 'atendido_por')
+
+
+def _caso_de_soporte(caso_id, *, bloquear=False):
+    consulta = _casos_admin()
+    # FOR UPDATE no admite el LEFT JOIN de `atendido_por`: se bloquea solo la fila del caso.
+    caso = consulta.select_for_update(of=('self',)).filter(pk=caso_id).first() if bloquear else consulta.filter(pk=caso_id).first()
+    if caso is None:
+        raise Http404
+    return caso
+
+
+def _caso_propio_en_atencion(admin, caso):
+    if caso.estado != 'en_atencion' or caso.atendido_por_id != admin.pk:
+        raise ReglaDeNegocio('caso-no-tuyo', 'Solo quien atiende el caso puede conectarse, dar órdenes o resolverlo.')
+
+
+def bandeja_soporte(actor, estado, pagina):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    if estado not in ESTADOS_BANDEJA:
+        raise ValidationError('Estado no válido')
+    orden = '-cerrado_en' if estado == 'resuelto' else 'autorizacion_vence_en'
+    conteo = {fila['estado']: fila['n'] for fila in SoporteCaso.objects.values('estado').annotate(n=Count('id'))}
+    return {'status': 'ready', 'counts': {nombre: conteo.get(nombre, 0) for nombre in ESTADOS_BANDEJA},
+            **paginar(_casos_admin().filter(estado=estado).order_by(orden, 'id'), pagina, lambda caso: _caso_admin_dto(caso, admin))}
+
+
+def _sesion_abierta_del_caso(admin, caso):
+    return SoporteSesion.objects.filter(caso_id=caso.pk, administrador_id=admin.pk, cerrada_en__isnull=True).first()
+
+
+def _sesion_dto(sesion):
+    return {'id': str(sesion.pk), 'startedAt': _fecha(sesion.iniciada_en)}
+
+
+def detalle_soporte(actor, caso_id):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    caso = _caso_de_soporte(caso_id)
+    sesion = _sesion_abierta_del_caso(admin, caso)
+    adjunto = Autodiagnostico.objects.filter(pk=caso.autodiagnostico_id).first() if caso.autodiagnostico_id else None
+    return {'status': 'ready', 'case': _caso_admin_dto(caso, admin), 'diagnostic': autodiagnostico_dto(adjunto) if adjunto else None,
+            'session': _sesion_dto(sesion) if sesion else None}
+
+
+@transaction.atomic
+def atender_caso(actor, caso_id):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    caso = _caso_de_soporte(caso_id, bloquear=True)
+    if caso.estado != 'abierto':
+        raise ReglaDeNegocio('caso-ya-atendido', 'Este caso ya lo atiende otra persona o ya está cerrado.')
+    caso.estado, caso.atendido_por = 'en_atencion', admin
+    caso.save(update_fields=['estado', 'atendido_por'])
+    auditar(admin, 'atender_caso', entidad='soporte_caso', entidad_id=caso.pk)
+    return {'status': 'accepted', 'case': _caso_admin_dto(_caso_de_soporte(caso_id), admin)}
+
+
+@transaction.atomic
+def conectar_caso(actor, caso_id):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    caso = _caso_de_soporte(caso_id, bloquear=True)
+    _caso_propio_en_atencion(admin, caso)
+    existente = _sesion_abierta_del_caso(admin, caso)
+    if existente:
+        return {'status': 'accepted', 'session': _sesion_dto(existente)}
+    if _autorizacion(caso) != 'vigente':
+        raise ReglaDeNegocio('autorizacion-no-vigente', 'La persona ya no autoriza el acceso o la autorización venció.')
+    if SoporteSesion.objects.filter(administrador_id=admin.pk, cerrada_en__isnull=True).exists():
+        raise ReglaDeNegocio('sesion-abierta', 'Ya tienes una sesión técnica abierta en otro caso. Ciérrala antes de conectarte.')
+    sesion = SoporteSesion.objects.create(caso=caso, administrador=admin)
+    sesion.refresh_from_db()
+    auditar(admin, 'conectar_sesion', entidad='soporte_sesion', entidad_id=sesion.pk)
+    return {'status': 'accepted', 'session': _sesion_dto(sesion)}
+
+
+def _sesion_propia(admin, sesion_id, *, bloquear=False):
+    consulta = SoporteSesion.objects.select_for_update() if bloquear else SoporteSesion.objects
+    sesion = consulta.filter(pk=sesion_id, administrador_id=admin.pk).first()
+    if sesion is None:
+        raise Http404
+    return sesion
+
+
+def _lecturas_actuales(caso):
+    medicion = Medicion.objects.filter(dispositivo_id=caso.dispositivo_id).order_by('-medida_en').first()
+    if medicion is None:
+        return None
+    plantas = MedicionPlanta.objects.filter(medicion_id=medicion.pk).order_by('planta_numero')
+    numero = lambda valor: None if valor is None else float(valor)
+    return {'measuredAt': _fecha(medicion.medida_en), 'temperature': numero(medicion.temperatura_c),
+            'airHumidity': numero(medicion.humedad_aire_pct), 'light': numero(medicion.luz_lux), 'tankHasWater': medicion.deposito_con_agua,
+            'plants': [{'number': fila.planta_numero, 'moisture': numero(fila.humedad_sustrato_pct), 'adc': fila.adc_crudo} for fila in plantas]}
+
+
+def _equipo_de_sesion(caso):
+    equipo = Dispositivo.objects.get(pk=caso.dispositivo_id)
+    ultima = Medicion.objects.filter(dispositivo_id=equipo.pk).order_by('-medida_en').values_list('medida_en', flat=True).first()
+    return {'identifier': equipo.identificador, 'connection': equipo.conexion, 'firmware': equipo.firmware_version or None,
+            'lastConnectionAt': _fecha(equipo.ultima_conexion_en), 'lastReadingAt': _fecha(ultima)}
+
+
+def _motivo_de_cierre(sesion, caso):
+    if sesion.cerrada_en is not None:
+        return sesion.motivo_cierre
+    return {'revocada': 'revocada', 'vencida': 'vencida'}.get(_autorizacion(caso))
+
+
+def estado_sesion(actor, sesion_id):
+    """Lo que ve el administrador conectado; la pantalla lo consulta cada 10 s para enterarse de una revocación."""
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    sesion = _sesion_propia(admin, sesion_id)
+    caso = SoporteCaso.objects.get(pk=sesion.caso_id)
+    motivo = _motivo_de_cierre(sesion, caso)
+    resumen = {'id': str(sesion.pk), 'state': 'closed' if motivo else 'open', 'reason': motivo or None,
+               'startedAt': _fecha(sesion.iniciada_en), 'closedAt': _fecha(sesion.cerrada_en)}
+    if motivo:
+        return {'status': 'ready', 'session': resumen}
+    eventos = DispositivoEvento.objects.filter(dispositivo_id=caso.dispositivo_id, ocurrido_en__gte=timezone.now() - EVENTOS_DE_SESION)
+    ordenes = Comando.objects.filter(sesion_id=sesion.pk).order_by('-creado_en')[:MAXIMO_LISTA_SESION]
+    diagnostico = Autodiagnostico.objects.filter(comando__sesion_id=sesion.pk).order_by('-iniciado_en').first()
+    return {'status': 'ready', 'session': resumen, 'device': _equipo_de_sesion(caso), 'readings': _lecturas_actuales(caso),
+            'events': [{'type': evento.tipo, 'detail': evento.detalle or None, 'at': _fecha(evento.ocurrido_en)}
+                       for evento in eventos.order_by('-ocurrido_en', '-id')[:MAXIMO_LISTA_SESION]],
+            'orders': [_orden_de_soporte_dto(orden) for orden in ordenes],
+            'diagnostic': autodiagnostico_dto(diagnostico) if diagnostico else None}
+
+
+def _orden_de_soporte_valida(tipo, planta, duracion):
+    if tipo not in ACCIONES_SOPORTE:
+        raise ValidationError('Orden no válida')
+    if tipo == 'probar_bomba':
+        minimo, maximo = SEGUNDOS_PRUEBA_BOMBA
+        if type(planta) is not int or not 1 <= planta <= 3 or type(duracion) is not int or not minimo <= duracion <= maximo:
+            raise ValidationError('Planta o duración no válidas')
+    elif planta is not None or duracion is not None:
+        raise ValidationError('Datos que sobran')
+
+
+@transaction.atomic
+def dar_orden(actor, sesion_id, tipo, planta, duracion):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    _orden_de_soporte_valida(tipo, planta, duracion)
+    sesion = _sesion_propia(admin, sesion_id, bloquear=True)
+    caso = SoporteCaso.objects.get(pk=sesion.caso_id)
+    if sesion.cerrada_en is not None or _autorizacion(caso) != 'vigente':
+        raise ReglaDeNegocio('sesion-cerrada', 'La sesión técnica ya se cerró o la persona retiró su autorización.')
+    _caso_propio_en_atencion(admin, caso)
+    orden = Comando.objects.create(huerto_id=caso.huerto_id, dispositivo_id=caso.dispositivo_id, tipo=tipo, planta_numero=planta,
+                                   duracion_s=duracion, origen='soporte', solicitado_por=admin, sesion=sesion)
+    orden.refresh_from_db()
+    auditar(admin, 'crear_comando', entidad='comando', entidad_id=orden.pk, detalle={'tipo': tipo, 'origen': 'soporte'})
+    return {'status': 'accepted', 'order': _orden_de_soporte_dto(orden)}
+
+
+def _cerrar_sesion(sesion, actor, motivo):
+    sesion.cerrada_en, sesion.motivo_cierre = timezone.now(), motivo
+    sesion.save(update_fields=['cerrada_en', 'motivo_cierre'])
+    auditar(actor, 'cerrar_sesion_tecnica', entidad='soporte_sesion', entidad_id=sesion.pk, detalle={'motivo': motivo})
+
+
+@transaction.atomic
+def cerrar_sesion_tecnica(actor, sesion_id):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    sesion = _sesion_propia(admin, sesion_id, bloquear=True)
+    # Cerrar una sesión que la base ya cerró (revocación) no es un error: la pantalla lo hace al salir.
+    if sesion.cerrada_en is None:
+        _cerrar_sesion(sesion, admin, 'manual')
+    return {'status': 'accepted'}
+
+
+def cerrar_sesion_tecnica_al_salir(sender, user=None, **kwargs):
+    """Al cerrar la sesión de la cuenta (a mano o por vencimiento) termina su sesión técnica. Que falle no impide salir."""
+    if user is None or not getattr(user, 'pk', None):
+        return
+    try:
+        with transaction.atomic(), connection.cursor() as cursor:
+            # El vencimiento por inactividad ocurre antes del middleware que fija el actor.
+            cursor.execute("SELECT set_config('chilito.actor_id', %s, true)", [str(user.pk)])
+            sesion = SoporteSesion.objects.select_for_update().filter(administrador_id=user.pk, cerrada_en__isnull=True).first()
+            if sesion:
+                _cerrar_sesion(sesion, user, 'cierre_sesion')
+    except DatabaseError:
+        logger.exception('sesion-tecnica-sin-cerrar')
+
+
+@transaction.atomic
+def resolver_caso(actor, caso_id, resultado, nota):
+    admin = require_cap(actor, CAPACIDAD_SOPORTE)
+    if resultado not in RESULTADOS_SOPORTE:
+        raise ValidationError('Resultado no válido')
+    nota = _nota_de_caso(nota)
+    if resultado == 'otro' and not nota:
+        raise ValidationError('La nota es obligatoria con «Otro»')
+    caso = _caso_de_soporte(caso_id, bloquear=True)
+    _caso_propio_en_atencion(admin, caso)
+    caso.estado, caso.resultado, caso.nota_resolucion = 'resuelto', resultado, nota
+    caso.save(update_fields=['estado', 'resultado', 'nota_resolucion'])
+    auditar(admin, 'resolver_caso', entidad='soporte_caso', entidad_id=caso.pk, detalle={'resultado': resultado})
+    return {'status': 'accepted', 'case': _caso_admin_dto(_caso_de_soporte(caso_id), admin)}
 
 
 # Avisos: la misma tabla sirve a personas y administradores; cada quien ve solo los suyos.

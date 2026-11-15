@@ -34,7 +34,7 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   assert.deepEqual(menu([]), []);
   assert.equal(run('AppModel.adminDestinations.length'), 10);
   assert.equal(run('new Set(AppModel.adminDestinations.map(item => item.capability)).size'), 10);
-  assert.equal(run("AppModel.adminRedirects.vinculacion"), 'equipos'); assert.equal(run("AppModel.adminRedirects.comercial"), 'ventas');
+  assert.equal(run("AppModel.adminRedirects.vinculacion"), 'equipos'); assert.equal(run("AppModel.adminRedirects.comercial"), 'ventas'); assert.equal(run("AppModel.adminRedirects.consola"), 'soporte');
   assert.deepEqual(Array.from(run("AppModel.allowedAdmin({capabilities:['gestionar_dispositivos','gestionar_legales']}).map(item => item.id)")), ['admin/equipos', 'admin/legales']);
   // Validaciones previas al envío (el servidor y la base vuelven a validar).
   assert.equal(run("EquipmentModel.validate({identifier:'ESP32-A1B2', mac:'AA:BB:CC:DD:EE:FF', firmware:'1.0.0'})"), null);
@@ -103,6 +103,76 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   console.log('PASS administración: menú por grupos, validaciones, rutas seguras, texto escapado y paginación visible');
 });
 
+// ── Flota, consola remota y mantenimientos (fase 6) ──────────────────────────────────────────
+suite('flota, consola remota y mantenimientos', async () => {
+  const context = vm.createContext({console, crypto:webcrypto, structuredClone, DOMException, AbortController, AbortSignal, Date, Map, Set, Object, Array, JSON, Number, String, RegExp, Error, Intl, encodeURIComponent, decodeURIComponent,
+    URLSearchParams, document:{cookie:'csrftoken=test-csrf'}, window:{dispatchEvent() {}}, Event, fetch:async () => { throw new Error('Sin red en esta prueba'); }});
+  cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/huerto.js', 'modelos/equipos.js', 'modelos/administracion.js',
+    'vistas/comun.js', 'vistas/publico.js', 'vistas/cuenta.js', 'vistas/huerto.js', 'vistas/equipos.js', 'vistas/administracion.js');
+  const run = code => vm.runInContext(code, context);
+  context.bad = '<img src=x onerror=alert(1)>';
+  // Flota: totales reales, sin las métricas que no tienen fuente, y la fila según la capacidad de inventario.
+  const item = {id:'5', identifier:context.bad, state:'vinculado', connection:'en_linea', lastConnectionAt:null, lastReadingAt:null, firmware:null, gardenId:'1', garden:context.bad, owner:'a@b.test', lastReviewAt:null};
+  context.fleetState = {status:'ready', filters:{busqueda:context.bad}, data:{totals:{linked:3, online:2, offline:1, problems:1}, trends:{moisture:[], temperature:[]},
+    problems:[{type:'order', deviceId:'5', identifier:context.bad, at:'2026-11-14T10:00:00Z', detail:'reiniciar'}], items:[item], page:1, total:1}};
+  const fleet = run('FleetViews.screen(fleetState, {inventory:true})');
+  assert.ok(!fleet.includes('<img src=x') && fleet.includes('Equipos vinculados') && fleet.includes('Problemas (24 h)') && fleet.includes('Página 1 de 1') && fleet.includes('href="#admin/equipos/5"') && fleet.includes('Orden fallida'));
+  assert.ok(run('FleetViews.screen(fleetState, {inventory:false})').includes('data-admin-action="peek"'));
+  for(const gone of ['Evaporación', 'Mosquitto', 'Correlaciones', 'Vida mediana', 'mini bombas']) assert.ok(!fleet.includes(gone), gone);
+  // Consola: sin token ni pines; cada paso solo aparece para quien corresponde.
+  const caso = {id:'11111111-1111-4111-8111-111111111111', folio:'CS-1A2B3C4D', incident:'bomba', state:'abierto', createdAt:'2026-11-14T10:00:00Z', person:context.bad, email:'ana@b.test', garden:context.bad, device:'ESP32-1',
+    note:context.bad, authorization:'vigente', authorizedUntil:new Date(Date.now() + 5 * 3600000).toISOString(), revokedAt:null, attendedBy:null, mine:false, result:null, resolutionNote:null, closedAt:null};
+  const consoleState = (over, session = null) => { context.consoleState = {status:'ready', tab:'abierto', counts:{abierto:1, en_atencion:1, resuelto:0}, inbox:{items:[caso], page:1, total:1}, selectedId:caso.id,
+    detail:{case:{...caso, ...over}, diagnostic:null, session}}; return run('ConsoleViews.screen(consoleState)'); };
+  const nuevo = consoleState({});
+  assert.ok(!nuevo.includes('<img src=x') && nuevo.includes('Nuevos (1)') && nuevo.includes('data-admin-action="attend"') && !nuevo.includes('data-admin-action="connect"') && nuevo.includes('Página 1 de 1'));
+  assert.ok(!/token|GPIO|pin/i.test(nuevo.replace(/spinner|pinned/gi, '')), 'la consola no habla de token ni de pines');
+  const ajeno = consoleState({state:'en_atencion', attendedBy:'otra@b.test'});
+  assert.ok(ajeno.includes('Lo atiende otra@b.test') && !ajeno.includes('data-admin-action="connect"') && !ajeno.includes('data-admin-form="resolve"'));
+  const mio = consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true});
+  assert.ok(mio.includes('data-admin-action="connect"') && mio.includes('data-admin-form="resolve"') && !mio.includes('data-console-live'));
+  assert.ok(consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true, authorization:'revocada'}).includes('data-admin-action="connect" disabled'));
+  const conectado = consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true}, {id:'22222222-2222-4222-8222-222222222222', startedAt:new Date().toISOString()});
+  assert.ok(conectado.includes('Cerrar sesión técnica') && conectado.includes('data-type="reiniciar"') && conectado.includes('Probar bomba') && !conectado.includes('data-admin-action="connect"'));
+  const huecos = {}; for(const name of ['live', 'orders', 'events']) huecos[`[data-console-${name}]`] = {innerHTML:''};
+  context.rootFalso = {querySelector: selector => huecos[selector] || null};
+  context.vivo = {session:{state:'open'}, device:{connection:'en_linea', lastConnectionAt:'2026-11-14T10:00:00Z', lastReadingAt:new Date().toISOString(), firmware:'1.0.3'},
+    readings:{measuredAt:'2026-11-14T10:00:00Z', temperature:29.5, airHumidity:71, light:null, tankHasWater:true, plants:[{number:1, moisture:41, adc:2710}]},
+    events:[{type:'conectado', detail:context.bad, at:'2026-11-14T09:00:00Z'}], orders:[{id:'o', type:'probar_bomba', plant:2, duration:3, state:'enviado', createdAt:'2026-11-14T10:00:00Z', error:null}], diagnostic:null};
+  run('ConsoleViews.paintLive(rootFalso, vivo)');
+  assert.ok(huecos['[data-console-live]'].innerHTML.includes('Sin lectura') && huecos['[data-console-live]'].innerHTML.includes('ADC 2710') && huecos['[data-console-live]'].innerHTML.includes('Con agua'));
+  assert.ok(huecos['[data-console-orders]'].innerHTML.includes('Prueba de bomba · planta 2 · 3 s') && !huecos['[data-console-events]'].innerHTML.includes('<img src=x'));
+  assert.equal(run('ConsoleViews.closingText("revocada")'), 'La persona revocó el acceso. La sesión se cerró.');
+  assert.match(run('ConsoleViews.confirmations.reboot.texto'), /unos segundos/);
+  assert.match(run('ConsoleViews.confirmations.pump(2, 3).titulo'), /planta 2/);
+  assert.match(run('ConsoleViews.confirmations.resolve.texto'), /No se puede deshacer/);
+  // Mantenimientos de todos los huertos: paginación visible, estados y confirmación al anular.
+  const registro = {id:'33333333-3333-4333-8333-333333333333', type:'cosecha', plant:2, chiles:5, doneAt:'2026-11-14T10:00:00Z', voided:false, corrected:true, reason:'Era cosecha',
+    gardenId:'9', garden:context.bad, owner:'dueno@b.test', revision:1, registeredAt:'2026-11-14T10:00:00Z'};
+  context.careState = {status:'ready', filters:{busqueda:context.bad}, list:{items:[registro], page:2, total:60}};
+  const care = run('MaintenanceViews.screen(careState)');
+  assert.ok(!care.includes('<img src=x') && care.includes('Página 2 de 3') && care.includes('Corregido') && care.includes('Correo del dueño o huerto') && care.includes('+ Registrar intervención'));
+  context.record = registro; context.revisions = [{number:1, type:'correccion', correctedType:'cosecha', correctedPlant:2, correctedChiles:5, reason:context.bad, editor:'ed@b.test', at:'2026-11-14T11:00:00Z'}];
+  const detail = run('MaintenanceViews.detail(record, revisions)');
+  assert.ok(!detail.includes('<img src=x') && detail.includes('Anular registro') && detail.includes('Guardar corrección') && detail.includes('Motivo (obligatorio)'));
+  assert.ok(!run('MaintenanceViews.detail({...record, voided:true}, revisions)').includes('Anular registro'), 'un registro anulado ya no se cambia');
+  assert.ok(run('MaintenanceViews.createForm()').includes('N.º de huerto'));
+  assert.equal(run('MaintenanceViews.errorText("stale-record")'), 'Otra persona cambió este registro. Se actualizó la lista.');
+  // Confirmaciones nuevas en Solicitudes y Guías.
+  assert.equal(run('InquiryViews.confirmations.archive.accion'), 'Archivar');
+  assert.equal(run('CareGuideViews.confirmations.publish.accion'), 'Publicar'); assert.equal(run('CareGuideViews.confirmations.withdraw.peligro'), true);
+  assert.equal(run('MaintenanceViews.confirmations.void.peligro'), true);
+  // Lo viejo ya no existe.
+  const sources = ['modelos', 'vistas', 'controladores'].map(dir => ['administracion', 'huerto'].map(name => read(`${dir}/${name}.js`)).join('\n')).join('\n') + read('index.html');
+  for(const gone of ['validateToken', 'requestToken', 'admin-gpio', 'admin-logs', 'Evaporación estimada', 'Mosquitto']) assert.ok(!sources.includes(gone), gone);
+  for(const gone of ['AdminService', 'AdminViews', 'AdminController']) assert.ok(!new RegExp(`\\b${gone}\\b`).test(sources), gone);
+  for(const sheet of fs.readdirSync(path.join(FRONT, 'vistas/estilos')).filter(name => name.endsWith('.css'))) {
+    const css = read(`vistas/estilos/${sheet}`);
+    for(const gone of ['admin-gpio-grid', 'admin-logs', 'admin-token-form', 'admin-ticket-detail']) assert.ok(!css.includes(gone), `${sheet}: ${gone}`);
+  }
+  console.log('PASS flota, consola remota (sin token) y mantenimientos de todos los huertos');
+});
+
 // ── Fechas civiles y contrato HTTP de los filtros de mantenimientos ───────────────────────────
 suite('fechas', async () => {
   const zonaOriginal = process.env.TZ;
@@ -112,7 +182,7 @@ suite('fechas', async () => {
     const context = vm.createContext({URLSearchParams, ChilitoHTTP:{
       async request(path) { calls.push(path); return {http:200, body:{status:'ready'}}; }
     }});
-    cargar(context, 'modelos/huerto.js');
+    cargar(context, 'modelos/huerto.js', 'modelos/administracion.js');
     const dates = vm.runInContext('MaintenanceDates', context);
     const now = new Date();
     const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -137,10 +207,13 @@ suite('fechas', async () => {
     assert.equal(new Set(december).size, 31);
     assert.ok(december.includes('2011-12-30'));
     const service = vm.runInContext('MaintenanceService', context);
-    await service.list({since:'2026-11-07', until:'2026-11-09', garden:'1', state:'active', task:'inspection'});
-    assert.equal(calls.at(-1), '/api/admin/mantenimientos?since=2026-11-07&until=2026-11-09&garden=1&state=active&task=inspection');
-    await service.list({since:'', until:''});
-    assert.equal(calls.at(-1), '/api/admin/mantenimientos');
+    await service.list({since:'2026-11-07', until:'2026-11-09', huerto:'1', estado:'anulado', tipo:'inspeccion', busqueda:'ana@x.test'}, 2);
+    assert.equal(calls.at(-1), '/api/admin/mantenimientos?busqueda=ana%40x.test&huerto=1&tipo=inspeccion&estado=anulado&desde=2026-11-07&hasta=2026-11-09&page=2');
+    await service.list({since:'', until:''}, 1);
+    assert.equal(calls.at(-1), '/api/admin/mantenimientos?page=1');
+    // Un día pasado se manda al mediodía de Mérida; hoy o vacío significa «ahora».
+    assert.equal(service.moment('2026-11-10', '2026-11-14'), '2026-11-10T12:00:00-06:00');
+    assert.equal(service.moment('2026-11-14', '2026-11-14'), null); assert.equal(service.moment('', '2026-11-14'), null);
     console.log(`PASS fechas civiles, límites, bisiestos y filtros ISO: ${TZ}`);
   }
   try {
@@ -166,12 +239,19 @@ suite('contrato de adaptadores', async () => {
   let n = 0; respond = () => { if(n++ === 0) throw new Error('network'); return reply(200, {status:'accepted'}); };
   await evaluate("GardenService.care('1',{type:'cosecha',plant:1})"); await evaluate("GardenService.care('1',{type:'cosecha',plant:1})");
   assert.equal(calls.at(-2).options.headers['Idempotency-Key'], calls.at(-1).options.headers['Idempotency-Key']);
-  const token = 'aB'.repeat(21) + '_';
-  const before = calls.length;
-  assert.equal((await evaluate("AdminService.validateToken('case',' '+ 'a'.repeat(43))")).status, 'invalid-token'); assert.equal(calls.length, before);
-  respond = (path, options) => { assert.equal(JSON.parse(options.body).token, token); return reply(200, {status:'accepted', session:{id:'session-id', expiresAt:Date.now() + 60000}}); };
-  context.exactToken = token; await evaluate("AdminService.validateToken('case',exactToken)");
-  assert.equal(calls.at(-1).path, '/api/admin/soporte/case/abrir'); assert.ok(!calls.at(-1).path.includes(token));
+  // Consola remota: no hay token. Las rutas llevan un UUID y, con otra cosa, no se hace ninguna llamada.
+  const caso = '00000000-0000-4000-8000-000000000001', before = calls.length;
+  assert.equal((await evaluate("ConsoleService.connect('no-es-uuid')")).code, 'invalid-input'); assert.equal(calls.length, before);
+  respond = () => reply(200, {status:'accepted'});
+  await evaluate(`ConsoleService.connect('${caso}')`);
+  assert.equal(calls.at(-1).path, `/api/admin/soporte/${caso}/conectar`); assert.equal(calls.at(-1).options.method, 'POST');
+  await evaluate(`ConsoleService.session('${caso}')`);
+  assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}`); assert.equal(calls.at(-1).options.headers['X-Chilito-Sondeo'], '1');
+  await evaluate(`ConsoleService.order('${caso}', {type:'probar_bomba', plant:1, duration:3})`);
+  assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/accion`); assert.deepEqual(JSON.parse(calls.at(-1).options.body), {type:'probar_bomba', plant:1, duration:3});
+  await evaluate(`ConsoleService.endSession('${caso}', true)`);
+  assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/cerrar`); assert.equal(calls.at(-1).options.keepalive, true);
+  assert.equal(evaluate("typeof AdminService"), 'undefined');
   // Panel por sesión: el rol no abre nada por sí mismo, solo elige el destino que el servidor validará.
   assert.equal(evaluate("AppModel.panelHome({role:'user'})"), '#huerto');
   assert.equal(evaluate("AppModel.panelHome({role:'admin',capabilities:['ver_flota'],profile:{}})"), '#admin/flota');

@@ -1,105 +1,182 @@
-// VISTA · Administración: paneles de operación, buzón de consultas, ventas, administradores, textos legales y consentimientos.
-// Define: AdminViews, InquiryViews, SalesViews, AdminAccessViews, LegalAdminViews, ConsentViews.
+// VISTA · Administración: flota, consola remota, buzón de consultas, ventas, administradores, textos legales y consentimientos.
+// Define: FleetViews, ConsoleViews, InquiryViews, SalesViews, AdminAccessViews, LegalAdminViews, ConsentViews.
 
 // ── Administracion ──
-const AdminViews = (() => {
-  const date=AppViews.date;
-  const button=(action,label,primary=false,attrs='')=>`<button type="button" class="button ${primary?'btn-liquid-brand':'btn-liquid-light'}" data-admin-action="${action}" ${attrs}>${label}</button>`;
-  const heading=AppViews.heading;
-  const available=(value,missing='Sin lectura')=>value===null||value===undefined||value===''?missing:escaparHTML(String(value));
-  const metricValue=value=>value===null||value===undefined?'—':escaparHTML(AppModel.number(value));
-  const section=(title,copy='')=>`<div class="user-section-heading"><div><h2>${title}</h2>${copy?`<p>${copy}</p>`:''}</div></div>`;
-  const metric=(label,value,unit,copy,ico='activity')=>`<article class="bento-panel user-metric"><span class="user-metric-icon">${icon(ico)}</span><h2>${label}</h2><strong>${value}<small>${unit}</small></strong><p>${copy}</p></article>`;
-  const table=(label,headers,rows)=>`<div class="user-table-scroll" tabindex="0" role="region" aria-label="${escaparHTML(label)}"><table class="user-table admin-table"><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="${headers.length}">Sin registros disponibles.</td></tr>`}</tbody></table></div>`;
-  const fact=(label,value)=>`<div><dt>${label}</dt><dd>${value}</dd></div>`;
-  const notice=state=>AdminService.noticeLabels[state]||'Sin aviso registrado';
-  const note=text=>`<p class="admin-service-note">${text}</p>`;
-  const messages='<div id="admin-feedback" class="user-feedback" role="status" tabindex="-1" hidden></div>';
-  function fleet(data,access={}) {
-    const series=values=>Array.isArray(values)?values.filter(reading=>reading&&Number.isFinite(reading.value)&&Number.isFinite(Date.parse(reading.at))):[];
-    const metrics=data.metrics||{};
-    return heading('Telemetría de flota','Indicadores agregados y estado operativo de los dispositivos vinculados.')+
-    `<div class="user-status-line"><p>Vista agregada de la plataforma</p><p>${data.at?`Última consulta: ${date(data.at)}`:'Sin lecturas disponibles'}</p></div>
-    <section class="user-summary-metrics" aria-label="Estado de la flota">
-      ${metric('Nodos reportando',metricValue(metrics.reporting),metrics.total==null?'':'/ '+metricValue(metrics.total),'Sin información de disponibilidad','wifi')}
-      ${metric('Humedad media',metricValue(metrics.soilHumidity),metrics.soilHumidity==null?'':'%','Sin lecturas disponibles','drop')}
-      ${metric('Evaporación estimada',metricValue(metrics.evaporation),metrics.evaporation==null?'':'mm/día','Sin estimación disponible','sun')}
-      ${metric('Alertas de hardware',metricValue(metrics.hardwareAlerts),'','Sin información disponible','info')}
-    </section>
-    ${section('Tendencias ambientales agregadas','Últimos 7 días. Sin series de un hogar individual.')}
-    <section class="user-chart-grid-layout" aria-label="Tendencias agregadas">
-      ${GardenViews.chart('Humedad media del sustrato',series(data.trends.soil),'%','7d','fleet-soil')}
-      ${GardenViews.chart('Humedad relativa media',series(data.trends.humidity),'%','7d','fleet-rh')}
-    </section>
-    <div class="user-section-heading"><div><h2>Identidades y dispositivos vinculados</h2><p>Identificadores operativos y conexión al broker Mosquitto.</p></div>${button('refresh',icon('refresh')+'<span>Actualizar dispositivos</span>')}</div>
-    <section class="bento-panel admin-table-panel">${table('Dispositivos vinculados',['Device_ID','User_ID','Mosquitto','Último heartbeat'],data.nodes.map(n=>`<tr><th scope="row">${escaparHTML(n.device)}</th><td>${available(n.user,'Sin vínculo de usuario en esta proyección')}</td><td><span class="admin-connection ${n.connected?'online':'offline'}">${n.connected==null?'Sin información':n.connected?'En línea':'Sin conexión'}</span></td><td>${available(n.heartbeat,'Sin registro')}</td></tr>`))}<p class="admin-caption">Se muestra el vínculo operativo mínimo. No se incluyen contraseñas ni ubicación.</p></section>
-    ${section('Telemetría para evaluación de IA','Patrones agregados para evaluar el riego predictivo y el desgaste del hardware.')}
-    <section class="user-technical-metrics" aria-label="Indicadores de evaluación">
-      ${metric('Evaporación · mezcla con perlita',metricValue(metrics.perliteEvaporation),metrics.perliteEvaporation==null?'':'mm/día','Sin estimación disponible','sun')}
-      ${metric('Vida mediana del sensor capacitivo v1.2',metricValue(metrics.sensorLife),metrics.sensorLife==null?'':'meses','Sin estimación disponible','activity')}
-      ${metric('Órdenes de mini bombas',metricValue(metrics.pumpOrders),metrics.pumpOrders==null?'':'/ huerto / día','Sin registros disponibles','drop')}
-    </section>
-    ${section('Correlaciones por temperatura','Ventanas ambientales utilizadas para evaluar el modelo.')}
-    <section class="bento-panel admin-table-panel">${table('Correlaciones agregadas',['Temperatura media','Evaporación estimada','Órdenes de bomba','Uso en el modelo'],(data.correlations||[]).map(row=>`<tr>${row.map(c=>`<td>${escaparHTML(c)}</td>`).join('')}</tr>`))}<p class="admin-caption">La evaluación utiliza agregados. Las correlaciones lumínicas requieren una medición verificable de luz.</p></section>`+management(access);
+// Telemetría de flota (5.1). Todo dato del servidor entra escapado.
+const FleetViews = (() => {
+  const T = AdminTableViews, {tag, chart} = GardenViews;
+  const STATES = {disponible:'Disponible', vinculado:'Vinculado', retirado:'Retirado'};
+  const LINKS = {nunca:['Sin conexión aún', 'gris'], en_linea:['En línea', 'verde'], desconectado:['Desconectado', 'rojo']};
+  const PROBLEMS = {diagnostic:'Autodiagnóstico con fallas', order:'Orden fallida', offline:'Sin conexión por más de 24 horas'};
+  const when = value => value ? AppViews.date(value) : 'Sin datos';
+  const none = value => value ? escaparHTML(value) : '—';
+  const options = (items, selected = '') => items.map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
+  const tile = (label, value) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong>${value}</strong></article>`;
+
+  function filters(values) {
+    return `<form class="care-filters" data-admin-form="fleet-filter" novalidate>
+      <div><label for="fleet-search">Buscar</label><input id="fleet-search" name="busqueda" type="search" maxlength="60" placeholder="Identificador, MAC o correo" value="${escaparHTML(values.busqueda || '')}"></div>
+      <div><label for="fleet-state">Estado</label><select id="fleet-state" name="estado">${options([['', 'Todos'], ...Object.entries(STATES)], values.estado || '')}</select></div>
+      <div><label for="fleet-link">Conexión</label><select id="fleet-link" name="conexion">${options([['', 'Todas'], ...Object.entries(LINKS).map(([value, [label]]) => [value, label])], values.conexion || '')}</select></div>
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${T.button('clear', 'Limpiar')}</div></form>`;
   }
-  // Accesos de gestión: los registros existen en Mantenimientos; las solicitudes del producto aún no.
-  // `access` lo prepara el controlador a partir de las capacidades de la sesión; la vista solo pinta.
-  function management({records=false,inbox=false}={}) {
-    return `<section class="bento-panel admin-management" aria-labelledby="admin-management-title"><div class="admin-management-copy"><h2 id="admin-management-title">Gestión administrativa</h2><p>Acceso a los registros de mantenimiento y a las solicitudes del producto.</p></div>
-      <div class="admin-management-actions">${records?`<a class="button btn-liquid-light" href="#admin/mantenimientos">${icon('list')}<span>Gestión de registros</span></a>`:''}${AppModel.supportMailUrl()?`<a class="button btn-liquid-light" href="${escaparHTML(AppModel.supportMailUrl())}" target="_blank" rel="noopener noreferrer">${icon('mail')}<span>Abrir correo de soporte</span><span class="sr-only">(se abre en otra pestaña)</span></a>`:''}${inbox?`<a class="button btn-liquid-light" href="#admin/solicitudes">${icon('inbox')}<span>Solicitudes del producto</span></a>`:''}</div>
-      <p class="admin-service-note">Las consultas de «Consíguelo» se guardan en el buzón y generan un aviso al correo de soporte. Responde desde tu correo.</p></section>`;
+
+  // Con la capacidad de inventario la fila abre la ficha del equipo; sin ella, un panel de solo lectura.
+  function row(item, access) {
+    const open = access.inventory ? `<a class="button btn-liquid-light compact" href="#admin/equipos/${escaparHTML(item.id)}">Ver<span class="sr-only"> ${escaparHTML(item.identifier)}</span></a>`
+      : T.button('peek', 'Ver', 'light', `data-id="${escaparHTML(item.id)}"`);
+    return `<tr><td><strong>${escaparHTML(item.identifier)}</strong></td><td>${none(item.garden)}</td><td>${none(item.owner)}</td><td>${tag(...LINKS[item.connection])}</td>
+      <td>${when(item.lastReadingAt)}</td><td>${none(item.firmware)}</td><td>${item.lastReviewAt ? when(item.lastReviewAt) : 'Sin revisión'}</td><td>${open}</td></tr>`;
   }
-  function remote(data) {
-    const ticket=data.selected;
-    return heading('Consola remota','Atiende cada reporte con la autorización temporal de la persona usuaria.')+
-    `<div class="user-section-heading"><div><h2>Buzón de reportes</h2><p>Los registros técnicos se abren únicamente con el token del caso seleccionado.</p></div>${button('refresh','Actualizar reportes')}</div>
-    <section class="bento-panel admin-table-panel">${data.tickets.length?table('Reportes de soporte',['Folio','Device_ID','Incidente','Atención','Autorización','Acción'],data.tickets.map(t=>`<tr${ticket?.id===t.id?' class="admin-selected-row"':''}><th scope="row">${escaparHTML(t.folio||t.id)}</th><td>${available(t.device,'Sin dispositivo asignado')}</td><td>${escaparHTML(t.incident)}</td><td>${t.caseState==='resolved'?'Resuelto':'Abierto'}</td><td>${escaparHTML(t.status)}</td><td>${button('open-ticket','Abrir',false,`data-ticket="${escaparHTML(t.id)}" aria-label="Abrir caso ${escaparHTML(t.folio||t.id)}"`)}</td></tr>`)):'<p>No hay reportes registrados.</p>'}</section>
-    ${section('Detalle y autorización')}
-    <section class="bento-panel admin-ticket-detail" tabindex="-1" id="admin-ticket-detail">
-      ${ticket?`<h2>Caso ${escaparHTML(ticket.folio||ticket.id)}</h2><dl class="user-facts admin-ticket-facts">${fact('Device_ID',available(ticket.device,'Sin dispositivo asignado'))}${fact('User_ID',available(ticket.user,'Sin identificador disponible'))}${fact('Incidente',escaparHTML(ticket.incident))}${fact('Creado',date(ticket.createdAt))}${fact('Atención',ticket.caseState==='resolved'?'Resuelto':'Abierto')}${fact('Autorización',escaparHTML(ticket.status))}${fact('Aviso de caso nuevo',escaparHTML(notice(ticket.notices?.newCase)))}${fact('Token solicitado',ticket.tokenRequestedAt?`${date(ticket.tokenRequestedAt)} · ${escaparHTML(notice(ticket.notices?.tokenRequest))}`:'No')}</dl><p>El diagnóstico queda limitado a este caso. El token de otro caso no concede acceso. Vencer o revocar la autorización no resuelve el caso.</p>
-      ${ticket.caseState==='resolved'?`<p class="admin-access-state">Resuelto el ${date(ticket.resolution.at)} · ${escaparHTML(AdminService.results[ticket.resolution.result]||ticket.resolution.result)}${ticket.resolution.note?` · ${escaparHTML(ticket.resolution.note)}`:''}. El permiso está revocado y el token ya no abre acceso.</p>`:`${button('request-token','Solicitar token a la persona usuaria')}
-      <form data-admin-token-form class="admin-token-form"><label for="admin-token">Token compartido por la persona usuaria</label><div class="admin-input-row"><input id="admin-token" name="token" type="text" required minlength="43" maxlength="43" pattern="[A-Za-z0-9_-]{43}" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="button btn-liquid-brand" type="submit">Validar token</button></div></form>
-      <p class="admin-access-state">${data.remote?`Acceso autorizado hasta el ${date(new Date(data.remote.expiresAt).toISOString())}.`:'Acceso técnico bloqueado. Valida una autorización vigente para continuar.'}</p>
-      <form data-admin-resolve-form class="admin-resolve-form"><h3>Resolver caso</h3><label for="admin-resolve-result">Resultado de la atención</label><select id="admin-resolve-result" name="result" required>${Object.entries(AdminService.results).map(([v,l])=>`<option value="${v}">${escaparHTML(l)}</option>`).join('')}</select><label for="admin-resolve-note">Nota (obligatoria si eliges «Otro»)</label><textarea id="admin-resolve-note" name="note" rows="3" maxlength="500"></textarea><p class="admin-service-note">Resolver es definitivo: revoca la autorización vigente y cierra el acceso técnico de este caso.</p><div class="app-actions"><button class="button btn-liquid-brand" type="submit">Resolver caso</button></div></form>`}`:'<h2>Selecciona un reporte</h2><p>Abre un caso del buzón para consultar su detalle y validar el token correspondiente.</p>'}
-    </section>
-    ${data.remote?diagnostics(data):''}
-    ${section('Alcance del acceso remoto')}
-    <section class="bento-panel admin-governance-list"><dl class="admin-policy-list">
-      ${fact('Sesión de diagnóstico','Se abre con el token vigente del caso. El diagnóstico remoto del dispositivo todavía no está conectado.')}
-      ${fact('Duración','Máximo 24 horas desde que se emite; usar el token no la renueva.')}
-      ${fact('Cierre del acceso','Revocación de la persona usuaria, vencimiento o resolución del caso.')}
-      ${fact('Fuera del alcance','Acceso permanente, contraseñas, ubicación e historial de cultivo.')}
-    </dl></section>`;
+
+  function problem(item) {
+    const order = item.detail ? ` · ${escaparHTML(item.detail)}` : '';
+    return `<li><span>${icon('alert')}</span><div><p>${PROBLEMS[item.type] || 'Problema'}${order}</p><small>${escaparHTML(item.identifier)} · ${when(item.at)}</small></div></li>`;
   }
-  function diagnostics(data) {
-    // El servicio de diagnóstico del dispositivo no está conectado: se dice, sin simular lecturas.
-    const connected=data.diagnostics.pins.length>0||data.diagnostics.logs.length>0;
-    return `${section('Sesión de diagnóstico',available(data.selected.device,'Sin dispositivo asignado')+' · '+escaparHTML(data.selected.folio||data.selected.id))}
-    <section class="bento-panel admin-diagnostics"><h2>Diagnóstico del dispositivo</h2>${connected?`<dl class="admin-gpio-grid">${data.diagnostics.pins.map(([k,v])=>fact(escaparHTML(k),available(v))).join('')}</dl>${data.diagnostics.logs.length?`<pre class="admin-logs" tabindex="0" aria-label="Registros técnicos del caso"><code>${escaparHTML(data.diagnostics.logs.join('\n'))}</code></pre>`:''}`:'<p>Servicio de diagnóstico remoto no conectado. La sesión está abierta con la autorización del caso, pero todavía no hay lecturas del dispositivo.</p>'}<div class="app-actions">${button('refresh-diagnostics','Consultar de nuevo')}${button('close-remote','Cerrar sesión técnica')}</div></section>`;
+
+  function screen(state, access) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const {totals, trends, problems, items, page, total} = state.data;
+    const body = items.length ? T.table('Equipos de la flota', ['Identificador', 'Huerto', 'Dueño', 'Conexión', 'Última lectura', 'Firmware', 'Última revisión', ''], items.map(item => row(item, access)))
+      : '<div class="user-empty-inline"><p>No hay equipos con estos filtros.</p></div>';
+    return `<div class="page-heading"><div><h1>Telemetría de flota</h1><p>Equipos vinculados, su conexión y los problemas de las últimas 24 horas.</p></div>${T.button('refresh', `${icon('refresh')}<span>Actualizar</span>`)}</div>
+      <section class="user-summary-metrics" aria-label="Estado de la flota">${tile('Equipos vinculados', totals.linked)}${tile('En línea', totals.online)}${tile('Desconectados', totals.offline)}${tile('Problemas (24 h)', totals.problems)}</section>
+      <section class="user-chart-grid-layout" aria-label="Tendencias de 7 días">${chart('Humedad media del sustrato · 7 días', trends.moisture, '%', '7d', 'fleet-soil')}${chart('Temperatura media · 7 días', trends.temperature, '°C', '7d', 'fleet-temp')}</section>
+      <section class="bento-panel"><h2>Equipos</h2>${filters(state.filters)}${body}${T.pager({page, total})}</section>
+      <section class="bento-panel"><h2>Problemas recientes</h2>${problems.length ? `<ol class="user-history-list">${problems.map(problem).join('')}</ol>` : '<p>No hay problemas en las últimas 24 horas.</p>'}</section>${T.dialog}`;
   }
-  const errors={
-    'forbidden':'Tu cuenta no tiene acceso a esta operación.',
-    'stale':'El caso ya está resuelto o cambió. Actualiza la consola.',
-    'not-found':'Selecciona un reporte disponible antes de continuar.',
-    'no-permission':'No hay una autorización vigente para este reporte. Solicita un token nuevo a la persona usuaria.',
-    'wrong-report':'El token corresponde a otro reporte. Utiliza la autorización específica de este caso.',
-    'invalid-token':'El token es incorrecto. Comprueba el código compartido por la persona usuaria.'};
-  const errorText=status=>errors[status]||'No se pudo completar la operación. Inténtalo de nuevo.';
-  return {
-    errorText,
-    // Operaciones de presentación que coordina AdminController.
-    paint(root,screen,data,access) { root.innerHTML=this.render(screen,data,access); },
-    feedback(root,message,error=false) {
-      const el=root.querySelector('#admin-feedback');
-      if(!el)return;
-      el.hidden=false;el.textContent=message;el.setAttribute('role',error?'alert':'status');el.focus();
+
+  function peek(item) {
+    const facts = [['Identificador', escaparHTML(item.identifier)], ['Estado', STATES[item.state] || '—'], ['Conexión', tag(...LINKS[item.connection])], ['Huerto', none(item.garden)],
+      ['Dueño', none(item.owner)], ['Firmware', none(item.firmware)], ['Última conexión', when(item.lastConnectionAt)], ['Última lectura', when(item.lastReadingAt)],
+      ['Última revisión', item.lastReviewAt ? when(item.lastReviewAt) : 'Sin revisión']];
+    return `<h2 id="admin-dialog-title">${escaparHTML(item.identifier)}</h2><dl class="user-facts">${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
+      <div class="app-dialog-actions">${T.button('close-dialog', 'Cerrar')}</div>`;
+  }
+
+  return Object.freeze({screen, peek, paint: (root, html) => T.paint(root, html), openDialog: (root, html) => T.open(root, html), closeDialog: root => T.dismiss(root),
+    resetFilters(root) { root.querySelector('[data-admin-form="fleet-filter"]').reset(); }});
+})();
+
+// Consola remota (5.2). Atiende una cuenta y solo ella se conecta; la sesión técnica se ve en vivo mientras la persona no la revoque.
+const ConsoleViews = (() => {
+  const T = AdminTableViews, {tag, orderCard} = GardenViews, act = (...args) => T.button(...args);
+  const TABS = [['abierto', 'Nuevos'], ['en_atencion', 'En atención'], ['resuelto', 'Resueltos']];
+  const CASE_STATES = {abierto:['Nuevo', 'ambar'], en_atencion:['En atención', 'verde'], resuelto:['Resuelto', 'gris']};
+  const AUTHORIZATION = {vigente:['Vigente', 'verde'], revocada:['Revocada', 'rojo'], vencida:['Vencida', 'gris']};
+  const CLOSINGS = {revocada:'La persona revocó el acceso. La sesión se cerró.', vencida:'La autorización venció. La sesión se cerró.',
+    caso_cerrado:'El caso se cerró. La sesión terminó.', manual:'La sesión técnica se cerró.', cierre_sesion:'La sesión técnica se cerró.'};
+  const ERRORS = {'caso-ya-atendido':'Este caso ya lo atiende otra persona o ya está cerrado.', 'caso-no-tuyo':'Solo quien atiende el caso puede conectarse, dar órdenes o resolverlo.',
+    'autorizacion-no-vigente':'La persona ya no autoriza el acceso o la autorización venció.', 'sesion-abierta':'Ya tienes una sesión técnica abierta. Ciérrala antes de conectarte a otro caso.',
+    'sesion-cerrada':'La sesión técnica ya se cerró o la persona retiró su autorización.', 'caso-cerrado':'Este caso ya está cerrado.',
+    'orden-en-curso':'Ya hay una orden igual esperando la respuesta del equipo.', 'not-found':'Ese caso o esa sesión ya no existe.',
+    'access-denied':'Tu cuenta no tiene acceso a esta operación.', 'rate-limited':'Demasiadas operaciones seguidas. Espera un momento.'};
+  const errorText = (code, fallback = 'No se pudo completar la operación. Inténtalo de nuevo.') => ERRORS[code] || fallback;
+  const closingText = reason => CLOSINGS[reason] || CLOSINGS.manual;
+  const when = value => AppViews.date(value);
+  const none = value => value ? escaparHTML(value) : '—';
+  const incident = value => GardenModel.INCIDENTS[value] || escaparHTML(value);
+  const number = value => Number.isFinite(value) ? AppModel.number(value) : null;
+  const plantOptions = [1, 2, 3].map(plant => `<option value="${plant}">Planta ${plant}</option>`).join('');
+  const secondOptions = Array.from({length:ConsoleService.bombSeconds.max - ConsoleService.bombSeconds.min + 1}, (_, index) => `<option value="${ConsoleService.bombSeconds.min + index}">${ConsoleService.bombSeconds.min + index} s</option>`).join('');
+
+  function authorization(caso) {
+    const [label, tone] = AUTHORIZATION[caso.authorization];
+    return `${tag(label, tone)}${caso.authorization === 'vigente' ? ` vence en ${GardenModel.lapse(caso.authorizedUntil)}` : ''}`;
+  }
+
+  function item(caso, selected) {
+    const remaining = caso.state === 'resuelto' ? (ConsoleService.results[caso.result] || '—') : caso.authorization === 'vigente' ? `${GardenModel.lapse(caso.authorizedUntil)} restantes` : AUTHORIZATION[caso.authorization][0];
+    return `<li><button type="button" class="console-item${selected ? ' is-selected' : ''}" data-admin-action="open-case" data-case="${escaparHTML(caso.id)}" aria-pressed="${selected}">
+      <strong>${escaparHTML(caso.folio)}</strong> · ${incident(caso.incident)} <small>${when(caso.createdAt)}</small>
+      <small>${escaparHTML(caso.email)} · ${escaparHTML(caso.device)} · ${escaparHTML(remaining)}</small></button></li>`;
+  }
+
+  function inbox(state) {
+    const {items, page, total} = state.inbox;
+    return `<section class="bento-panel console-inbox" aria-label="Bandeja">${items.length ? `<ul class="console-list">${items.map(caso => item(caso, caso.id === state.selectedId)).join('')}</ul>` : '<p>No hay casos en esta pestaña.</p>'}${T.pager({page, total})}</section>`;
+  }
+
+  const confirmations = {
+    reboot:{titulo:'¿Reiniciar el equipo?', texto:'El equipo dejará de responder unos segundos.', accion:'Reiniciar equipo', peligro:true},
+    pump:(plant, seconds) => ({titulo:`¿Probar la bomba de la planta ${plant}?`, texto:`La bomba funcionará ${seconds} s y moverá agua de verdad.`, accion:'Probar bomba'}),
+    resolve:{titulo:'¿Resolver el caso?', texto:'Se cerrará el caso y terminará el acceso. No se puede deshacer.', accion:'Resolver caso', peligro:true}};
+
+  const sessionActions = () => `<div class="console-actions" role="group" aria-label="Acciones del equipo">
+      ${act('order', 'Pedir lectura', 'light', 'data-type="lectura_inmediata"')}${act('order', 'Revisar equipo', 'light', 'data-type="autodiagnostico"')}
+      ${act('order', 'Apagar lámpara', 'light', 'data-type="lampara_apagar"')}${act('order', 'Restaurar lámpara', 'light', 'data-type="lampara_automatico"')}
+      ${act('order', 'Encender ventilador', 'light', 'data-type="ventilador_encender"')}${act('order', 'Apagar ventilador', 'light', 'data-type="ventilador_apagar"')}
+      ${act('order', 'Reiniciar equipo', 'light', 'data-type="reiniciar" data-danger="true"')}</div>
+    <form class="console-pump" data-admin-form="pump" novalidate><div><label for="pump-plant">Planta</label><select id="pump-plant" name="plant">${plantOptions}</select></div>
+      <div><label for="pump-seconds">Duración</label><select id="pump-seconds" name="seconds">${secondOptions}</select></div><button class="button btn-liquid-light" type="submit">Probar bomba</button></form>`;
+
+  // Marco de la sesión técnica: lo que cambia cada 10 s va en los tres espacios `data-console-*` y se rellena con `live`.
+  function sessionFrame(caso, session) {
+    return `<section class="bento-panel console-session" aria-labelledby="console-session-title"><div class="console-session-head"><h2 id="console-session-title">Sesión técnica · ${escaparHTML(caso.device)}</h2>
+        <p>Abierta ${GardenModel.ago(session.startedAt) || ''}</p>${act('close-session', 'Cerrar sesión técnica', 'light')}</div>
+      <div data-console-live><p>Consultando el equipo…</p></div>${sessionActions()}
+      <h3>Órdenes de esta sesión</h3><div data-console-orders></div><h3>Eventos del equipo · últimas 24 h</h3><div data-console-events></div></section>`;
+  }
+
+  function readings(data) {
+    if(!data) return '<p>El equipo todavía no envía lecturas.</p>';
+    const read = (value, unit) => number(value) === null ? 'Sin lectura' : `${number(value)}${unit}`;
+    const tank = data.tankHasWater === null ? 'Sin dato' : data.tankHasWater ? 'Con agua' : 'Sin agua';
+    const plants = data.plants.map(plant => `<div><dt>Planta ${plant.number}</dt><dd>${read(plant.moisture, ' %')}${plant.adc === null ? '' : ` · ADC ${plant.adc}`}</dd></div>`).join('');
+    return `<dl class="user-facts"><div><dt>Ambiente</dt><dd>${read(data.temperature, ' °C')} / ${read(data.airHumidity, ' %')}</dd></div><div><dt>Luz</dt><dd>${read(data.light, ' lx')}</dd></div>
+      <div><dt>Depósito</dt><dd>${tank}</dd></div>${plants}<div><dt>Lectura de</dt><dd>${when(data.measuredAt)}</dd></div></dl>`;
+  }
+
+  function events(items) {
+    if(!items.length) return '<p>Sin eventos en las últimas 24 horas.</p>';
+    return `<ol class="user-history-list">${items.map(event => `<li><span>${icon('clock')}</span><div><p>${escaparHTML(TechnicalViews.eventLabel(event.type))}${event.detail ? ` · ${escaparHTML(event.detail)}` : ''}</p><small>${when(event.at)}</small></div></li>`).join('')}</ol>`;
+  }
+
+  function live(data) {
+    const link = GardenModel.connection(data.device);
+    return {live:`<p class="console-status">${tag(link.text.split(' · ')[0], link.tone)} ${escaparHTML(link.text.split(' · ').slice(1).join(' · '))}</p>${readings(data.readings)}`,
+      orders:(data.orders.length ? data.orders.map(orderCard).join('') : '<p>Todavía no das órdenes en esta sesión.</p>') + SupportViews.diagnosticCard(data.diagnostic),
+      events:events(data.events)};
+  }
+
+  function resolution(caso) {
+    return `<section class="bento-panel"><form data-admin-form="resolve" novalidate><h2>Resolver el caso</h2><label for="console-result">Resultado</label>
+      <select id="console-result" name="result">${Object.entries(ConsoleService.results).map(([value, label]) => `<option value="${value}">${escaparHTML(label)}</option>`).join('')}</select>
+      <label for="console-note">Nota (obligatoria con «Otro»)</label><textarea id="console-note" name="note" rows="3" maxlength="500"></textarea>
+      <p class="user-small-copy">Resolver termina el acceso de la persona y cierra la sesión técnica.</p><button class="button btn-liquid-brand" type="submit">Resolver caso</button></form></section>`;
+  }
+
+  function detail(state) {
+    if(!state.detail) return '<section class="bento-panel console-detail" id="console-detail" tabindex="-1"><h2>Selecciona un caso</h2><p>Abre uno de la bandeja para ver su detalle.</p></section>';
+    const {case: caso, diagnostic, session} = state.detail;
+    const [label, tone] = CASE_STATES[caso.state];
+    const facts = [['Persona', none(caso.person)], ['Correo', escaparHTML(caso.email)], ['Huerto', escaparHTML(caso.garden)], ['Equipo', escaparHTML(caso.device)],
+      ['Problema', incident(caso.incident)], ['Nota', none(caso.note)], ['Autorización', authorization(caso)], ['Atiende', none(caso.attendedBy)]];
+    const closed = caso.state === 'resuelto' ? `<p>Resuelto el ${when(caso.closedAt)} · ${escaparHTML(ConsoleService.results[caso.result] || '—')}${caso.resolutionNote ? ` · ${escaparHTML(caso.resolutionNote)}` : ''}</p>` : '';
+    const action = caso.state === 'abierto' ? act('attend', 'Atender', 'brand')
+      : caso.state === 'en_atencion' && !caso.mine ? `<p>Lo atiende ${escaparHTML(caso.attendedBy)}.</p>`
+      : caso.state === 'en_atencion' && !session ? act('connect', 'Conectar', 'brand', caso.authorization === 'vigente' ? '' : 'disabled') : '';
+    const mine = caso.state === 'en_atencion' && caso.mine;
+    return `<section class="bento-panel console-detail" id="console-detail" tabindex="-1"><h2>Caso ${escaparHTML(caso.folio)} ${tag(label, tone)}</h2>
+        <dl class="user-facts">${facts.map(([name, value]) => `<div><dt>${name}</dt><dd>${value}</dd></div>`).join('')}</dl>${closed}
+        ${diagnostic ? `<h3>Autodiagnóstico adjunto</h3>${SupportViews.diagnosticCard(diagnostic)}` : ''}<div class="app-actions">${action}</div></section>
+      ${mine && session ? sessionFrame(caso, session) : ''}${mine ? resolution(caso) : ''}`;
+  }
+
+  function screen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const tabs = TABS.map(([id, name]) => [id, `${name} (${state.counts[id]})`]);
+    return `<div class="page-heading"><div><h1>Consola remota</h1><p>Atiende los casos con la autorización de la persona. Todo queda en la auditoría.</p></div>${act('refresh', `${icon('refresh')}<span>Actualizar</span>`)}</div>
+      ${T.tabs(tabs, state.tab)}<div class="console-layout">${inbox(state)}<div class="console-side">${detail(state)}</div></div>`;
+  }
+
+  return Object.freeze({screen, confirmations, errorText, closingText,
+    paint: (root, html) => T.paint(root, html),
+    paintLive(root, data) {
+      const parts = live(data);
+      for(const [name, html] of Object.entries(parts)) { const slot = root.querySelector(`[data-console-${name}]`); if(slot) slot.innerHTML = html; }
     },
-    focusDetail(root) { root.querySelector('#admin-ticket-detail')?.focus(); },
-    render(screen,data,access={}) {
-      if(data.status!=='ready')return messages+heading('Administración')+AppViews.state(data.status==='loading'?'Consultando la plataforma':'Esta sección se está actualizando.',data.status==='loading'?'Espera un momento.':'Vuelve a intentarlo más tarde.',data.status==='loading')+button('refresh','Reintentar');
-      return messages+({flota:fleet,soporte:remote}[screen]||fleet)(data,access);
-    }
-  };
+    focusDetail(root) { root.querySelector('#console-detail')?.focus(); }});
 })();
 
 // ── Consultas ──
@@ -173,7 +250,8 @@ const InquiryViews = (() => {
       }
     };
   }
-  return Object.freeze({shell, item, mount});
+  const confirmations = {archive:{titulo:'¿Archivar esta consulta?', texto:'Saldrá de la lista de pendientes. La verás en «Archivadas».', accion:'Archivar'}};
+  return Object.freeze({shell, item, mount, confirmations});
 })();
 
 // ── Ventas ──

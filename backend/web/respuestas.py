@@ -20,7 +20,13 @@ REGLAS_CON_CODIGO = (('Máximo 3 huertos activos', 'huerto-limite', 'Ya tienes 3
                      ('La versión debe ser mayor', 'version-no-mayor', 'La versión debe ser mayor que la vigente.'),
                      ('Nadie puede cambiar sus propias capacidades', 'capacidad-propia', 'No puedes cambiar tus propias capacidades.'),
                      ('Solo se dan capacidades a cuentas activas', 'cuenta-no-elegible', 'La cuenta debe estar activa y con el correo verificado.'),
-                     ('La cuenta debe tener el correo verificado', 'cuenta-no-elegible', 'La cuenta debe estar activa y con el correo verificado.'))
+                     ('La cuenta debe tener el correo verificado', 'cuenta-no-elegible', 'La cuenta debe estar activa y con el correo verificado.'),
+                     ('Número de revisión fuera de orden', 'stale-record', 'Otra persona cambió este registro. Actualiza la lista e inténtalo de nuevo.'),
+                     ('Un cuidado anulado no admite revisiones', 'cuidado-anulado', 'Este registro ya está anulado y no admite más cambios.'),
+                     ('Orden fuera de una sesión técnica autorizada', 'sesion-cerrada', 'La sesión técnica ya se cerró o la persona retiró su autorización.'),
+                     ('No hay autorización vigente para conectar', 'autorizacion-no-vigente', 'La persona ya no autoriza el acceso o la autorización venció.'),
+                     ('El caso está cerrado', 'caso-cerrado', 'Este caso ya está cerrado.'),
+                     ('Resuelve el caso quien lo atiende', 'caso-no-tuyo', 'Solo quien atiende el caso puede conectarse, dar órdenes o resolverlo.'))
 
 
 class EntradaInvalida(ValueError):
@@ -86,9 +92,14 @@ def leer_json(request, permitidos, *, vacio=False):
     return datos
 
 
-# Índices únicos que la persona puede provocar sin querer: un caso de soporte activo por huerto y una orden igual en curso.
+# Índices únicos que se pueden provocar sin querer: un caso de soporte activo por huerto, una orden igual en curso,
+# una sola sesión técnica abierta y una sola revisión de cuidado con cada número.
 UNICOS_CON_CODIGO = {'caso_uno_activo_por_huerto': ('caso-activo', 'Ya tienes una solicitud de soporte abierta.'),
-                     'comando_uno_en_curso': ('orden-en-curso', 'Ya hay una orden igual esperando la respuesta de tu equipo.')}
+                     'comando_uno_en_curso': ('orden-en-curso', 'Ya hay una orden igual esperando la respuesta del equipo.'),
+                     'sesion_una_abierta_por_admin': ('sesion-abierta', 'Ya tienes una sesión técnica abierta. Ciérrala antes de conectarte a otro caso.'),
+                     'sesion_una_abierta_por_caso': ('sesion-abierta', 'Ya tienes una sesión técnica abierta. Ciérrala antes de conectarte a otro caso.'),
+                     'revision_cuidado_orden': ('stale-record', 'Otra persona cambió este registro. Actualiza la lista e inténtalo de nuevo.'),
+                     'revision_cuidado_una_anulacion': ('cuidado-anulado', 'Este registro ya está anulado y no admite más cambios.')}
 
 
 def _unico_repetido(diagnostico):

@@ -696,6 +696,12 @@ const CareGuideAdminController = (() => {
       if(result.status === 'accepted') say(done);
       else say(result.status === 'stale' ? STALE_LIST : failureText(result.status, fallback), true);
     }
+    async function confirmedChange(kind, action, guideId, done, fallback) {
+      if(busy) return;
+      if(dirty) { say(DIRTY, true); return; }
+      if(!await confirmar(CareGuideViews.confirmations[kind])) return;
+      await changeState(action, guideId, done, fallback);
+    }
     root.addEventListener('click', event => {
       const target = event.target;
       const filterButton = target.closest('[data-guide-filter]');
@@ -716,9 +722,9 @@ const CareGuideAdminController = (() => {
         return;
       }
       const publish = target.closest('[data-guide-publish]');
-      if(publish) { changeState(service.publish, publish.dataset.guidePublish, 'Ficha publicada. Ya es visible para las personas usuarias.', 'No se pudo publicar la ficha.'); return; }
+      if(publish) { confirmedChange('publish', service.publish, publish.dataset.guidePublish, 'Ficha publicada. Ya es visible para las personas usuarias.', 'No se pudo publicar la ficha.'); return; }
       const withdraw = target.closest('[data-guide-withdraw]');
-      if(withdraw) changeState(service.withdraw, withdraw.dataset.guideWithdraw, 'Ficha retirada. Ya no es visible; puedes consultarla en Retiradas.', 'No se pudo retirar la ficha.');
+      if(withdraw) confirmedChange('withdraw', service.withdraw, withdraw.dataset.guideWithdraw, 'Ficha retirada. Ya no es visible; puedes consultarla en Retiradas.', 'No se pudo retirar la ficha.');
     }, {signal:life.signal});
     form.addEventListener('input', () => { dirty = true; }, {signal:life.signal});
     form.addEventListener('submit', event => {
@@ -732,54 +738,99 @@ const CareGuideAdminController = (() => {
 })();
 
 // ── Mantenimientos ──
+// Cuidados de todos los huertos: lista con filtros, registro y la corrección o anulación de cada uno. El servidor confirma.
 const MaintenanceController = (() => {
   function mount({root, service = MaintenanceService} = {}) {
     const life = new AbortController();
-    const view = MaintenanceViews.mount(root);
-    const {revise, filter} = view;
-    const dateFilters = DateFilterViews.mount(filter,life.signal);
-    let current = null, ready = false;
-    async function load() {
-      const invalid = dateFilters.validate();
-      if(invalid) { view.statusText(invalid); return; }
-      view.loading();
-      const result = await service.list(Object.fromEntries(new FormData(filter)));
-      if(life.signal.aborted) return;
-      if(result.status !== 'ready') { view.failed(result.status); return; }
-      view.show(result, !ready); ready = true;
+    let state = {status:'loading', filters:{}, list:{items:[], page:1, total:0}};
+    let datesLife = null, dates = null, serial = 0, working = false, current = null;
+    function paint() {
+      AdminTableViews.paint(root, MaintenanceViews.screen(state));
+      datesLife?.abort();
+      if(state.status !== 'ready') return;
+      datesLife = new AbortController();
+      dates = DateFilterViews.mount(root, datesLife.signal);
     }
+    async function load(page = 1) {
+      const id = ++serial;
+      const result = await service.list(state.filters, page);
+      if(life.signal.aborted || id !== serial) return;
+      state = result.status === 'ready' ? {...state, status:'ready', list:{items:result.items, page:result.page, total:result.total}} : {...state, status:'error'};
+      paint();
+    }
+    const fail = result => mostrarAviso('error', MaintenanceViews.errorText(result.code));
     async function open(id) {
       const result = await service.detail(id);
-      if(result.status !== 'ready') { view.notify(result.status,true); return; }
+      if(life.signal.aborted) return;
+      if(result.status !== 'ready') { fail(result); return; }
       current = result.record;
-      view.openDetail(result.record, result.revisions);
+      AdminTableViews.open(root, MaintenanceViews.detail(result.record, result.revisions));
+      MaintenanceViews.adjust(root, result.record.type);
     }
-    root.addEventListener('click',event => {
-      const opener = event.target.closest('[data-maint-open]');
-      if(opener) open(opener.dataset.maintOpen);
-    },{signal:life.signal});
-    view.closers.forEach(button => button.addEventListener('click',view.closeDetail,{signal:life.signal}));
-    filter.addEventListener('change',load,{signal:life.signal});
-    filter.addEventListener('submit',event => { event.preventDefault(); load(); },{signal:life.signal});
-    view.create.addEventListener('submit',async event => {
+    function careValues(form) {
+      const plant = form.elements.plant.value, chiles = form.elements.chiles.value;
+      return {type:form.elements.type.value, plant:plant ? Number(plant) : null, chiles:chiles !== '' && !form.querySelector('[data-care-chiles]').hidden ? Number(chiles) : null};
+    }
+    async function create(form) {
+      const today = MaintenanceDates.format(MaintenanceDates.today());
+      const doneAt = service.moment(form.elements.when.value, today);
+      const values = {garden:form.elements.garden.value.trim(), ...careValues(form), ...(doneAt ? {doneAt} : {})};
+      if(!AdminHTTP.validId(values.garden)) { mostrarAviso('error', 'Escribe el número del huerto, solo con dígitos.'); return; }
+      const result = await service.create(values);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { fail(result); return; }
+      AdminTableViews.dismiss(root);
+      mostrarAviso('exito', 'Intervención registrada.');
+      await load(1);
+    }
+    // Una vez que el servidor responde, el diálogo se cierra y la lista se vuelve a leer: nunca se supone un éxito.
+    async function finish(result, message) {
+      if(life.signal.aborted) return;
+      if(result.status === 'accepted') mostrarAviso('exito', message); else fail(result);
+      if(result.status === 'accepted' || ['stale-record', 'cuidado-anulado', 'not-found'].includes(result.code)) { AdminTableViews.dismiss(root); await load(state.list.page); }
+    }
+    async function revise(form, voiding) {
+      const reason = form.elements.reason.value.trim();
+      if(!reason) { mostrarAviso('error', 'Escribe el motivo del cambio.'); return; }
+      if(voiding) {
+        if(!await confirmar(MaintenanceViews.confirmations.void)) return;
+        await finish(await service.void(current.id, {revision:current.revision, reason}), 'Registro anulado.');
+        return;
+      }
+      await finish(await service.correct(current.id, {revision:current.revision, ...careValues(form), reason}), 'Corrección guardada.');
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, page, id} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'page') await load(Number(page));
+        else if(action === 'clear') { state.filters = {}; MaintenanceViews.resetFilters(root); await load(1); }
+        else if(action === 'create') { AdminTableViews.open(root, MaintenanceViews.createForm()); MaintenanceViews.adjust(root, 'rellenar_deposito'); }
+        else if(action === 'open') await open(id);
+        else if(action === 'void') await revise(trigger.closest('form'), true);
+        else if(action === 'close-dialog') AdminTableViews.dismiss(root);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('change', event => { if(event.target.matches('[data-care-type]')) MaintenanceViews.adjust(root, event.target.value); }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
       event.preventDefault();
-      const values = new FormData(event.target);
-      const result = await service.create(Number(values.get('garden')),values.get('task'));
-      if(result.status === 'accepted') { view.notify('created'); load(); } else view.notify(result.status,true);
-    },{signal:life.signal});
-    revise.addEventListener('submit',async event => {
-      event.preventDefault();
-      const reason = revise.elements.reason.value.trim();
-      if(!reason) { view.showError('reason'); return; }
-      const voiding = event.submitter?.value === 'void';
-      const result = voiding ? await service.void(current.id,reason,current.revision)
-        : await service.correct(current.id,revise.elements.task.value,reason,current.revision);
-      if(result.status === 'accepted') { view.closeDetail(); view.notify(voiding?'voided':'corrected'); load(); return; }
-      view.showError(result.status);
-      if(result.status === 'stale') { view.closeDetail(); view.notify('stale',true); load(); }
-    },{signal:life.signal});
-    load();
-    return {dispose(){life.abort(); view.closeDetail();}};
+      const kind = event.target.closest('[data-admin-form]')?.dataset.adminForm;
+      if(working) return;
+      working = true;
+      try {
+        if(kind === 'care-filter') {
+          const invalid = dates.validate();
+          if(invalid) { mostrarAviso('error', invalid); return; }
+          state.filters = Object.fromEntries(new FormData(event.target));
+          await load(1);
+        } else if(kind === 'care-create') await create(event.target);
+        else if(kind === 'care-revise') await revise(event.target, false);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    load(1);
+    return {dispose() { serial++; datesLife?.abort(); life.abort(); }};
   }
   return {mount};
 })();

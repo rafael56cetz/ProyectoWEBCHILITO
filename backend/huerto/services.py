@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
-from django.db.models import Case, CharField, F, OuterRef, SmallIntegerField, Subquery, When
+from django.db.models import Case, CharField, F, OuterRef, Q, SmallIntegerField, Subquery, When
 from django.http import Http404
 from django.utils import timezone
 
@@ -20,6 +20,7 @@ from datos import services as s
 from datos.models import (Actuacion, Autodiagnostico, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, Dispositivo,
                           DispositivoEvento, IaResumen, Medicion, MedicionPlanta, ResumenHoraHuerto, ResumenHoraPlanta)
 from datos.paginacion import paginar
+from web.respuestas import ReglaDeNegocio
 
 from .models import Huerto, Planta, PlantaEtapa
 
@@ -201,7 +202,7 @@ def _cuidados_vigentes():
     return (Cuidado.objects
             .annotate(rev_tipo=Subquery(ultima.values('tipo')[:1]), rev_tipo_c=Subquery(ultima.values('tipo_corregido')[:1]),
                       rev_planta=Subquery(ultima.values('planta_corregida')[:1]), rev_chiles=Subquery(ultima.values('chiles_corregidos')[:1]),
-                      rev_motivo=Subquery(ultima.values('motivo')[:1]))
+                      rev_motivo=Subquery(ultima.values('motivo')[:1]), rev_numero=Subquery(ultima.values('numero')[:1]))
             .annotate(tipo_vigente=vigente('tipo', 'rev_tipo_c', CharField()), planta_vigente=vigente('planta_numero', 'rev_planta', SmallIntegerField()),
                       chiles_vigentes=vigente('chiles_cosechados', 'rev_chiles', SmallIntegerField())))
 
@@ -321,9 +322,7 @@ def _momento_cuidado(valor):
     return momento
 
 
-@transaction.atomic
-def registrar_cuidado(actor, huerto_id, tipo, planta, chiles, realizado_en=None):
-    huerto = s.huerto_propio(actor, huerto_id)
+def _validar_cuidado(tipo, planta, chiles):
     if tipo not in TIPOS_CUIDADO:
         raise ValidationError('Cuidado no válido')
     if tipo == 'rellenar_deposito' and planta is not None:
@@ -332,10 +331,21 @@ def registrar_cuidado(actor, huerto_id, tipo, planta, chiles, realizado_en=None)
         _entero(planta, 1, 3)
     if chiles is not None and (tipo != 'cosecha' or type(chiles) is not int or not 0 <= chiles <= 999):
         raise ValidationError('Cantidad no válida')
+
+
+def _crear_cuidado(actor, huerto, tipo, planta, chiles, realizado_en):
+    _validar_cuidado(tipo, planta, chiles)
     momento = _momento_cuidado(realizado_en)
     cuidado = Cuidado.objects.create(huerto=huerto, tipo=tipo, planta_numero=planta, chiles_cosechados=chiles,
                                      registrado_por_id=actor.pk, **({'realizado_en': momento} if momento else {}))
     s.auditar(actor, 'registrar_cuidado', entidad='cuidado', entidad_id=cuidado.pk, detalle={'tipo': tipo})
+    return cuidado
+
+
+@transaction.atomic
+def registrar_cuidado(actor, huerto_id, tipo, planta, chiles, realizado_en=None):
+    huerto = s.huerto_propio(actor, huerto_id)
+    cuidado = _crear_cuidado(actor, huerto, tipo, planta, chiles, realizado_en)
     return {'status': 'accepted', 'care': _cuidado_dto(_cuidados_vigentes().get(pk=cuidado.pk))}
 
 
@@ -347,14 +357,12 @@ def _dia(valor):
     return date.fromisoformat(valor)
 
 
-def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
-    huerto = s.huerto_propio(actor, huerto_id)
+def _filtrar_cuidados(consulta, planta, tipo, desde, hasta):
     if planta not in (None, 'huerto', '1', '2', '3') or (tipo is not None and tipo not in TIPOS_CUIDADO):
         raise ValidationError('Filtro no válido')
     desde, hasta = _dia(desde), _dia(hasta)
     if desde and hasta and desde > hasta:
         raise ValidationError('Rango de fechas no válido')
-    consulta = _cuidados_vigentes().filter(huerto_id=huerto.pk).order_by('-realizado_en', '-registrado_en')
     if tipo:
         consulta = consulta.filter(tipo_vigente=tipo)
     if planta:
@@ -363,7 +371,121 @@ def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
         consulta = consulta.filter(realizado_en__gte=datetime.combine(desde, time.min, ZONA_MERIDA))
     if hasta:
         consulta = consulta.filter(realizado_en__lt=datetime.combine(hasta + timedelta(days=1), time.min, ZONA_MERIDA))
-    return {'status': 'ready', **paginar(consulta, pagina, _cuidado_dto)}
+    return consulta
+
+
+def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
+    huerto = s.huerto_propio(actor, huerto_id)
+    consulta = _filtrar_cuidados(_cuidados_vigentes().filter(huerto_id=huerto.pk), planta, tipo, desde, hasta)
+    return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en'), pagina, _cuidado_dto)}
+
+
+# ── Mantenimientos de todos los huertos (`gestionar_mantenimientos`) ──
+CAPACIDAD_MANTENIMIENTOS = 'gestionar_mantenimientos'
+ESTADOS_CUIDADO = {'vigente': None, 'corregido': 'correccion', 'anulado': 'anulacion'}
+MAXIMO_BUSQUEDA = 60
+MAXIMO_MOTIVO = 500
+
+
+def _mantenimientos():
+    return _cuidados_vigentes().select_related('huerto__propietario')
+
+
+def _mantenimiento_dto(cuidado):
+    return {**_cuidado_dto(cuidado), 'gardenId': str(cuidado.huerto_id), 'garden': cuidado.huerto.nombre,
+            'owner': cuidado.huerto.propietario.email, 'revision': cuidado.rev_numero or 0, 'registeredAt': _fecha(cuidado.registrado_en)}
+
+
+def _id_numerico(valor):
+    if type(valor) is int and valor > 0:
+        return valor
+    if isinstance(valor, str) and valor.isascii() and valor.isdecimal() and len(valor) <= 18:
+        return int(valor)
+    raise ValidationError('Identificador no válido')
+
+
+def _busqueda(texto):
+    if texto is not None and (not isinstance(texto, str) or len(texto) > MAXIMO_BUSQUEDA or not texto.isprintable()):
+        raise ValidationError('Búsqueda no válida')
+    return texto.strip() if texto else None
+
+
+def mantenimientos(actor, busqueda, huerto, planta, tipo, estado, desde, hasta, pagina):
+    s.require_cap(actor, CAPACIDAD_MANTENIMIENTOS)
+    if estado is not None and estado not in ESTADOS_CUIDADO:
+        raise ValidationError('Filtro no válido')
+    consulta = _filtrar_cuidados(_mantenimientos(), planta, tipo, desde, hasta)
+    if busqueda := _busqueda(busqueda):
+        consulta = consulta.filter(Q(huerto__nombre__icontains=busqueda) | Q(huerto__propietario__email__icontains=busqueda))
+    if huerto:
+        consulta = consulta.filter(huerto_id=_id_numerico(huerto))
+    if estado:
+        consulta = consulta.filter(rev_tipo=ESTADOS_CUIDADO[estado]) if ESTADOS_CUIDADO[estado] else consulta.filter(rev_tipo__isnull=True)
+    return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en', 'id'), pagina, _mantenimiento_dto)}
+
+
+def _revision_dto(revision):
+    return {'number': revision.numero, 'type': revision.tipo, 'correctedType': revision.tipo_corregido, 'correctedPlant': revision.planta_corregida,
+            'correctedChiles': revision.chiles_corregidos, 'reason': revision.motivo, 'editor': revision.editor.email, 'at': _fecha(revision.registrada_en)}
+
+
+def _mantenimiento(cuidado_id):
+    cuidado = _mantenimientos().filter(pk=cuidado_id).first()
+    if cuidado is None:
+        raise Http404
+    return cuidado
+
+
+def detalle_mantenimiento(actor, cuidado_id):
+    s.require_cap(actor, CAPACIDAD_MANTENIMIENTOS)
+    cuidado = _mantenimiento(cuidado_id)
+    revisiones = CuidadoRevision.objects.select_related('editor').filter(cuidado_id=cuidado.pk).order_by('numero')
+    return {'status': 'ready', 'record': _mantenimiento_dto(cuidado), 'revisions': [_revision_dto(revision) for revision in revisiones]}
+
+
+@transaction.atomic
+def registrar_mantenimiento(actor, huerto_id, tipo, planta, chiles, realizado_en):
+    admin = s.require_cap(actor, CAPACIDAD_MANTENIMIENTOS)
+    huerto = Huerto.objects.filter(pk=_id_numerico(huerto_id), estado='activo').first()
+    if huerto is None:
+        raise Http404
+    cuidado = _crear_cuidado(admin, huerto, tipo, planta, chiles, realizado_en)
+    return {'status': 'accepted', 'record': _mantenimiento_dto(_mantenimiento(cuidado.pk))}
+
+
+def _motivo_de_revision(motivo):
+    if not isinstance(motivo, str) or not motivo.replace('\n', ' ').isprintable() or not 1 <= len(motivo.strip()) <= MAXIMO_MOTIVO:
+        raise ValidationError('Motivo no válido')
+    return motivo.strip()
+
+
+def _revisar(editor, cuidado_id, revision, motivo, accion, **campos):
+    """Agrega la revisión siguiente. `revision` es la que la persona vio: si otra se adelantó, el registro está desactualizado."""
+    motivo = _motivo_de_revision(motivo)
+    cuidado = _mantenimiento(cuidado_id)
+    if cuidado.rev_tipo == 'anulacion':
+        raise ReglaDeNegocio('cuidado-anulado', 'Este registro ya está anulado y no admite más cambios.')
+    if type(revision) is not int or revision < 0:
+        raise ValidationError('Revisión no válida')
+    if revision != (cuidado.rev_numero or 0):
+        raise s.RegistroDesactualizado
+    CuidadoRevision.objects.create(cuidado_id=cuidado.pk, numero=revision + 1, motivo=motivo, editor_id=editor.pk, **campos)
+    s.auditar(editor, accion, entidad='cuidado', entidad_id=cuidado.pk, detalle={'revision': revision + 1})
+    return {'status': 'accepted', 'record': _mantenimiento_dto(_mantenimiento(cuidado.pk))}
+
+
+@transaction.atomic
+def corregir_mantenimiento(actor, cuidado_id, revision, tipo, planta, chiles, motivo):
+    editor = s.require_cap(actor, CAPACIDAD_MANTENIMIENTOS)
+    _validar_cuidado(tipo, planta, chiles)
+    return _revisar(editor, cuidado_id, revision, motivo, 'corregir_cuidado', tipo='correccion',
+                    tipo_corregido=tipo, planta_corregida=planta, chiles_corregidos=chiles)
+
+
+@transaction.atomic
+def anular_mantenimiento(actor, cuidado_id, revision, motivo):
+    editor = s.require_cap(actor, CAPACIDAD_MANTENIMIENTOS)
+    return _revisar(editor, cuidado_id, revision, motivo, 'anular_cuidado', tipo='anulacion')
 
 
 # ── Panel técnico y bitácora ──

@@ -88,14 +88,6 @@ def endpoint(methods=('GET',), fields=(), cap=None):
     return wrap
 
 
-@never_cache
-def en_actualizacion(request, *args, **kwargs):
-    """Pantallas que se rediseñan en fases posteriores: sin datos y sin lógica."""
-    if not request.user.is_authenticated:
-        return failure(401, 'unauthenticated')
-    return JsonResponse({'status': 'error', 'code': 'en-actualizacion'}, status=503)
-
-
 @endpoint(cap='atender_consultas')
 def inquiries(request, data):
     state = request.GET.get('state') or None

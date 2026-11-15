@@ -1,87 +1,30 @@
 // MODELO · Administración: paneles de operación, buzón de consultas, ventas, administradores, textos legales y consentimientos.
-// Define: AdminService, InquiryService, AdminHTTP, SalesModel, SalesService, AdminAccessService, LegalAdminService, ConsentService.
+// Define: FleetService, ConsoleService, InquiryService, AdminHTTP, SalesModel, SalesService, AdminAccessService, LegalAdminService, ConsentService.
 
 // ── Administracion ──
-// Los datos de administración en memoria solo contienen respuestas autorizadas por Django.
-const AdminService = (() => {
-  const results=Object.freeze({solucionado:'Problema solucionado',sin_falla:'Sin falla detectada',sin_respuesta:'Sin respuesta de la persona usuaria',otro:'Otro (explicado en la nota)'});
-  // Estado real del aviso: aceptado por SMTP no significa entregado en la bandeja.
-  const noticeLabels=Object.freeze({pendiente:'Pendiente de envío',aceptado_smtp:'Aceptado por el servidor de correo',fallido:'Envío fallido; se reintentará'});
-  let remote=null,diagnosis=null;
-  const incidents=GardenModel.INCIDENTS;
-  const statusOf=response=>response.body?.code==='stale-record'?'stale':response.http===403?'forbidden':response.http===401?'unauthenticated':response.http===429?'limited':'error';
-  async function request(path,body) {
-    try {
-      const response=await ChilitoHTTP.request('/api/admin/'+path,body===undefined?{}:{method:'POST',body});
-      if(response.http===401)ChilitoHTTP.sessionExpired();
-      return [200,201].includes(response.http)?response.body:{status:statusOf(response)};
-    }catch{return {status:'error'};}
-  }
-  async function closeRemote() {
-    if(!remote)return {status:'accepted'};
-    const prior=remote;
-    const result=await request('sesiones/'+encodeURIComponent(prior.id)+'/cerrar',{});
-    if(result.status==='accepted'||result.status==='unauthenticated') {if(remote===prior)remote=null;diagnosis=null;}
-    return result;
-  }
-  async function act(ticket,action) {
-    if(!remote||remote.ticket!==ticket)return {status:'no-permission'};
-    if(remote.expiresAt<=Date.now()){await closeRemote();return {status:'no-permission'};}
-    const result=await request('sesiones/'+encodeURIComponent(remote.id)+'/accion',{action});
-    if(result.status!=='accepted') {remote=null;diagnosis=null;return result;}
-    if(action==='diagnostic')diagnosis={pins:Array.isArray(result.pins)?result.pins:[],logs:Array.isArray(result.logs)?result.logs:[],at:result.at??null};
-    return result;
-  }
-  return {
-    results,noticeLabels,
-    async snapshot(selectedId=null,screen='flota') {
-      const name={flota:'flota',soporte:'soporte'}[screen];
-      const result=await request(name);
-      if(screen==='soporte'&&result.status==='ready'&&Array.isArray(result.items)) {
-        let page=result.page||1;
-        while(result.total>result.items.length&&page<100) {
-          const next=await request(name+'?page='+(++page));
-          if(next.status!=='ready'||!Array.isArray(next.items))return {status:'error'};
-          if(!next.items.length)break;result.items.push(...next.items);
-        }
-      }
-      if(result.status!=='ready')return result;
-      const data={status:'ready',at:null,nodes:[],tickets:[],selected:null,remote:null,diagnostics:null,trends:{soil:[],humidity:[]},metrics:{},correlations:[],...result};
-      if(screen==='soporte') {
-        data.tickets=(result.items||[]).map(t=>({...t,incident:incidents[t.incident]||t.incident,status:{active:'Espera validación',expired:'Autorización vencida',revoked:'Autorización revocada',closed:'Sin autorización'}[t.permissionState]||'Sin autorización'}));
-        data.selected=data.tickets.find(t=>t.id===selectedId)||null;
-        if(remote&&remote.ticket===selectedId) {
-          const checked=await act(selectedId,'diagnostic');
-          if(checked.status==='accepted'){data.remote={...remote};data.diagnostics=diagnosis;data.selected.status='Diagnóstico autorizado';}
-        }
-      }
-      return data;
-    },
-    async selectTicket(id){const result=await closeRemote();return result.status==='accepted'?{status:'accepted'}:result;},
-    async requestToken(id) {
-      if(!id)return {status:'not-found'};
-      const closed=await closeRemote();if(closed.status!=='accepted')return closed;
-      return request('soporte/'+encodeURIComponent(id)+'/solicitar-token',{});
-    },
-    // Resolver cierra el caso para siempre: el servidor revoca el permiso y cierra la sesión técnica.
-    async resolveCase(id,result,note) {
-      if(!id)return {status:'not-found'};
-      const closed=await closeRemote();if(closed.status!=='accepted')return closed;
-      return request('soporte/'+encodeURIComponent(id)+'/resolver',{result,note});
-    },
-    async validateToken(id,token) {
-      if(!id)return {status:'not-found'};
-      if(typeof token!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(token))return {status:'invalid-token'};
-      const closed=await closeRemote();if(closed.status!=='accepted')return closed;
-      const result=await request('soporte/'+encodeURIComponent(id)+'/abrir',{token});
-      if(result.status==='accepted'&&result.session?.id)remote={...result.session,ticket:id};
-      return result;
-    },
-    refreshDiagnostics(id){return act(id,'diagnostic');},
-    closeRemote,
-    get remote(){return remote?{...remote}:null;},
-    reset(){remote=null;diagnosis=null;}
-  };
+// Flota y consola remota. Solo transportan datos: la capacidad, la propiedad del caso y la autorización las decide el servidor en cada llamada.
+const FleetService = Object.freeze({
+  load: (filters, page) => AdminHTTP.call('/api/admin/flota' + AdminHTTP.query({...filters, page}))
+});
+
+const ConsoleService = (() => {
+  const cases = '/api/admin/soporte', sessions = '/api/admin/sesiones';
+  const results = Object.freeze({solucionado:'Problema solucionado', sin_falla:'Sin falla detectada', sin_respuesta:'Sin respuesta de la persona usuaria', otro:'Otro (explicado en la nota)'});
+  const bombSeconds = Object.freeze({min:1, max:5});
+  const path = (root, id, rest = '') => AdminHTTP.validUuid(id) ? `${root}/${id}${rest}` : null;
+  const post = (url, body = {}, options = {}) => AdminHTTP.call(url, {method:'POST', body, ...options});
+  return Object.freeze({
+    results, bombSeconds,
+    inbox: (state, page) => AdminHTTP.call(cases + AdminHTTP.query({estado:state, page})),
+    detail: id => AdminHTTP.call(path(cases, id)),
+    attend: id => post(path(cases, id, '/atender')),
+    connect: id => post(path(cases, id, '/conectar')),
+    resolve: (id, result, note) => post(path(cases, id, '/resolver'), {result, note}),
+    // El sondeo no cuenta como actividad: la consola abierta sin tocarla no mantiene viva la sesión de la cuenta.
+    session: (id, signal) => AdminHTTP.call(path(sessions, id), {signal, headers:{'X-Chilito-Sondeo':'1'}}),
+    order: (id, body) => post(path(sessions, id, '/accion'), body),
+    endSession: (id, keepalive = false) => post(path(sessions, id, '/cerrar'), {}, {keepalive})
+  });
 })();
 
 // ── Consultas ──
@@ -140,10 +83,10 @@ const AdminHTTP = (() => {
   const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
   const validUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
   const query = values => { const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== '' && value != null)); return params.size ? `?${params}` : ''; };
-  async function call(path, {method = 'GET', body, signal} = {}) {
+  async function call(path, {method = 'GET', body, signal, headers, keepalive} = {}) {
     if(!path) return {status:'error', code:'invalid-input'};
     try {
-      const response = await ChilitoHTTP.request(path, {method, body, signal});
+      const response = await ChilitoHTTP.request(path, {method, body, signal, headers, keepalive});
       if(response.http === 401) { ChilitoHTTP.sessionExpired(); return {status:'error', code:'unauthenticated'}; }
       return response.http === 200 ? response.body : {status:'error', code:response.body?.code || 'unavailable'};
     } catch { return {status:'error', code:'network'}; }

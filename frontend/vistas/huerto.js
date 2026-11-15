@@ -5,7 +5,9 @@
 // Mi huerto, crear huerto, vincular equipo, ficha de planta y Mis huertos. Todo dato del servidor entra con escaparHTML.
 const GardenViews = (() => {
   const STAGES = {sin_sembrar:'Sin sembrar', germinacion:'Germinación', plantula:'Plántula', crecimiento:'Crecimiento', floracion:'Floración', fructificacion:'Fructificación'};
-  const ORDER_TITLES = {regar:'Riego', lampara_apagar:'Apagar la lámpara', lampara_automatico:'Restaurar la lámpara automática', autodiagnostico:'Revisión del equipo'};
+  const ORDER_TITLES = {regar:'Riego', lampara_apagar:'Apagar la lámpara', lampara_automatico:'Restaurar la lámpara automática', autodiagnostico:'Revisión del equipo',
+    probar_bomba:'Prueba de bomba', ventilador_encender:'Encender el ventilador', ventilador_apagar:'Apagar el ventilador', reiniciar:'Reinicio del equipo', lectura_inmediata:'Lectura inmediata'};
+  const TIMED_ORDERS = ['regar', 'probar_bomba'];
   const ORDER_STATES = {pendiente:['Pendiente','ambar'], enviado:['Enviada','ambar'], confirmado:['Confirmada','verde'], fallido:['Falló','rojo'], expirado:['Sin respuesta','gris']};
   const ERRORS = {
     'huerto-limite':'Ya tienes 3 huertos. Archiva uno para crear otro.',
@@ -130,7 +132,7 @@ const GardenViews = (() => {
   // Tarjeta de orden 3.3: el estado lo confirma el equipo, no esta pantalla.
   function orderCard(order) {
     const [label, tone] = ORDER_STATES[order.state] || ['Sin respuesta', 'gris'];
-    const detail = order.type === 'regar' ? ` · planta ${order.plant} · ${order.duration} s` : '';
+    const detail = TIMED_ORDERS.includes(order.type) ? ` · planta ${order.plant} · ${order.duration} s` : '';
     return `<article class="bento-panel order-card${order.state === 'enviado' ? ' is-sending' : ''}" role="status"><div><h3>${ORDER_TITLES[order.type] || 'Orden'}${detail}</h3>
       ${order.state === 'fallido' && order.error ? `<p>${escaparHTML(order.error)}</p>` : ''}</div>${tag(label, tone)}</article>`;
   }
@@ -202,7 +204,7 @@ const GardenViews = (() => {
 
   const noGarden = title => `${AppViews.heading(title)}<section class="bento-panel garden-empty"><h2>Aún no tienes un huerto</h2><p>Crea tu huerto para usar esta pantalla.</p><a class="button btn-liquid-brand" href="#huerto/nuevo">Crear mi huerto</a></section>`;
   const noDevice = (gardens, garden, title, screen) => `${selector(gardens, garden, screen)}${AppViews.heading(title)}<section class="bento-panel garden-empty"><h2>Tu huerto aún no tiene equipo</h2><p>Vincula tu equipo para usar esta pantalla.</p><a class="button btn-liquid-brand" href="${withGarden('huerto/vincular', garden.id)}">Vincular equipo</a></section>`;
-  const orderTitle = order => `${ORDER_TITLES[order.type] || 'Orden'}${order.type === 'regar' ? ` · planta ${order.plant} · ${order.duration} s` : ''}`;
+  const orderTitle = order => `${ORDER_TITLES[order.type] || 'Orden'}${TIMED_ORDERS.includes(order.type) ? ` · planta ${order.plant} · ${order.duration} s` : ''}`;
   const orderStateTag = state => { const [label, tone] = ORDER_STATES[state] || ['Sin respuesta', 'gris']; return tag(label, tone); };
 
   const dialog = '<dialog class="bento-panel app-dialog garden-dialog" aria-labelledby="garden-dialog-title"><div data-garden-dialog-content></div></dialog>';
@@ -439,7 +441,7 @@ const CareViews = (() => {
   }
   const resetFilters = root => root.querySelector('[data-garden-form="care-filter"]').reset();
 
-  return Object.freeze({screen, list, adjust, prepare, reset, resetFilters});
+  return Object.freeze({screen, list, adjust, prepare, reset, resetFilters, types:TYPES});
 })();
 
 const SupportViews = (() => {
@@ -713,11 +715,14 @@ const CareGuideViews = (() => {
     summary.textContent = 'Aplicando el cambio…';
   }
   function focusNew(root) { root.querySelector('[data-guide-new]').focus(); }
-  return Object.freeze({slot, paint, openItem, focusSection, adminShell, mountAdmin, adminFeedback, adminLoading, adminApplying, focusNew, adminList, adminError, setFilter, fillEditor, readEditor, markInvalid, formStatus, saving, staleOption, closeEditor, focusEditor});
+  const confirmations = {
+    publish:{titulo:'¿Publicar esta ficha?', texto:'Será visible para todas las personas usuarias en la guía de cuidado.', accion:'Publicar'},
+    withdraw:{titulo:'¿Retirar esta ficha?', texto:'Dejará de verse para las personas usuarias. Podrás volver a publicarla.', accion:'Retirar ficha', peligro:true}};
+  return Object.freeze({confirmations, slot, paint, openItem, focusSection, adminShell, mountAdmin, adminFeedback, adminLoading, adminApplying, focusNew, adminList, adminError, setFilter, fillEditor, readEditor, markInvalid, formStatus, saving, staleOption, closeEditor, focusEditor});
 })();
 
 // ── Mantenimientos ──
-// Pantalla de mantenimientos. Datos del servidor solo por textContent y value.
+// Mantenimientos de todos los huertos (5.3). Todo dato del servidor entra escapado. Incluye el calendario compartido de los filtros de fecha.
 const MaintenanceViews = (() => {
   const el = (tag, props = {}, ...children) => {
     const node = Object.assign(document.createElement(tag), props);
@@ -728,60 +733,81 @@ const MaintenanceViews = (() => {
     select.replaceChildren(...(blank ? [el('option',{value:'',textContent:blank})] : []),
       ...entries.map(([value,label]) => el('option',{value:String(value),textContent:label})));
   };
-  const taskEntries = () => Object.entries(MaintenanceService.tasks);
   const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const weekdays = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
-  function dateField(name, label) {
-    return `<div class="maint-date-control"><label for="maint-${name}">${label}</label>
-      <div class="maint-date-field"><input type="text" name="${name}" id="maint-${name}" placeholder="aaaa-mm-dd" maxlength="10" autocomplete="off" spellcheck="false" aria-describedby="maint-date-format">
-      <button type="button" data-date-open="${name}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div></div>`;
+  const T = AdminTableViews, {tag} = GardenViews;
+  const act = (...args) => T.button(...args);
+  const when = value => AppViews.date(value);
+  const ERRORS = {'stale-record':'Otra persona cambió este registro. Se actualizó la lista.', 'cuidado-anulado':'Este registro ya está anulado y no admite más cambios.',
+    'not-found':'No se encontró ese huerto o ese registro.', 'rate-limited':'Demasiadas operaciones seguidas. Espera un momento.', 'access-denied':'Tu cuenta no tiene acceso a esta operación.'};
+  const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
+  const STATES = {vigente:'Vigente', corregido:'Corregido', anulado:'Anulado'};
+  const plantLabel = plant => plant ? `planta ${plant}` : 'todo el huerto';
+  const stateTag = record => record.voided ? tag('Anulado', 'rojo') : record.corrected ? tag('Corregido', 'ambar') : tag('Vigente', 'verde');
+  const choices = (items, selected = '') => items.map(([value, label]) => `<option value="${escaparHTML(value)}"${String(value) === String(selected) ? ' selected' : ''}>${escaparHTML(label)}</option>`).join('');
+  const typeItems = () => Object.entries(CareViews.types);
+  const plantItems = whole => [['', whole ? 'Todo el huerto' : '—'], [1, 'Planta 1'], [2, 'Planta 2'], [3, 'Planta 3']];
+  const today = () => MaintenanceDates.format(MaintenanceDates.today());
+  // Las reglas de tipo, planta y chiles son las del formulario de la persona usuaria (CareViews.adjust).
+  const careFields = (record, whole = false) => `<label for="mant-type">Tipo</label><select id="mant-type" name="type" data-care-type>${choices(typeItems(), record?.type || 'rellenar_deposito')}</select>
+    <div data-care-plant hidden><label for="mant-plant">Planta</label><select id="mant-plant" name="plant">${choices(plantItems(whole), record?.plant || '')}</select></div>
+    <div data-care-chiles hidden><label for="mant-chiles">Chiles cosechados (opcional)</label><input id="mant-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric" value="${record?.chiles ?? ''}"></div>`;
+
+  function filters(values) {
+    return `<form class="care-filters" data-admin-form="care-filter" novalidate>
+      <div><label for="mant-search">Buscar</label><input id="mant-search" name="busqueda" type="search" maxlength="60" placeholder="Correo del dueño o huerto" value="${escaparHTML(values.busqueda || '')}"></div>
+      <div><label for="mant-garden">N.º de huerto</label><input id="mant-garden" name="huerto" type="text" inputmode="numeric" maxlength="18" pattern="[0-9]*" value="${escaparHTML(values.huerto || '')}"></div>
+      <div><label for="mant-f-plant">Planta</label><select id="mant-f-plant" name="planta">${choices([['', 'Todas'], ['huerto', 'Todo el huerto'], [1, 'Planta 1'], [2, 'Planta 2'], [3, 'Planta 3']], values.planta || '')}</select></div>
+      <div><label for="mant-f-type">Tipo</label><select id="mant-f-type" name="tipo">${choices([['', 'Todos'], ...typeItems()], values.tipo || '')}</select></div>
+      <div><label for="mant-f-state">Estado</label><select id="mant-f-state" name="estado">${choices([['', 'Todos'], ...Object.entries(STATES)], values.estado || '')}</select></div>
+      ${T.dateField('since', 'Desde', values.since)}${T.dateField('until', 'Hasta', values.until)}
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${act('clear', 'Limpiar')}</div></form>`;
   }
-  function shell() {
-    return `${AppViews.heading('Mantenimientos','Registra, corrige y anula intervenciones de los huertos asignados.')}
-      <div id="admin-feedback" class="user-feedback" role="status" tabindex="-1" hidden></div>
-      <section class="bento-panel" aria-labelledby="mant-alta"><h2 id="mant-alta">Registrar intervención</h2>
-        <form data-maint-create class="maint-form"><label>Huerto<select name="garden" required></select></label>
-        <label>Tipo<select name="task" required></select></label>
-        <button class="button btn-liquid-brand" type="submit">Registrar</button></form></section>
-      <section class="bento-panel" aria-labelledby="mant-lista"><h2 id="mant-lista">Registros</h2>
-        <form data-maint-filter class="maint-form"><label>Huerto<select name="garden"></select></label>
-        <label>Estado<select name="state"><option value="">Todos</option><option value="active">Vigentes</option><option value="voided">Anulados</option></select></label>
-        <label>Tipo<select name="task"></select></label>
-        ${dateField('since','Desde')}${dateField('until','Hasta')}
-        <p class="sr-only" id="maint-date-format">Escribe la fecha en formato año-mes-día, por ejemplo 2026-11-07. Usa flecha abajo para abrir el calendario.</p></form>
-        <div class="user-table-scroll" tabindex="0" role="region" aria-label="Registros de mantenimiento">
-        <table class="user-table admin-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Huerto</th><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead><tbody data-maint-rows></tbody></table></div>
-        <p data-maint-status role="status"></p></section>
-      <dialog class="bento-panel app-dialog" data-maint-dialog aria-labelledby="mant-dialogo"><h2 id="mant-dialogo">Registro</h2><button class="maint-dialog-close" type="button" data-maint-close aria-label="Cerrar registro">${icon('close')}</button>
-        <div data-maint-history></div>
-        <form data-maint-revise><label data-maint-task>Tipo correcto<select name="task"></select></label>
-        <label>Motivo<textarea name="reason" rows="3" maxlength="500" required></textarea></label>
-        <p data-maint-error role="alert" hidden></p>
-        <div class="app-actions maint-dialog-actions"><button class="button btn-liquid-brand" type="submit" name="action" value="correct">Guardar corrección</button>
-        <button class="button btn-liquid-light" type="button" data-maint-close>Cerrar</button>
-        <button class="button btn-liquid-light" type="submit" name="action" value="void" data-danger="true">Anular registro</button></div></form></dialog>`;
+
+  function row(item) {
+    const chiles = item.chiles != null ? ` · ${item.chiles} chiles` : '';
+    return `<tr><td>${when(item.doneAt)}</td><td>${escaparHTML(item.garden)} <small>N.º ${escaparHTML(item.gardenId)}</small></td><td>${escaparHTML(item.owner)}</td>
+      <td>${escaparHTML(CareViews.types[item.type] || item.type)} · ${plantLabel(item.plant)}${chiles}</td><td>${stateTag(item)}</td><td>${act('open', 'Ver', 'light', `data-id="${escaparHTML(item.id)}"`)}</td></tr>`;
   }
-  function fillForms(root, gardens) {
-    const entries = gardens.map(item => [item.id,item.name]);
-    options(root.querySelector('[data-maint-create] [name=garden]'),entries);
-    options(root.querySelector('[data-maint-filter] [name=garden]'),entries,'Todos');
-    options(root.querySelector('[data-maint-create] [name=task]'),taskEntries());
-    options(root.querySelector('[data-maint-filter] [name=task]'),taskEntries(),'Todos');
-    options(root.querySelector('[data-maint-revise] [name=task]'),taskEntries());
+
+  function screen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const {items} = state.list;
+    const body = items.length ? T.table('Registros de mantenimiento', ['Fecha', 'Huerto', 'Dueño', 'Cuidado', 'Estado', ''], items.map(row))
+      : '<div class="user-empty-inline"><p>No hay registros con estos filtros.</p></div>';
+    return `<div class="page-heading"><div><h1>Mantenimientos</h1><p>Registra, corrige y anula intervenciones de todos los huertos. Cada cambio pide un motivo.</p></div>${act('create', '+ Registrar intervención', 'brand')}</div>
+      <section class="bento-panel">${filters(state.filters)}${body}${T.pager(state.list)}</section>${T.dialog}`;
   }
-  function rows(host, items) {
-    host.replaceChildren(...items.map(item => {
-      const open = el('button',{type:'button',className:'button btn-liquid-light',textContent:'Ver'});
-      open.dataset.maintOpen = item.id;
-      const when = new Date(item.at).toLocaleString('es-MX');
-      return el('tr',{},...[when,item.garden,MaintenanceService.tasks[item.type]||item.type,item.state==='voided'?'Anulado':'Vigente'].map(text=>el('td',{textContent:text})),el('td',{},open));
-    }));
+
+  function createForm() {
+    const first = MaintenanceDates.shift(MaintenanceDates.today(), -6);
+    return `<h2 id="admin-dialog-title">Registrar intervención</h2><form data-admin-form="care-create" novalidate>
+      <label for="mant-new-garden">N.º de huerto</label><input id="mant-new-garden" name="garden" type="text" inputmode="numeric" maxlength="18" pattern="[0-9]*" required>
+      ${careFields(null, true)}
+      <label for="mant-when">¿Cuándo?</label><input id="mant-when" name="when" type="date" min="${MaintenanceDates.format(first)}" max="${today()}">
+      <p class="user-small-copy">Déjalo vacío para registrar ahora. Se admiten hasta 6 días atrás.</p>
+      <div class="app-dialog-actions">${act('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit">Registrar</button></div></form>`;
   }
-  function history(host, record, revisions) {
-    const lines = [`Original: ${MaintenanceService.tasks[record.originalType]||record.originalType}`];
-    for(const item of revisions) lines.push(`${new Date(item.at).toLocaleString('es-MX')} · ${item.kind==='anulacion'?'Anulación':'Corrección a '+(MaintenanceService.tasks[item.correctedType]||item.correctedType)}: ${item.reason}`);
-    host.replaceChildren(el('ol',{className:'user-history-list'},...lines.map(text=>el('li',{textContent:text}))));
+
+  function history(revisions) {
+    if(!revisions.length) return '<p>Sin correcciones: este es el registro original.</p>';
+    return `<ol class="user-history-list">${revisions.map(item => `<li><span>${icon('tool')}</span><div><p>${when(item.at)} · ${item.type === 'anulacion' ? 'Anulación'
+      : `Corrección a ${escaparHTML(CareViews.types[item.correctedType] || item.correctedType)}, ${plantLabel(item.correctedPlant)}${item.correctedChiles != null ? `, ${item.correctedChiles} chiles` : ''}`}</p>
+      <small>${escaparHTML(item.editor)}</small><p>${escaparHTML(item.reason)}</p></div></li>`).join('')}</ol>`;
   }
+
+  function detail(record, revisions) {
+    const facts = [['Huerto', `${escaparHTML(record.garden)} · N.º ${escaparHTML(record.gardenId)}`], ['Dueño', escaparHTML(record.owner)], ['Fecha', when(record.doneAt)],
+      ['Cuidado', `${escaparHTML(CareViews.types[record.type] || record.type)} · ${plantLabel(record.plant)}${record.chiles != null ? ` · ${record.chiles} chiles` : ''}`], ['Estado', stateTag(record)]];
+    const form = record.voided ? '' : `<form data-admin-form="care-revise" novalidate><h3>Corregir o anular</h3>${careFields(record, true)}
+      <label for="mant-reason">Motivo (obligatorio)</label><textarea id="mant-reason" name="reason" rows="3" maxlength="500" required></textarea>
+      <div class="app-dialog-actions">${act('close-dialog', 'Cerrar')}${act('void', 'Anular registro', 'light', 'data-danger="true"')}<button class="button btn-liquid-brand" type="submit">Guardar corrección</button></div></form>`;
+    return `<h2 id="admin-dialog-title">Registro de mantenimiento</h2><dl class="user-facts">${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
+      <h3>Historial</h3>${history(revisions)}${form || `<div class="app-dialog-actions">${act('close-dialog', 'Cerrar')}</div>`}`;
+  }
+
+  const confirmations = {void:{titulo:'¿Anular este registro?', texto:'Dejará de contar como un cuidado. El historial conserva el motivo y no se puede deshacer.', accion:'Anular registro', peligro:true}};
+
   function datePicker() {
     const picker = el('div',{id:'maint-calendar',className:'maint-calendar',hidden:true});
     picker.setAttribute('popover','manual');
@@ -835,39 +861,6 @@ const MaintenanceViews = (() => {
     table.append(el('thead',{},head),body);
     picker.querySelector('[data-date-grid]').replaceChildren(table);
   }
-  const messages = {stale:'Otra persona cambió este registro. Revísalo de nuevo antes de continuar.',forbidden:'Tu cuenta no tiene acceso a este huerto.',invalid:'Revisa los datos e inténtalo de nuevo.',limited:'Demasiadas operaciones. Espera un momento.'};
-  const textOf = status => messages[status] || 'Esta sección se está actualizando.';
-  // Monta el panel y devuelve las operaciones de presentación que coordina MaintenanceController.
-  function mount(root) {
-    root.innerHTML = shell();
-    const dialog = root.querySelector('[data-maint-dialog]'), status = root.querySelector('[data-maint-status]');
-    const revise = root.querySelector('[data-maint-revise]'), error = root.querySelector('[data-maint-error]');
-    const showError = code => { error.textContent = code === 'reason' ? 'Escribe el motivo.' : textOf(code); error.hidden = false; };
-    return {dialog, revise, filter: root.querySelector('[data-maint-filter]'), create: root.querySelector('[data-maint-create]'),
-      closers: root.querySelectorAll('[data-maint-close]'),
-      notify(code, failed = false) {
-        const box = root.querySelector('#admin-feedback');
-        box.hidden = false; box.textContent = {created:'Intervención registrada.',voided:'Registro anulado.',corrected:'Corrección guardada.'}[code] || textOf(code);
-        box.setAttribute('role',failed?'alert':'status'); box.focus();
-      },
-      statusText(text) { status.textContent = text; },
-      loading() { status.textContent = 'Cargando registros…'; },
-      failed(code) { status.textContent = textOf(code); },
-      show(result, first) {
-        if(first) fillForms(root,result.gardens);
-        rows(root.querySelector('[data-maint-rows]'),result.items);
-        status.textContent = result.gardens.length ? `${result.total} registros.` : 'Tu cuenta no tiene huertos asignados.';
-        root.querySelector('[data-maint-create] button').disabled = !result.gardens.length;
-      },
-      openDetail(record, revisions) {
-        history(root.querySelector('[data-maint-history]'),record,revisions);
-        revise.reset(); error.hidden = true;
-        revise.hidden = record.state === 'voided';
-        revise.elements.task.value = record.type;
-        dialog.showModal();
-      },
-      closeDetail() { if(dialog.open) dialog.close(); },
-      showError};
-  }
-  return {shell,fillForms,rows,history,datePicker,renderCalendar,mount};
+  return Object.freeze({screen, createForm, detail, confirmations, errorText, datePicker, renderCalendar,
+    adjust: (root, type) => CareViews.adjust(root, type), resetFilters(root) { root.querySelector('[data-admin-form="care-filter"]').reset(); }});
 })();

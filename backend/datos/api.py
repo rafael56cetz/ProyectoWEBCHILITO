@@ -1,4 +1,4 @@
-"""Legales, órdenes, soporte, avisos y vinculación del equipo."""
+"""Legales, órdenes, soporte, avisos, vinculación del equipo y administración de flota, soporte, equipos, administradores y ventas."""
 import logging
 
 from allauth.core import ratelimit
@@ -139,6 +139,55 @@ def admin_device_rotate(request, data, equipo_id):
 @endpoint(('POST',), cap='gestionar_dispositivos')
 def admin_device_retire(request, data, equipo_id):
     return equipos_admin.retirar(request.user, equipo_id)
+
+
+@endpoint(cap='ver_flota')
+def admin_fleet(request, data):
+    pagina = bounds(request, allowed=('busqueda', 'estado', 'conexion', 'page'))
+    return equipos_admin.flota(request.user, _filtro(request, 'busqueda'), _filtro(request, 'estado'), _filtro(request, 'conexion'), pagina)
+
+
+@endpoint(cap='atender_soporte')
+def admin_support(request, data):
+    pagina = bounds(request, allowed=('estado', 'page'))
+    return datos.bandeja_soporte(request.user, request.GET.get('estado', 'abierto'), pagina)
+
+
+@endpoint(cap='atender_soporte')
+def admin_support_case(request, data, caso_id):
+    bounds(request, allowed=())
+    return datos.detalle_soporte(request.user, caso_id)
+
+
+@endpoint(('POST',), cap='atender_soporte')
+def admin_support_attend(request, data, caso_id):
+    return datos.atender_caso(request.user, caso_id)
+
+
+@endpoint(('POST',), cap='atender_soporte')
+def admin_support_connect(request, data, caso_id):
+    return datos.conectar_caso(request.user, caso_id)
+
+
+@endpoint(('POST',), ('result', 'note'), cap='atender_soporte')
+def admin_support_resolve(request, data, caso_id):
+    return datos.resolver_caso(request.user, caso_id, data.get('result'), data.get('note'))
+
+
+@endpoint(cap='atender_soporte')
+def admin_session(request, data, sesion_id):
+    bounds(request, allowed=())
+    return datos.estado_sesion(request.user, sesion_id)
+
+
+@endpoint(('POST',), ('type', 'plant', 'duration'), cap='atender_soporte')
+def admin_session_order(request, data, sesion_id):
+    return datos.dar_orden(request.user, sesion_id, data.get('type'), data.get('plant'), data.get('duration'))
+
+
+@endpoint(('POST',), cap='atender_soporte')
+def admin_session_close(request, data, sesion_id):
+    return datos.cerrar_sesion_tecnica(request.user, sesion_id)
 
 
 @endpoint(cap='gestionar_administradores')

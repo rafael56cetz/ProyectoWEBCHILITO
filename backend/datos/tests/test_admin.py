@@ -1,21 +1,26 @@
 """Administración nueva sobre PostgreSQL temporal: equipos, administradores, ventas (aquí) con cuenta con y sin capacidad."""
 import json
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
+from django.db import connection
 from django.test import Client, TestCase
 from django.utils import timezone
 
 from datos import ventas
-from datos.models import Auditoria, CodigoVinculacion, Dispositivo, DispositivoEvento, Venta
+from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, Dispositivo, DispositivoEvento, ResumenHoraHuerto, ResumenHoraPlanta,
+                          SoporteCaso, SoporteSesion, Venta)
 from huerto.models import Huerto
+from huerto.services import ZONA_MERIDA
 from tests import cuenta, publicar_textos
 from web.models import Idempotencia
 
 MAC = '02:00:00:00:aa:{:02x}'
+UUID_AJENO = '00000000-0000-4000-8000-000000000001'
 
 
 class BaseAdmin(TestCase):
@@ -66,7 +71,16 @@ class Capacidades(BaseAdmin):
         ('post', '/api/admin/ventas/1/cancelar', 'gestionar_ventas'),
         ('get', '/api/admin/legales?tipo=terminos', 'gestionar_legales'), ('post', '/api/admin/legales/vista-previa', 'gestionar_legales'),
         ('get', '/api/admin/consentimientos', 'ver_consentimientos'), ('get', '/api/admin/consentimientos/resumen', 'ver_consentimientos'),
-        ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos')]
+        ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos'),
+        ('get', '/api/admin/flota', 'ver_flota'), ('get', '/api/admin/soporte', 'atender_soporte'),
+        ('get', f'/api/admin/soporte/{UUID_AJENO}', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender', 'atender_soporte'),
+        ('post', f'/api/admin/soporte/{UUID_AJENO}/conectar', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/resolver', 'atender_soporte'),
+        ('get', f'/api/admin/sesiones/{UUID_AJENO}', 'atender_soporte'), ('post', f'/api/admin/sesiones/{UUID_AJENO}/accion', 'atender_soporte'),
+        ('post', f'/api/admin/sesiones/{UUID_AJENO}/cerrar', 'atender_soporte'),
+        ('get', '/api/admin/mantenimientos', 'gestionar_mantenimientos'), ('post', '/api/admin/mantenimientos', 'gestionar_mantenimientos'),
+        ('get', f'/api/admin/mantenimientos/{UUID_AJENO}', 'gestionar_mantenimientos'),
+        ('post', f'/api/admin/mantenimientos/{UUID_AJENO}/corregir', 'gestionar_mantenimientos'),
+        ('post', f'/api/admin/mantenimientos/{UUID_AJENO}/anular', 'gestionar_mantenimientos')]
 
     def llamar(self, cliente, metodo, ruta):
         return cliente.get(ruta) if metodo == 'get' else self.post(cliente, ruta)
@@ -374,3 +388,305 @@ class Ventas(BaseAdmin):
         for accion, datos in (('pago', {'received': '1'}), ('entrega', {'deliveredAt': '2026-01-01'}), ('nota', {'note': 'x'}), ('cancelar', {})):
             with self.subTest(accion=accion):
                 self.assertEqual(self.post(self.admin, f'/api/admin/ventas/999999/{accion}', datos).status_code, 404)
+
+
+class Flota(BaseAdmin):
+    def setUp(self):
+        super().setUp()
+        self.admin = self.cliente(cuenta('flota-admin@example.test', 'ver_flota'))
+
+    def test_sin_equipos_ni_datos_no_inventa_nada(self):
+        flota = self.admin.get('/api/admin/flota').json()
+        self.assertEqual(flota['totals'], {'linked': 0, 'online': 0, 'offline': 0, 'problems': 0})
+        self.assertEqual((flota['trends'], flota['problems'], flota['items'], flota['total']), ({'moisture': [], 'temperature': []}, [], [], 0))
+
+    def test_totales_tendencias_tabla_y_problemas(self):
+        equipo = self.equipo_vinculado('flota-dueno@example.test', 'FLO-0001')
+        self.equipo('FLO-0002')
+        hora = datetime.combine(datetime.now(ZONA_MERIDA).date() - timedelta(days=2), time(12), ZONA_MERIDA).astimezone(UTC)
+        ResumenHoraHuerto.objects.create(huerto_id=equipo.huerto_id, hora=hora, muestras=4, temperatura_prom=30, temperatura_min=28, temperatura_max=32)
+        ResumenHoraHuerto.objects.create(huerto_id=equipo.huerto_id, hora=hora - timedelta(hours=1), muestras=12, temperatura_prom=26, temperatura_min=24, temperatura_max=28)
+        ResumenHoraPlanta.objects.create(huerto_id=equipo.huerto_id, hora=hora, planta_numero=1, muestras=4, humedad_prom=40, humedad_min=38, humedad_max=42)
+        persona = self.cliente(get_user_model().objects.get(email='flota-dueno@example.test'))
+        orden = self.post(persona, f'/api/huertos/{equipo.huerto_id}/comandos', {'type': 'regar', 'plant': 1, 'duration': 5}).json()['command']['id']
+        Comando.objects.filter(pk=orden).update(estado='fallido', detalle_error='bomba')
+        flota = self.admin.get('/api/admin/flota').json()
+        self.assertEqual(flota['totals']['linked'], 1)
+        self.assertEqual(flota['totals']['problems'], 1)
+        self.assertEqual([problema['type'] for problema in flota['problems']], ['order'])
+        self.assertEqual([punto['value'] for punto in flota['trends']['moisture']], [40.0])
+        # Ponderado por muestras, no promedio de promedios: (30*4 + 26*12) / 16 = 27.
+        self.assertEqual([punto['value'] for punto in flota['trends']['temperature']], [27.0])
+        self.assertEqual({fila['identifier'] for fila in flota['items']}, {'FLO-0001', 'FLO-0002'})
+        self.assertEqual(self.admin.get('/api/admin/flota?busqueda=flota-dueno').json()['total'], 1)
+        for consulta in ('?estado=otro', '?conexion=x', '?x=1', '?page=0'):
+            with self.subTest(consulta=consulta):
+                self.assertEqual(self.admin.get(f'/api/admin/flota{consulta}').status_code, 400)
+
+    def test_equipo_desconectado_mas_de_24_horas_cuenta_como_problema(self):
+        equipo = self.equipo_vinculado('flota-ausente@example.test', 'FLO-0003')
+        Dispositivo.objects.filter(pk=equipo.pk).update(conexion='desconectado', ultima_conexion_en=timezone.now() - timedelta(hours=30))
+        flota = self.admin.get('/api/admin/flota').json()
+        self.assertEqual((flota['totals']['offline'], flota['totals']['problems'], flota['problems'][0]['type']), (1, 1, 'offline'))
+
+
+class Consola(BaseAdmin):
+    """Consola remota sin token: atiende una cuenta, solo ella se conecta y opera, y cada orden revalida la autorización."""
+    def setUp(self):
+        super().setUp()
+        self.ana = cuenta('soporte-ana@example.test', 'atender_soporte')
+        self.beto = cuenta('soporte-beto@example.test', 'atender_soporte')
+        self.admin_ana, self.admin_beto = self.cliente(self.ana), self.cliente(self.beto)
+        equipo = self.equipo_vinculado('soporte-persona@example.test', 'SOP-0001')
+        self.huerto = equipo.huerto_id
+        self.persona = self.cliente(get_user_model().objects.get(email='soporte-persona@example.test'))
+        respuesta = self.post(self.persona, f'/api/huertos/{self.huerto}/soporte', {'incident': 'bomba', 'note': 'No riega', 'consent': True})
+        self.caso = respuesta.json()['case']['id']
+
+    def conectar(self, cliente=None):
+        cliente = cliente or self.admin_ana
+        self.assertEqual(self.post(cliente, f'/api/admin/soporte/{self.caso}/atender').status_code, 200)
+        respuesta = self.post(cliente, f'/api/admin/soporte/{self.caso}/conectar')
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        return respuesta.json()['session']['id']
+
+    def vencer_autorizacion(self):
+        with connection.cursor() as cursor:
+            cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')
+            cursor.execute('ALTER TABLE soporte_caso DISABLE TRIGGER caso_reglas')
+            cursor.execute("UPDATE soporte_caso SET autorizada_en = now() - interval '25 hours', autorizacion_vence_en = now() - interval '1 hour' WHERE id = %s", [self.caso])
+            cursor.execute('ALTER TABLE soporte_caso ENABLE TRIGGER caso_reglas')
+
+    def codigo(self, respuesta):
+        return (respuesta.status_code, respuesta.json()['code'])
+
+    def test_bandeja_por_estado_con_detalle_y_conteos(self):
+        bandeja = self.admin_ana.get('/api/admin/soporte').json()
+        self.assertEqual(bandeja['counts'], {'abierto': 1, 'en_atencion': 0, 'resuelto': 0})
+        caso = bandeja['items'][0]
+        self.assertEqual((caso['id'], caso['folio'][:3], caso['email'], caso['device'], caso['authorization'], caso['mine']),
+                         (self.caso, 'CS-', 'soporte-persona@example.test', 'SOP-0001', 'vigente', False))
+        detalle = self.admin_ana.get(f'/api/admin/soporte/{self.caso}').json()
+        self.assertEqual((detalle['case']['note'], detalle['diagnostic'], detalle['session']), ('No riega', None, None))
+        self.assertEqual(self.admin_ana.get('/api/admin/soporte?estado=en_atencion').json()['total'], 0)
+        for consulta in ('?estado=cancelado', '?x=1', '?page=0'):
+            with self.subTest(consulta=consulta):
+                self.assertEqual(self.admin_ana.get(f'/api/admin/soporte{consulta}').status_code, 400)
+
+    def test_flujo_completo_con_auditoria(self):
+        sesion = self.conectar()
+        estado = self.admin_ana.get(f'/api/admin/sesiones/{sesion}').json()
+        self.assertEqual((estado['session']['state'], estado['readings'], estado['orders']), ('open', None, []))
+        self.assertEqual(estado['device']['identifier'], 'SOP-0001')
+        orden = self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'probar_bomba', 'plant': 2, 'duration': 3})
+        self.assertEqual((orden.status_code, orden.json()['order']['state']), (200, 'pendiente'))
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'}).status_code, 200)
+        comando = Comando.objects.get(pk=orden.json()['order']['id'])
+        self.assertEqual((comando.origen, str(comando.sesion_id), comando.solicitado_por_id), ('soporte', sesion, self.ana.pk))
+        self.assertEqual(len(self.admin_ana.get(f'/api/admin/sesiones/{sesion}').json()['orders']), 2)
+        visto = self.persona.get(f'/api/huertos/{self.huerto}/soporte').json()
+        self.assertEqual(sorted(orden['type'] for orden in visto['orders']), ['probar_bomba', 'reiniciar'])
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/cerrar').status_code, 200)
+        self.assertEqual(SoporteSesion.objects.get(pk=sesion).motivo_cierre, 'manual')
+        resuelto = self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/resolver', {'result': 'otro', 'note': 'Cambié la manguera'})
+        self.assertEqual((resuelto.status_code, resuelto.json()['case']['state']), (200, 'resuelto'))
+        self.assertEqual(self.persona.get(f'/api/huertos/{self.huerto}/soporte').json()['history'][0]['result'], 'otro')
+        acciones = list(Auditoria.objects.filter(actor=self.ana).order_by('id').values_list('accion', flat=True))
+        self.assertEqual(acciones, ['atender_caso', 'conectar_sesion', 'crear_comando', 'crear_comando', 'cerrar_sesion_tecnica', 'resolver_caso'])
+        self.assertNotIn('manguera', json.dumps(list(Auditoria.objects.filter(actor=self.ana).values_list('detalle', flat=True))))
+
+    def test_conectar_es_repetible_y_una_sesion_cerrada_no_recibe_ordenes(self):
+        sesion = self.conectar()
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar').json()['session']['id'], sesion)
+        self.assertEqual(SoporteSesion.objects.count(), 1)
+        self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/cerrar')
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/cerrar').status_code, 200)
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'})), (409, 'sesion-cerrada'))
+
+    def test_ordenes_validadas_en_el_servidor(self):
+        sesion = self.conectar()
+        casos = [{'type': 'regar', 'plant': 1, 'duration': 5}, {'type': 'probar_bomba'}, {'type': 'probar_bomba', 'plant': 4, 'duration': 3},
+                 {'type': 'probar_bomba', 'plant': 1, 'duration': 6}, {'type': 'probar_bomba', 'plant': 1, 'duration': 0},
+                 {'type': 'reiniciar', 'plant': 1}, {'type': 'ventilador_encender', 'duration': 2}, {}]
+        for datos in casos:
+            with self.subTest(datos=datos):
+                self.assertEqual(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', datos).status_code, 400)
+        self.assertEqual(Comando.objects.filter(origen='soporte').count(), 0)
+
+    def test_el_segundo_admin_no_conecta_ni_opera_ni_resuelve_el_caso_del_primero(self):
+        sesion = self.conectar()
+        self.assertEqual(self.codigo(self.post(self.admin_beto, f'/api/admin/soporte/{self.caso}/atender')), (409, 'caso-ya-atendido'))
+        self.assertEqual(self.codigo(self.post(self.admin_beto, f'/api/admin/soporte/{self.caso}/conectar')), (409, 'caso-no-tuyo'))
+        self.assertEqual(self.codigo(self.post(self.admin_beto, f'/api/admin/soporte/{self.caso}/resolver', {'result': 'solucionado'})), (409, 'caso-no-tuyo'))
+        self.assertEqual(self.admin_beto.get(f'/api/admin/sesiones/{sesion}').status_code, 404)
+        self.assertEqual(self.post(self.admin_beto, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'}).status_code, 404)
+        self.assertEqual(self.post(self.admin_beto, f'/api/admin/sesiones/{sesion}/cerrar').status_code, 404)
+        self.assertIsNone(SoporteSesion.objects.get(pk=sesion).cerrada_en)
+        self.assertEqual(self.admin_beto.get(f'/api/admin/soporte/{self.caso}').json()['session'], None)
+        self.assertEqual(self.admin_ana.get(f'/api/admin/soporte/{self.caso}').json()['session']['id'], sesion)
+
+    def test_sin_atender_no_se_conecta_ni_se_resuelve(self):
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar')), (409, 'caso-no-tuyo'))
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/resolver', {'result': 'solucionado'})), (409, 'caso-no-tuyo'))
+
+    def test_resolver_valida_resultado_y_nota(self):
+        self.conectar()
+        for datos in ({'result': 'otro'}, {'result': 'otro', 'note': '   '}, {'result': 'nada'}, {'result': 'solucionado', 'note': 'x' * 501}, {}):
+            with self.subTest(datos=datos):
+                self.assertEqual(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/resolver', datos).status_code, 400)
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/resolver', {'result': 'sin_falla'}).status_code, 200)
+
+    def test_resolver_cierra_la_sesion_tecnica(self):
+        sesion = self.conectar()
+        self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/resolver', {'result': 'solucionado'})
+        self.assertEqual(SoporteSesion.objects.get(pk=sesion).motivo_cierre, 'caso_cerrado')
+        self.assertEqual(self.admin_ana.get(f'/api/admin/sesiones/{sesion}').json()['session']['reason'], 'caso_cerrado')
+
+    def test_la_revocacion_durante_la_sesion_cierra_y_la_siguiente_orden_falla(self):
+        sesion = self.conectar()
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'lectura_inmediata'}).status_code, 200)
+        self.assertEqual(self.post(self.persona, f'/api/soporte/{self.caso}/revocar').status_code, 200)
+        estado = self.admin_ana.get(f'/api/admin/sesiones/{sesion}').json()
+        self.assertEqual((estado['session']['state'], estado['session']['reason']), ('closed', 'revocada'))
+        self.assertNotIn('readings', estado)
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'})), (409, 'sesion-cerrada'))
+        self.assertEqual(Comando.objects.filter(sesion_id=sesion).count(), 1)
+
+    def test_autorizacion_vencida_no_permite_conectar(self):
+        self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/atender')
+        self.vencer_autorizacion()
+        self.assertEqual(self.admin_ana.get('/api/admin/soporte?estado=en_atencion').json()['items'][0]['authorization'], 'vencida')
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar')), (409, 'autorizacion-no-vigente'))
+        self.assertEqual(SoporteSesion.objects.count(), 0)
+
+    def test_autorizacion_vencida_durante_la_sesion_bloquea_ordenes_y_la_marca_cerrada(self):
+        sesion = self.conectar()
+        self.vencer_autorizacion()
+        estado = self.admin_ana.get(f'/api/admin/sesiones/{sesion}').json()
+        self.assertEqual((estado['session']['state'], estado['session']['reason']), ('closed', 'vencida'))
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'})), (409, 'sesion-cerrada'))
+
+    def test_el_vencimiento_tambien_lo_rechaza_la_base(self):
+        sesion = self.conectar()
+        self.vencer_autorizacion()
+        with self.assertRaises(Exception) as fallo:
+            Comando.objects.create(huerto_id=self.huerto, dispositivo_id=SoporteCaso.objects.get(pk=self.caso).dispositivo_id, tipo='reiniciar',
+                                   origen='soporte', solicitado_por=self.ana, sesion_id=sesion)
+        self.assertIn('Orden fuera de una sesión técnica autorizada', str(fallo.exception))
+
+    def test_cerrar_la_sesion_de_la_cuenta_cierra_la_sesion_tecnica(self):
+        sesion = self.conectar()
+        self.admin_ana.delete('/_allauth/browser/v1/auth/session')
+        cerrada = SoporteSesion.objects.get(pk=sesion)
+        self.assertEqual((cerrada.motivo_cierre, cerrada.cerrada_en is not None), ('cierre_sesion', True))
+        self.assertTrue(Auditoria.objects.filter(actor=self.ana, accion='cerrar_sesion_tecnica', detalle={'motivo': 'cierre_sesion'}).exists())
+
+    def test_una_sola_sesion_abierta_por_administrador(self):
+        self.conectar()
+        self.numero += 1
+        otro = self.equipo_vinculado('soporte-otra@example.test', 'SOP-0002')
+        persona = self.cliente(get_user_model().objects.get(email='soporte-otra@example.test'))
+        caso = self.post(persona, f'/api/huertos/{otro.huerto_id}/soporte', {'incident': 'otro', 'consent': True}).json()['case']['id']
+        self.post(self.admin_ana, f'/api/admin/soporte/{caso}/atender')
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{caso}/conectar')), (409, 'sesion-abierta'))
+
+    def test_casos_o_sesiones_inexistentes(self):
+        for metodo, ruta in (('get', f'/api/admin/soporte/{UUID_AJENO}'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender'),
+                             ('get', f'/api/admin/sesiones/{UUID_AJENO}')):
+            with self.subTest(ruta=ruta):
+                respuesta = self.admin_ana.get(ruta) if metodo == 'get' else self.post(self.admin_ana, ruta)
+                self.assertEqual(respuesta.status_code, 404)
+
+
+class Mantenimientos(BaseAdmin):
+    def setUp(self):
+        super().setUp()
+        self.editor = cuenta('mant-editor@example.test', 'gestionar_mantenimientos')
+        self.admin = self.cliente(self.editor)
+        equipo = self.equipo_vinculado('mant-dueno@example.test', 'MAN-0001')
+        self.dueno = get_user_model().objects.get(email='mant-dueno@example.test')
+        self.huerto = equipo.huerto_id
+        self.persona = self.cliente(self.dueno)
+
+    def cuidado(self, tipo='rellenar_deposito', planta=None):
+        return Cuidado.objects.create(huerto_id=self.huerto, tipo=tipo, planta_numero=planta, registrado_por=self.dueno)
+
+    def corregir(self, cuidado, revision, **cambios):
+        datos = {'revision': revision, 'type': 'cosecha', 'plant': 2, 'chiles': 5, 'reason': 'Era cosecha', **cambios}
+        return self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/corregir', datos)
+
+    def test_lista_todos_los_huertos_con_paginacion_busqueda_y_filtros(self):
+        for _ in range(27):
+            self.cuidado()
+        self.cuidado('sustrato', 1)
+        pagina1 = self.admin.get('/api/admin/mantenimientos').json()
+        self.assertEqual((pagina1['total'], len(pagina1['items']), pagina1['page']), (28, 25, 1))
+        self.assertEqual(len(self.admin.get('/api/admin/mantenimientos?page=2').json()['items']), 3)
+        primero = pagina1['items'][0]
+        self.assertEqual((primero['owner'], primero['gardenId'], primero['revision']), ('mant-dueno@example.test', str(self.huerto), 0))
+        total = lambda consulta: self.admin.get(f'/api/admin/mantenimientos{consulta}').json()['total']
+        self.assertEqual((total('?busqueda=mant-dueno'), total('?busqueda=Mi%20huerto'), total('?busqueda=nadie')), (28, 28, 0))
+        self.assertEqual((total('?tipo=sustrato'), total('?planta=1'), total('?planta=huerto'), total(f'?huerto={self.huerto}'), total('?huerto=999999')), (1, 1, 27, 28, 0))
+        self.assertEqual((total('?estado=vigente'), total('?estado=anulado'), total('?desde=2000-01-01&hasta=2000-12-31')), (28, 0, 0))
+        for consulta in ('?estado=x', '?tipo=x', '?planta=9', '?huerto=abc', '?desde=ayer', '?desde=2026-02-01&hasta=2026-01-01', '?x=1', '?page=0'):
+            with self.subTest(consulta=consulta):
+                self.assertEqual(self.admin.get(f'/api/admin/mantenimientos{consulta}').status_code, 400)
+
+    def test_corregir_con_motivo_y_numero_de_revision(self):
+        cuidado = self.cuidado()
+        respuesta = self.corregir(cuidado, 0)
+        registro = respuesta.json()['record']
+        self.assertEqual((respuesta.status_code, registro['type'], registro['plant'], registro['chiles'], registro['corrected'], registro['revision']),
+                         (200, 'cosecha', 2, 5, True, 1))
+        visto = self.persona.get(f'/api/huertos/{self.huerto}/cuidados').json()['items'][0]
+        self.assertEqual((visto['corrected'], visto['type'], visto['reason']), (True, 'cosecha', 'Era cosecha'))
+        self.assertEqual(self.corregir(cuidado, 0).json()['code'], 'stale-record')
+        segunda = self.corregir(cuidado, 1, reason='Fueron 7', chiles=7)
+        self.assertEqual((segunda.status_code, segunda.json()['record']['chiles'], segunda.json()['record']['revision']), (200, 7, 2))
+        historial = self.admin.get(f'/api/admin/mantenimientos/{cuidado.pk}').json()['revisions']
+        self.assertEqual([(revision['number'], revision['type']) for revision in historial], [(1, 'correccion'), (2, 'correccion')])
+
+    def test_anular_y_no_admite_mas_cambios(self):
+        cuidado = self.cuidado()
+        anulado = self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/anular', {'revision': 0, 'reason': 'Duplicado'})
+        self.assertEqual((anulado.status_code, anulado.json()['record']['voided']), (200, True))
+        self.assertTrue(self.persona.get(f'/api/huertos/{self.huerto}/cuidados').json()['items'][0]['voided'])
+        for ruta, datos in (('anular', {'revision': 1, 'reason': 'Otra vez'}), ('corregir', {'revision': 1, 'type': 'inspeccion', 'reason': 'x'})):
+            with self.subTest(ruta=ruta):
+                respuesta = self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/{ruta}', datos)
+                self.assertEqual((respuesta.status_code, respuesta.json()['code']), (409, 'cuidado-anulado'))
+        self.assertEqual(self.admin.get('/api/admin/mantenimientos?estado=anulado').json()['total'], 1)
+
+    def test_validacion_de_la_correccion(self):
+        cuidado = self.cuidado()
+        for cambios in ({'reason': ''}, {'reason': '   '}, {'reason': 'x' * 501}, {'type': 'sustrato', 'plant': None}, {'type': 'rellenar_deposito', 'plant': 1, 'chiles': None},
+                        {'type': 'sustrato', 'plant': 1, 'chiles': 3}, {'plant': 4}, {'chiles': -1}, {'type': 'nada'}):
+            with self.subTest(cambios=cambios):
+                self.assertEqual(self.corregir(cuidado, 0, **cambios).status_code, 400)
+        for revision in ('0', None, -1, 1.5):
+            with self.subTest(revision=revision):
+                self.assertEqual(self.corregir(cuidado, revision).status_code, 400)
+        self.assertEqual(self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/anular', {'revision': 0}).status_code, 400)
+        self.assertEqual(self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/corregir', {'revision': 0, 'type': 'inspeccion', 'otro': 1, 'reason': 'x'}).status_code, 400)
+        self.assertEqual(self.admin.get('/api/admin/mantenimientos').json()['items'][0]['revision'], 0)
+
+    def test_registrar_en_un_huerto_ajeno(self):
+        respuesta = self.post(self.admin, '/api/admin/mantenimientos', {'garden': str(self.huerto), 'type': 'sustrato', 'plant': 3})
+        self.assertEqual((respuesta.status_code, respuesta.json()['record']['owner']), (200, 'mant-dueno@example.test'))
+        self.assertEqual(Cuidado.objects.get(pk=respuesta.json()['record']['id']).registrado_por_id, self.editor.pk)
+        self.assertEqual(self.post(self.admin, '/api/admin/mantenimientos', {'garden': '999999', 'type': 'sustrato', 'plant': 3}).status_code, 404)
+        for datos in ({'garden': 'abc', 'type': 'sustrato', 'plant': 3}, {'type': 'sustrato', 'plant': 3}, {'garden': str(self.huerto), 'type': 'sustrato'}):
+            with self.subTest(datos=datos):
+                self.assertEqual(self.post(self.admin, '/api/admin/mantenimientos', datos).status_code, 400)
+
+    def test_auditoria_sin_el_motivo(self):
+        cuidado = self.cuidado()
+        self.corregir(cuidado, 0, reason='Dato personal en el motivo')
+        self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/anular', {'revision': 1, 'reason': 'Otro dato personal'})
+        filas = Auditoria.objects.filter(actor=self.editor)
+        self.assertEqual(list(filas.order_by('id').values_list('accion', flat=True)), ['corregir_cuidado', 'anular_cuidado'])
+        self.assertNotIn('personal', json.dumps(list(filas.values_list('detalle', flat=True))))
+
+    def test_cuidado_inexistente(self):
+        self.assertEqual(self.admin.get(f'/api/admin/mantenimientos/{UUID_AJENO}').status_code, 404)
+        self.assertEqual(self.post(self.admin, f'/api/admin/mantenimientos/{UUID_AJENO}/anular', {'revision': 0, 'reason': 'x'}).status_code, 404)

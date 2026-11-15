@@ -86,8 +86,8 @@ const AppModel = (() => {
   const adminCapabilities = Object.fromEntries(adminDestinations.map(item=>[item.id,item.capability]));
   const allowedAdmin=(session=AuthService.session)=>adminDestinations.filter(item=>(session.capabilities||[]).includes(item.capability));
   const adminMenu=session=>adminGroups.map(group=>({label:group.label,items:group.items.filter(item=>(session?.capabilities||[]).includes(item.capability))})).filter(group=>group.items.length);
-  // Rutas que cambiaron de nombre: la vinculación de huertos pasó al inventario y la maqueta comercial, a Ventas.
-  const adminRedirects = {vinculacion:'equipos',comercial:'ventas'};
+  // Rutas que cambiaron de nombre: la vinculación de huertos pasó al inventario, la maqueta comercial a Ventas y los avisos de caso nuevo apuntan a «consola».
+  const adminRedirects = {vinculacion:'equipos',comercial:'ventas',consola:'soporte'};
   // Gmail en otra pestaña con la cuenta de soporte seleccionada. Sin API ni credenciales: Gmail autentica por su cuenta.
   const supportMailUrl=()=>{const contact=ChilitoHTTP.configuration?.supportContact;
     return typeof contact==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)?'https://mail.google.com/mail/?authuser='+encodeURIComponent(contact):null;};

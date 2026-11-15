@@ -183,32 +183,19 @@ const CareGuideService = (() => {
 })();
 
 // ── Mantenimientos ──
-// Solo respuestas autorizadas por Django. El estado vigente lo calcula el servidor.
+// Cuidados de todos los huertos para quien tiene `gestionar_mantenimientos`. El estado vigente y el número de revisión los calcula el servidor.
 const MaintenanceService = (() => {
-  const tasks = Object.freeze({refill:'Recarga del depósito', substrate:'Revisión de sustrato y perlita', germination:'Germinación externa', harvest:'Cosecha', inspection:'Inspección visual de conexiones'});
   const base = '/api/admin/mantenimientos';
-  async function send(path, options = {}) {
-    try {
-      const response = await ChilitoHTTP.request(path, options);
-      if(response.http === 401) { ChilitoHTTP.sessionExpired(); return {status:'unauthenticated'}; }
-      if(response.http === 409) return {status:response.body?.code === 'stale-record' ? 'stale' : 'conflict'};
-      if(response.http === 403) return {status:'forbidden'};
-      if(response.http === 429) return {status:'limited'};
-      if(response.http === 400) return {status:'invalid'};
-      return [200,201].includes(response.http) ? response.body : {status:'error'};
-    } catch { return {status:'error'}; }
-  }
-  const query = filters => {
-    const params = new URLSearchParams(Object.entries(filters).filter(([,value]) => value));
-    return params.size ? '?'+params : '';
-  };
+  const record = (id, rest = '') => AdminHTTP.validUuid(id) ? `${base}/${id}${rest}` : null;
   return Object.freeze({
-    tasks,
-    list: (filters = {}) => send(base+query(filters)),
-    detail: id => send(base+'/'+encodeURIComponent(id)),
-    create: (gardenId,task) => send(base,{method:'POST',body:{gardenId,task}}),
-    correct: (id,task,reason,revision) => send(base+'/'+encodeURIComponent(id)+'/corregir',{method:'POST',body:{task,reason,revision}}),
-    void: (id,reason,revision) => send(base+'/'+encodeURIComponent(id)+'/anular',{method:'POST',body:{reason,revision}})
+    list: (filters, page) => AdminHTTP.call(base + AdminHTTP.query({busqueda:filters.busqueda, huerto:filters.huerto, planta:filters.planta, tipo:filters.tipo,
+      estado:filters.estado, desde:filters.since, hasta:filters.until, page})),
+    detail: id => AdminHTTP.call(record(id)),
+    create: values => AdminHTTP.call(base, {method:'POST', body:values}),
+    correct: (id, values) => AdminHTTP.call(record(id, '/corregir'), {method:'POST', body:values}),
+    void: (id, values) => AdminHTTP.call(record(id, '/anular'), {method:'POST', body:values}),
+    // Día escrito por quien registra → mediodía de Mérida (UTC−6 todo el año). Hoy o vacío significa «ahora»: el mediodía aún no llegó.
+    moment: (day, today) => !day || day === today ? null : `${day}T12:00:00-06:00`
   });
 })();
 

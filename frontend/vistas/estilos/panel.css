@@ -459,59 +459,36 @@ body[data-private=true] .private-nav .button[aria-current=page] {
 }
 body[data-private=true] .private-nav .button:focus-visible { outline:3px solid #d6e8a7!important;outline-offset:3px; }
 .private-role-label { color:#d0e0d4;font-size:14px;margin:0 14px 24px;font-weight:500; }
-.admin-two-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start; }
-.admin-two-columns>* { min-width:0; }
-.admin-table-panel { min-width:0;padding:12px 16px; }
 .admin-table th[scope=row] { color:var(--garden-ink);font-weight:500;vertical-align:top;border-top:1px solid var(--garden-line);padding:18px 12px; }
 .admin-table td { overflow-wrap:normal; }
 .admin-table .button { min-width:76px; }
-.admin-caption,.admin-service-note { font-size:13px;line-height:1.65;color:var(--garden-muted); }
-.admin-caption { margin:16px 12px 12px; }
-.admin-service-note { border-top:1px solid var(--garden-line);padding-top:16px;margin:24px 0 0; }
-.admin-selected-row { background:#edf3ee; }
-.admin-connection { display:inline-flex;align-items:center;gap:8px;white-space:nowrap; }
-.admin-connection:before { content:'';width:7px;height:7px;border-radius:50%;background:#448259; }
-.admin-connection.offline:before { background:#8d622c; }
-.admin-ticket-detail { margin-bottom:28px; }
-.admin-ticket-detail>h2,.admin-diagnostics>h2,.admin-governance-list>h2 { margin:0 0 20px;font-size:22px;font-weight:500; }
-.admin-ticket-facts { display:grid;grid-template-columns:1fr 1fr;gap:0 28px; }
-.admin-ticket-facts>div { justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:8px; }
-.admin-ticket-facts dd { text-align:left; }
-.admin-token-form { margin-top:28px;max-width:760px; }
-.admin-input-row { display:flex;gap:12px;align-items:start; }
-.admin-input-row input { flex:1;min-width:0; }
+
+/* Consola remota (5.2): bandeja a la izquierda; detalle y sesión técnica a la derecha */
+.console-layout { display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:24px;align-items:start;margin-top:16px; }
+.console-layout>*,.console-side>* { min-width:0; }
+.console-side { display:grid;gap:24px; }
+.console-list { list-style:none;margin:0;padding:0;display:grid;gap:8px; }
+.console-item { display:grid;gap:4px;width:100%;box-sizing:border-box;text-align:left;padding:12px 14px;border:1px solid var(--garden-line);border-radius:var(--radio-campo);background:transparent;color:inherit;font:inherit;cursor:pointer; }
+.console-item small { color:var(--garden-muted); }
+.console-item:hover,.console-item.is-selected { background:var(--garden-tint); }
+.console-item.is-selected { border-color:var(--garden-green); }
+.console-item:focus-visible { outline:3px solid var(--focus);outline-offset:3px; }
+.console-session-head { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px; }
+.console-session-head :is(h2,p) { margin:0; }
+.console-actions { display:flex;flex-wrap:wrap;gap:8px;margin:16px 0; }
+.console-pump { display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-bottom:16px; }
+.console-pump label { margin-top:0; }
+.console-status { margin:12px 0; }
+@media (max-width:1050px) { .console-layout { grid-template-columns:1fr; } }
+@media (forced-colors:active) { .console-item.is-selected { outline:2px solid Highlight; } }
 body[data-role=admin] :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { display:block;width:100%;min-height:46px;box-sizing:border-box;border:1px solid #b4c5b9;border-radius:14px;padding:12px 14px;color:var(--garden-ink);background:#fff;font:inherit;font-size:16px; }
 body[data-role=admin] textarea { resize:vertical;line-height:1.6; }
 body[data-role=admin] :is(input:not([type=checkbox]):not([type=radio]),select,textarea):focus-visible { outline:3px solid #355a44;outline-offset:3px; }
 body[data-role=admin] label { display:block;font-size:14px;line-height:1.5;margin:20px 0 8px; }
-.admin-access-state { margin:20px 0 0;font-size:14px; }
-.admin-policy-list { margin:0; }
-.admin-policy-list>div { padding:20px 0;border-bottom:1px solid var(--garden-line); }
-.admin-policy-list>div:last-child { border-bottom:0;padding-bottom:0; }
-.admin-policy-list dt { font-size:16px;font-weight:500; }
-.admin-policy-list dd { margin:8px 0 0;font-size:15px;line-height:1.65;color:var(--garden-muted); }
-.admin-inline-status { font-size:14px;line-height:1.65; }
-.admin-gpio-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0 32px; }
-.admin-gpio-grid>div { border:1px solid var(--garden-line);border-radius:16px;background:#f6f9f6;padding:18px; }
-.admin-gpio-grid dt { font-size:13px;color:var(--garden-muted);line-height:1.5; }
-.admin-gpio-grid dd { margin:8px 0 0;font-size:16px;font-weight:500; }
-.admin-logs { max-width:100%;overflow:auto;padding:20px;border-radius:16px;background:#192b22;color:#e1eddf;font:13px/1.9 ui-monospace,monospace; }
-.admin-diagnostics [data-danger] { color:#8c392f;border-color:#ddb6b1;background:#fff4f2; }
 body[data-role=admin] .app-actions { flex-wrap:wrap; }
 body[data-role=admin] .app-actions .button { white-space:normal; }
-@media (max-width:1150px) {
-  .admin-two-columns { grid-template-columns:1fr; }
-  .admin-gpio-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-}
 @media (max-width:768px) {
   .private-role-label { display:none; }
-  .admin-two-columns { gap:20px; }
-}
-@media (max-width:480px) {
-  .admin-ticket-facts { grid-template-columns:1fr; }
-  .admin-input-row { flex-direction:column; }
-  .admin-input-row .button { width:100%; }
-  .admin-gpio-grid { grid-template-columns:1fr; }
 }
 @media (prefers-reduced-transparency:reduce) {
   body[data-private=true] .sidebar { background:#173c2f!important; }
@@ -521,8 +498,6 @@ body[data-role=admin] .app-actions .button { white-space:normal; }
   body[data-private=true] .sidebar,body[data-private=true] .private-nav .button,body[data-private=true] .private-nav .button[aria-current=page] { background:Canvas!important;color:CanvasText!important;border:1px solid CanvasText!important;box-shadow:none!important; }
   body[data-private=true] .private-nav .button[aria-current=page] { outline:2px solid Highlight;outline-offset:-4px; }
   .private-role-label { color:CanvasText; }
-  .admin-gpio-grid>div,.admin-logs { background:Canvas;color:CanvasText;border:1px solid CanvasText; }
-  .admin-connection:before { background:CanvasText; }
   body[data-role=admin] :is(input,select,textarea) { background:Field;color:FieldText; }
 }
 

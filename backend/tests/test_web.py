@@ -15,8 +15,6 @@ from datos.models import Auditoria, ConsultaProducto, GuiaCuidado
 from tests import aceptar_vigentes, cuenta, publicar_textos
 from web.middleware import ActorDeBase
 
-ENDPOINTS_ACTUALIZACION = ['/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
-
 
 class BaseWeb(TestCase):
     @classmethod
@@ -53,7 +51,7 @@ def guia(**cambios):
 class Sesion(BaseWeb):
     def test_rutas_privadas_y_de_administracion_exigen_sesion(self):
         anonimo = self.cliente()
-        for ruta in ['/api/cuenta', '/api/guias', '/api/admin/guias', '/api/admin/consultas', *ENDPOINTS_ACTUALIZACION]:
+        for ruta in ['/api/cuenta', '/api/guias', '/api/admin/guias', '/api/admin/consultas', '/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']:
             with self.subTest(ruta=ruta):
                 self.assertEqual(anonimo.get(ruta).status_code, 401)
 
@@ -84,19 +82,6 @@ class Sesion(BaseWeb):
         self.assertEqual(self.cliente(self.admin).get('/api/admin/guias').status_code, 200)
         self.assertEqual(self.cliente(self.admin).get('/api/admin/consultas').status_code, 403)
         self.assertEqual(self.cliente(self.buzon).get('/api/admin/consultas').status_code, 200)
-
-
-class PantallasEnActualizacion(BaseWeb):
-    def test_responden_503_sin_datos(self):
-        for ruta in ENDPOINTS_ACTUALIZACION:
-            with self.subTest(ruta=ruta):
-                respuesta = self.client.get(ruta)
-                self.assertEqual(respuesta.status_code, 503)
-                self.assertEqual(respuesta.json(), {'status': 'error', 'code': 'en-actualizacion'})
-
-    def test_tambien_las_escrituras(self):
-        respuesta = self.post('/api/admin/mantenimientos', {'type': 'refill'})
-        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (503, 'en-actualizacion'))
 
 
 class Escrituras(BaseWeb):

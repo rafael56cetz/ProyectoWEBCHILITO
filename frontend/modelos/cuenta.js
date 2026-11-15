@@ -106,7 +106,7 @@ const ChilitoHTTP = (() => {
   const pendingWrites = new Map();
   let onExpired = () => {};
   const csrf = () => document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('csrftoken='))?.slice(10) || '';
-  async function request(path, {method='GET', body, signal, headers={}} = {}) {
+  async function request(path, {method='GET', body, signal, headers={}, keepalive=false} = {}) {
     if (!path.startsWith('/api/') && !path.startsWith('/_allauth/browser/v1/')) throw new Error('Unsupported endpoint');
     if (method !== 'GET' && !csrf()) await configure(signal);
     const write = method === 'POST' && path.startsWith('/api/');
@@ -115,7 +115,7 @@ const ChilitoHTTP = (() => {
     const key = write ? pendingWrites.get(fingerprint) || crypto.randomUUID() : null;
     if (write) pendingWrites.set(fingerprint,key);
     const response = await fetch(path, {
-      method, credentials:'same-origin', cache:'no-store', redirect:'error', signal,
+      method, credentials:'same-origin', cache:'no-store', redirect:'error', signal, keepalive,
       headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {}),
         ...(method !== 'GET' ? {'X-CSRFToken':decodeURIComponent(csrf())} : {}), ...(key ? {'Idempotency-Key':key} : {}), ...headers},
       ...(body ? {body:JSON.stringify(body)} : {})
@@ -257,14 +257,13 @@ const AuthService = (() => {
   function forgetSession() {
     version++; session = {status:'unauthenticated'};
   }
+  // El servidor cierra la sesión técnica de soporte al cerrar la sesión de la cuenta.
   async function logout({signal}={}) {
-    await AdminService.closeRemote();
     const result = await ChilitoHTTP.request(prefix+'auth/session',{method:'DELETE',signal});
     if (result.http === 401 && result.body.status === 401 && result.body?.meta?.is_authenticated === false) {
       forgetSession();
       ChilitoHTTP.clearPending();
       GardenModel.reset();
-      AdminService.reset();
       return {status:'accepted'};
     }
     return failure(result) || {status:'unavailable'};

@@ -398,8 +398,8 @@ const AdminTableViews = (() => {
   const tabs = (items, active) => `<div class="user-range-control" role="group" aria-label="Apartados">${items.map(([id, label]) => button('tab', label, id === active ? 'brand' : 'light', `data-tab="${id}" aria-pressed="${id === active}"`)).join('')}</div>`;
   const status = state => state === 'loading' ? AppViews.state('Cargando', 'Consultando la información.', true) : AppViews.state('No pudimos cargar esta pantalla', 'Inténtalo de nuevo.', false, true);
   const dialog = '<dialog class="bento-panel app-dialog admin-dialog" aria-labelledby="admin-dialog-title"><div data-admin-dialog-content></div></dialog>';
-  const dateField = (name, label) => `<div class="maint-date-control"><label for="admin-${name}">${label}</label>
-    <div class="maint-date-field"><input type="text" name="${name}" id="admin-${name}" placeholder="aaaa-mm-dd" maxlength="10" autocomplete="off" spellcheck="false">
+  const dateField = (name, label, value = '') => `<div class="maint-date-control"><label for="admin-${name}">${label}</label>
+    <div class="maint-date-field"><input type="text" name="${name}" id="admin-${name}" placeholder="aaaa-mm-dd" maxlength="10" autocomplete="off" spellcheck="false" value="${escaparHTML(value)}">
     <button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div></div>`;
   const day = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString('es-MX', {dateStyle:'medium'}) : '—';
   const merida = value => new Date(value).toLocaleString('es-MX', {timeZone:'America/Merida', dateStyle:'medium', timeStyle:'short'});

@@ -82,3 +82,29 @@ def telemetry(request, data, huerto_id):
 def log(request, data, huerto_id):
     pagina = bounds(request, allowed=('tipo', 'page'))
     return services.bitacora(request.user, huerto_id, request.GET.get('tipo', 'ordenes'), pagina)
+
+
+# Mantenimientos de todos los huertos (`gestionar_mantenimientos`).
+@endpoint(('GET', 'POST'), ('garden', 'type', 'plant', 'chiles', 'doneAt'), cap='gestionar_mantenimientos')
+def admin_cares(request, data):
+    if request.method == 'POST':
+        return services.registrar_mantenimiento(request.user, data.get('garden'), data.get('type'), data.get('plant'), data.get('chiles'), data.get('doneAt'))
+    pagina = bounds(request, allowed=('busqueda', 'huerto', 'planta', 'tipo', 'estado', 'desde', 'hasta', 'page'))
+    filtro = lambda nombre: request.GET.get(nombre) or None
+    return services.mantenimientos(request.user, *(filtro(nombre) for nombre in ('busqueda', 'huerto', 'planta', 'tipo', 'estado', 'desde', 'hasta')), pagina)
+
+
+@endpoint(cap='gestionar_mantenimientos')
+def admin_care(request, data, cuidado_id):
+    bounds(request, allowed=())
+    return services.detalle_mantenimiento(request.user, cuidado_id)
+
+
+@endpoint(('POST',), ('revision', 'type', 'plant', 'chiles', 'reason'), cap='gestionar_mantenimientos')
+def admin_care_correct(request, data, cuidado_id):
+    return services.corregir_mantenimiento(request.user, cuidado_id, data.get('revision'), data.get('type'), data.get('plant'), data.get('chiles'), data.get('reason'))
+
+
+@endpoint(('POST',), ('revision', 'reason'), cap='gestionar_mantenimientos')
+def admin_care_void(request, data, cuidado_id):
+    return services.anular_mantenimiento(request.user, cuidado_id, data.get('revision'), data.get('reason'))

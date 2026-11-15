@@ -1,21 +1,24 @@
-"""Inventario de equipos para quien tiene `gestionar_dispositivos`. La credencial del equipo se genera aquí, se muestra una sola
+"""Inventario de equipos para quien tiene `gestionar_dispositivos` y flota para quien tiene `ver_flota`. La credencial del equipo se genera aquí, se muestra una sola
 vez y en la base solo queda su hash. El detalle de qué puede hacer cada rol lo decide la base; aquí se validan las entradas y
 se evita pedirle lo que ya sabemos que rechazará."""
 import re
 import secrets
+from datetime import datetime, time, timedelta
 
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
-from django.db.models import Count
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
+from django.db.models.functions import TruncDate
 from django.http import Http404
 from django.utils import timezone
 
 from huerto.models import Huerto
+from huerto.services import ZONA_MERIDA
 from web.respuestas import ReglaDeNegocio
 
 from . import services as s
-from .models import Autodiagnostico, Dispositivo, DispositivoEvento, Venta
+from .models import Autodiagnostico, Comando, Dispositivo, DispositivoEvento, ResumenHoraHuerto, ResumenHoraPlanta, Venta
 from .paginacion import paginar, paginar_sql
 
 CAPACIDAD = 'gestionar_dispositivos'
@@ -27,6 +30,10 @@ MAC = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
 FIRMWARE = re.compile(r'^[A-Za-z0-9._-]{1,32}$')
 MAXIMO_BUSQUEDA = 60
 DIAGNOSTICOS_EN_FICHA = 5
+CAPACIDAD_FLOTA = 'ver_flota'
+DIAS_TENDENCIA = 7
+HORAS_PROBLEMAS = 24
+PROBLEMAS_VISIBLES = 10
 ORIGEN = ('v_estado_equipos v JOIN dispositivo d ON d.id = v.dispositivo_id '
           "LEFT JOIN venta ve ON ve.dispositivo_id = d.id AND ve.estado = 'vigente'")
 COLUMNAS = ('v.dispositivo_id, v.identificador, d.mac::text AS mac, v.estado, v.conexion, v.ultima_conexion_en, v.firmware_version, '
@@ -167,3 +174,59 @@ def retirar(actor, equipo_id):
     equipo.save(update_fields=['estado', 'retirado_en'])
     s.auditar(usuario, 'retirar_equipo', entidad='dispositivo', entidad_id=equipo.pk)
     return {'status': 'accepted', 'device': _ficha(_equipo(equipo.pk))}
+
+
+# ── Flota (`ver_flota`) ──
+COLUMNAS_FLOTA = ('v.dispositivo_id, v.identificador, v.estado, v.conexion, v.ultima_conexion_en, v.firmware_version, v.huerto_id, v.huerto, '
+                  'v.dueno, v.ultima_medicion_en, '
+                  '(SELECT max(a.iniciado_en) FROM autodiagnostico a WHERE a.dispositivo_id = v.dispositivo_id) AS ultima_revision_en')
+
+
+def _fila_flota_dto(fila):
+    return {'id': str(fila['dispositivo_id']), 'identifier': fila['identificador'], 'state': fila['estado'], 'connection': fila['conexion'],
+            'lastConnectionAt': _fecha(fila['ultima_conexion_en']), 'lastReadingAt': _fecha(fila['ultima_medicion_en']),
+            'firmware': fila['firmware_version'] or None, 'gardenId': str(fila['huerto_id']) if fila['huerto_id'] else None,
+            'garden': fila['huerto'], 'owner': fila['dueno'], 'lastReviewAt': _fecha(fila['ultima_revision_en'])}
+
+
+def _totales_flota():
+    conexiones = {fila['conexion']: fila['n'] for fila in Dispositivo.objects.filter(estado='vinculado').values('conexion').annotate(n=Count('id'))}
+    return {'linked': sum(conexiones.values()), 'online': conexiones.get('en_linea', 0), 'offline': conexiones.get('desconectado', 0)}
+
+
+def _tendencia(modelo, campo):
+    """Promedio diario de todos los huertos, ponderado por las muestras de cada hora. Un día sin muestras no tiene punto."""
+    primer_dia = datetime.now(ZONA_MERIDA).date() - timedelta(days=DIAS_TENDENCIA - 1)
+    ponderado = ExpressionWrapper(F(campo) * F('muestras'), output_field=DecimalField(max_digits=12, decimal_places=1))
+    dias = (modelo.objects.filter(hora__gte=datetime.combine(primer_dia, time.min, ZONA_MERIDA), **{f'{campo}__isnull': False})
+            .annotate(dia=TruncDate('hora', tzinfo=ZONA_MERIDA)).values('dia')
+            .annotate(suma=Sum(ponderado), muestras_dia=Sum('muestras')).order_by('dia'))
+    # Mediodía de Mérida: una fecha sola se leería en UTC y el navegador la mostraría el día anterior.
+    return [{'at': datetime.combine(fila['dia'], time(12), ZONA_MERIDA).isoformat(), 'value': round(float(fila['suma']) / fila['muestras_dia'], 1)} for fila in dias]
+
+
+def _problema(tipo, equipo_id, identificador, momento, detalle=None):
+    return {'type': tipo, 'deviceId': str(equipo_id), 'identifier': identificador, 'at': _fecha(momento), 'detail': detalle}
+
+
+def _problemas_recientes():
+    """Autodiagnósticos con fallas, órdenes fallidas y equipos vinculados sin conexión desde hace más de un día."""
+    desde = timezone.now() - timedelta(hours=HORAS_PROBLEMAS)
+    diagnosticos = Autodiagnostico.objects.select_related('dispositivo').filter(resultado_general='con_fallas', completado_en__gte=desde)
+    ordenes = Comando.objects.select_related('dispositivo').filter(estado='fallido', resuelto_en__gte=desde)
+    ausentes = Dispositivo.objects.filter(estado='vinculado', conexion='desconectado', ultima_conexion_en__lt=desde)
+    problemas = ([_problema('diagnostic', d.dispositivo_id, d.dispositivo.identificador, d.completado_en) for d in diagnosticos]
+                 + [_problema('order', o.dispositivo_id, o.dispositivo.identificador, o.resuelto_en, o.tipo) for o in ordenes]
+                 + [_problema('offline', e.pk, e.identificador, e.ultima_conexion_en) for e in ausentes])
+    equipos = {problema['deviceId'] for problema in problemas}
+    problemas.sort(key=lambda problema: problema['at'], reverse=True)
+    return len(equipos), problemas[:PROBLEMAS_VISIBLES]
+
+
+def flota(actor, busqueda, estado, conexion, pagina):
+    s.require_cap(actor, CAPACIDAD_FLOTA)
+    donde, parametros = _filtros(busqueda, estado, conexion, None)
+    con_problemas, problemas = _problemas_recientes()
+    return {'status': 'ready', 'totals': {**_totales_flota(), 'problems': con_problemas},
+            'trends': {'moisture': _tendencia(ResumenHoraPlanta, 'humedad_prom'), 'temperature': _tendencia(ResumenHoraHuerto, 'temperatura_prom')},
+            'problems': problemas, **paginar_sql(COLUMNAS_FLOTA, f'{ORIGEN} {donde}', 'v.identificador', parametros, pagina, _fila_flota_dto)}

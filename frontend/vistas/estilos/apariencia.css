@@ -227,11 +227,11 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-top
 @media (max-width:768px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .topbar-brand { border-radius:999px!important;background:#28623e!important; } }
 
 /* Tarjetas translúcidas: desenfocan el fondo, filo claro y sombra cálida. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel,.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list,.admin-management) {
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel) {
   background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:var(--radio-tarjeta)!important;box-shadow:var(--claro-filo)!important;color:var(--claro-tinta);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel,.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list,.admin-management) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel) {
     background:var(--claro-tarjeta)!important;-webkit-backdrop-filter:var(--claro-desenfoque)!important;backdrop-filter:var(--claro-desenfoque)!important;
   }
 }
@@ -253,19 +253,12 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 @media (min-width:1100px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-summary-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 
 /* Gestión administrativa */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;align-items:center;margin-top:28px;padding:22px 26px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management h2 { margin:0 0 4px;font-size:22px;font-weight:700;color:var(--claro-titulo)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management-actions { display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management .admin-service-note { grid-column:1/-1;margin:0;padding-top:12px; }
-@media (max-width:900px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management { grid-template-columns:1fr; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management-actions { justify-content:flex-start; } }
 
 /* Texto */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(h1,h2,h3,h4,strong,dd,th,legend,label,summary) { color:var(--claro-tinta)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(p,dt,small,time,td,li,span:not(.skeleton-line):not(.icon-medallion)) { color:var(--claro-suave)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page a:not(.button) { color:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-table th[scope=row] { color:var(--claro-tinta);border-color:var(--claro-linea); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.admin-caption,.admin-service-note,.admin-inline-status,.admin-access-state) { color:var(--claro-suave); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-service-note { border-color:var(--claro-linea); }
 
 /* Mensajes */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback,.user-data-warning,.privacy-saved) {
@@ -290,13 +283,10 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :i
 /* Tablas y gráficas */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table :is(th,td) { border-color:var(--claro-linea); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table thead th { color:var(--claro-suave);font-weight:600; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-selected-row { background:rgba(250,114,74,.1); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-connection:before { background:#2f8a55; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-connection.offline:before { background:#b8741e; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-chart-grid text,.user-chart-labels text,.user-history-chart text) { fill:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-chart line { stroke:var(--claro-linea); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page pre { color:var(--claro-tinta);background:#f6f0e7;border:1px solid var(--claro-linea); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-facts>div,.admin-policy-list>div) { border-color:var(--claro-linea)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-facts>div { border-color:var(--claro-linea)!important; }
 
 /* Campos del panel (C3): vidrio claro, texto oscuro y foco verde. Sin desenfoque propio: viven dentro de una tarjeta. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
@@ -404,11 +394,11 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-me
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.password-meter>span,.password-length.is-met .password-meter>span) { background:var(--claro-verde); }
 
 @media (prefers-reduced-transparency:reduce) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.admin-table-panel,.admin-management) { background:var(--claro-tarjeta-solida)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart) { background:var(--claro-tarjeta-solida)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { -webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:#1f5236!important; }
 }
 @media (forced-colors:active) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel,.user-metric,.admin-management) { border:1px solid CanvasText!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel,.user-metric) { border:1px solid CanvasText!important; }
 }
 
 /* Ritmo vertical cercano a la referencia: menos aire arriba y tarjetas más compactas. */
@@ -504,9 +494,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .i
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button.active { background:#fff!important;color:var(--claro-tinta)!important; }
 
 /* Soporte: resolución del caso y pasos del token */
-.admin-resolve-form { margin-top:28px;padding-top:22px;border-top:1px solid var(--claro-linea); }
-.admin-resolve-form h3 { margin:0 0 4px;font-size:18px; }
-.admin-resolve-form textarea { width:100%; }
 
 /* Solo las fechas Desde/Hasta de Registros. El icono SVG sustituye al indicador nativo. */
 html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-control { display:flex;flex-direction:column;gap:6px;min-width:0; }

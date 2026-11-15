@@ -1,70 +1,175 @@
-// CONTROLADOR · Administración: paneles de operación, consultas, ventas, administradores, textos legales, consentimientos y el panel general.
-// Define: AdminController, InquiryController, SalesController, AdminAccessController, LegalAdminController, ConsentController, AppController.
+// CONTROLADOR · Administración: flota, consola remota, consultas, ventas, administradores, textos legales, consentimientos y el panel general.
+// Define: FleetController, ConsoleController, InquiryController, SalesController, AdminAccessController, LegalAdminController, ConsentController, AppController.
 
 // ── Administracion ──
-const AdminController = (() => {
-  function mount(screen,{root,service=AdminService}={}) {
-    const life=new AbortController();
-    let selected=null, data={status:'loading'}, disposed=false,working=false,serial=0;
-    const feedback=(message,error=false)=>AdminViews.feedback(root,message,error);
-    const errorText=AdminViews.errorText;
-    // Punto de acceso por capacidades: lo decide el controlador; la vista recibe el resultado.
-    function access() {
-      const allowed=AppModel.allowedAdmin();
-      return {records:allowed.some(item=>item.id==='admin/mantenimientos'),inbox:allowed.some(item=>item.id==='admin/solicitudes')};
+// Telemetría de flota: lista, filtros y panel de solo lectura. El servidor decide qué se ve según la capacidad.
+const FleetController = (() => {
+  function mount({root, service = FleetService} = {}) {
+    const life = new AbortController();
+    let state = {status:'loading', filters:{}, data:null};
+    let serial = 0, working = false;
+    const access = () => ({inventory:AppModel.allowedAdmin().some(item => item.id === 'admin/equipos')});
+    const paint = () => FleetViews.paint(root, FleetViews.screen(state, access()));
+    async function load(page = 1) {
+      const id = ++serial;
+      const result = await service.load(state.filters, page);
+      if(life.signal.aborted || id !== serial) return;
+      state = result.status === 'ready' ? {...state, status:'ready', data:result} : {...state, status:'error'};
+      paint();
     }
-    const render=()=>AdminViews.paint(root,screen,data,access());
-    async function load({message='',error=false,focusDetail=false}={}) {
-      if(disposed)return;
-      const id=++serial;
-      try {data=await service.snapshot(selected,screen);}catch {data={status:'error'};}
-      if(disposed||id!==serial)return;
-      render();
-      if(focusDetail)AdminViews.focusDetail(root);
-      if(message)feedback(message,error);
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, page, id} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'page') await load(Number(page));
+        else if(action === 'refresh') await load(state.data?.page || 1);
+        else if(action === 'clear') { state.filters = {}; FleetViews.resetFilters(root); await load(1); }
+        else if(action === 'peek') FleetViews.openDialog(root, FleetViews.peek(state.data.items.find(item => item.id === id)));
+        else if(action === 'close-dialog') FleetViews.closeDialog(root);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      if(working || event.target.closest('[data-admin-form]')?.dataset.adminForm !== 'fleet-filter') return;
+      working = true;
+      try { state.filters = Object.fromEntries(new FormData(event.target)); await load(1); } finally { working = false; }
+    }, {signal:life.signal});
+    load(1);
+    return {dispose() { serial++; life.abort(); }};
+  }
+  return {mount};
+})();
+
+// Consola remota: atender, conectar, dar órdenes y resolver. Mientras hay sesión técnica se consulta el servidor cada 10 s
+// para enterarse de una revocación; al salir de la pantalla la sesión se cierra.
+const ConsoleController = (() => {
+  const POLL_MS = 10000;
+  function mount({root, service = ConsoleService} = {}) {
+    const life = new AbortController();
+    let state = {status:'loading', tab:'abierto', counts:{abierto:0, en_atencion:0, resuelto:0}, inbox:{items:[], page:1, total:0}, selectedId:null, detail:null};
+    let serial = 0, pollSerial = 0, working = false, poller = null;
+    const paint = () => ConsoleViews.paint(root, ConsoleViews.screen(state));
+    const fail = result => mostrarAviso('error', ConsoleViews.errorText(result.code));
+    const sessionId = () => state.detail?.session?.id || null;
+
+    async function loadInbox(page) {
+      const result = await service.inbox(state.tab, page);
+      if(life.signal.aborted || result.status !== 'ready') return false;
+      state = {...state, status:'ready', counts:result.counts, inbox:{items:result.items, page:result.page, total:result.total}};
+      return true;
     }
-    async function result(response,message) {
-      await load({message:response.status==='accepted'?message:errorText(response.status),error:response.status!=='accepted'});
+    async function loadDetail() {
+      if(!state.selectedId) { state = {...state, detail:null}; return; }
+      const result = await service.detail(state.selectedId);
+      if(life.signal.aborted) return;
+      if(result.status === 'ready') state = {...state, detail:{case:result.case, diagnostic:result.diagnostic, session:result.session}};
+      else { state = {...state, selectedId:null, detail:null}; fail(result); }
     }
-    root.addEventListener('click',async event=>{
-      const trigger=event.target.closest('[data-admin-action]');if(!trigger||working)return;
-      const action=trigger.dataset.adminAction;
-      if(action==='refresh'){await load({message:'Consulta actualizada.'});return;}
-      if(action==='open-ticket'){
-        working=true;let response;try{response=await service.selectTicket(trigger.dataset.ticket);}finally{working=false;}
-        if(disposed)return;
-        if(response.status!=='accepted'){feedback(errorText(response.status),true);return;}
-        selected=trigger.dataset.ticket;await load({focusDetail:true});return;
-      }
-      if(action==='request-token'){
-        const response=await service.requestToken(selected);
-        await result(response,response.repeated?'Ya se pidió el token de este caso hace menos de 10 minutos. No se envió otro aviso.':'Solicitud registrada. Se avisará a la persona usuaria por correo, sin el token; el estado del aviso aparece en el detalle.');return;
-      }
-      if(action==='close-remote'){await result(await service.closeRemote(),'Sesión técnica cerrada. Los registros vuelven a estar bloqueados.');return;}
-      if(action==='refresh-diagnostics'){await result(await service.refreshDiagnostics(selected),'Consulta de diagnóstico registrada.');return;}
-    },{signal:life.signal});
-    root.addEventListener('submit',async event=>{
-      const form=event.target;
-      if(form.matches('[data-admin-resolve-form]')){
-        event.preventDefault();
-        const fields=new FormData(form);
-        await result(await service.resolveCase(selected,String(fields.get('result')||''),String(fields.get('note')||'').trim()),'Caso resuelto. El permiso quedó revocado y el acceso técnico cerrado.');
-        return;
-      }
-      if(!form.matches('[data-admin-token-form]'))return;
-      event.preventDefault();if(working||!form.reportValidity())return;
-      const fields=Object.fromEntries(new FormData(form));
-      await result(await service.validateToken(selected,fields.token),'Token válido para este reporte. El diagnóstico autorizado está disponible.');
-    },{signal:life.signal});
-    const checkExpiry=()=>{
-      if(disposed||!data.remote||data.remote.expiresAt>Date.now())return;
-      service.closeRemote();data.remote=null;data.diagnostics=null;
-      render();feedback('La autorización ha vencido. El acceso técnico se cerró.');
-    };
-    const timer=setInterval(checkExpiry,1000);
-    document.addEventListener('visibilitychange',checkExpiry,{signal:life.signal});
-    render();load();
-    return {dispose(){disposed=true;serial++;clearInterval(timer);if(screen==='soporte')service.closeRemote();life.abort();}};
+    async function refresh({page = state.inbox.page, focus = false} = {}) {
+      const id = ++serial;
+      const listed = await loadInbox(page);
+      if(listed) await loadDetail();
+      if(life.signal.aborted || id !== serial) return;
+      if(!listed) state = {...state, status:'error'};
+      paint();
+      if(sessionId()) startPolling(); else stopPolling();
+      if(focus) ConsoleViews.focusDetail(root);
+    }
+
+    function stopPolling() { clearInterval(poller); poller = null; pollSerial++; }
+    function startPolling() {
+      if(!poller) poller = setInterval(() => { if(document.visibilityState === 'visible' && !working) pollOnce(); }, POLL_MS);
+      pollOnce();
+    }
+    async function pollOnce() {
+      const id = sessionId(), mine = ++pollSerial;
+      if(!id) return;
+      const result = await service.session(id, life.signal);
+      if(life.signal.aborted || mine !== pollSerial || id !== sessionId()) return;
+      if(result.code === 'not-found') { await sessionEnded('manual'); return; }
+      if(result.status !== 'ready') return;
+      if(result.session.state === 'closed') { await sessionEnded(result.session.reason); return; }
+      ConsoleViews.paintLive(root, result);
+    }
+    async function sessionEnded(reason) {
+      stopPolling();
+      mostrarAviso('info', ConsoleViews.closingText(reason));
+      await refresh();
+    }
+
+    async function closeSession(keepalive = false) {
+      const id = sessionId();
+      if(!id) return;
+      stopPolling();
+      const result = await service.endSession(id, keepalive);
+      if(!life.signal.aborted && result.status !== 'accepted' && result.code !== 'not-found') fail(result);
+    }
+    async function openCase(id) {
+      if(id === state.selectedId) return;
+      await closeSession();
+      state = {...state, selectedId:id, detail:null};
+      await refresh({focus:true});
+    }
+    async function change(request, message) {
+      const result = await request;
+      if(life.signal.aborted) return;
+      if(result.status === 'accepted') mostrarAviso('exito', message); else fail(result);
+      await refresh();
+    }
+    async function order(body, confirmation) {
+      if(confirmation && !await confirmar(confirmation)) return;
+      const result = await service.order(sessionId(), body);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') fail(result); else mostrarAviso('exito', 'Orden enviada al equipo.');
+      await pollOnce();
+    }
+    async function resolve(form) {
+      const fields = new FormData(form), result = String(fields.get('result') || ''), note = String(fields.get('note') || '').trim();
+      if(result === 'otro' && !note) { mostrarAviso('error', 'Escribe una nota cuando el resultado es «Otro».'); return; }
+      if(!await confirmar(ConsoleViews.confirmations.resolve)) return;
+      stopPolling();
+      await change(service.resolve(state.selectedId, result, note), 'Caso resuelto. El acceso de la persona terminó.');
+    }
+
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, tab, page, type} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'tab') { await closeSession(); state = {...state, tab, selectedId:null, detail:null}; await refresh({page:1}); }
+        else if(action === 'page') await refresh({page:Number(page)});
+        else if(action === 'refresh') await refresh();
+        else if(action === 'open-case') await openCase(trigger.dataset.case);
+        else if(action === 'attend') await change(service.attend(state.selectedId), 'El caso quedó a tu nombre.');
+        else if(action === 'connect') await change(service.connect(state.selectedId), 'Sesión técnica abierta.');
+        else if(action === 'order') await order({type}, type === 'reiniciar' ? ConsoleViews.confirmations.reboot : null);
+        else if(action === 'close-session') { await closeSession(); mostrarAviso('exito', 'Sesión técnica cerrada.'); await refresh(); }
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      const kind = event.target.closest('[data-admin-form]')?.dataset.adminForm;
+      if(working || !kind) return;
+      working = true;
+      try {
+        if(kind === 'pump') {
+          const plant = Number(event.target.elements.plant.value), duration = Number(event.target.elements.seconds.value);
+          await order({type:'probar_bomba', plant, duration}, ConsoleViews.confirmations.pump(plant, duration));
+        } else if(kind === 'resolve') await resolve(event.target);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !working) pollOnce(); }, {signal:life.signal});
+    refresh({page:1});
+    return {dispose() {
+      serial++; stopPolling();
+      const id = sessionId();
+      // keepalive: el cierre sale aunque la pestaña se esté cerrando.
+      if(id) service.endSession(id, true);
+      life.abort();
+    }};
   }
   return {mount};
 })();
@@ -101,6 +206,7 @@ const InquiryController = (() => {
       if(pager) { page = Math.max(1, page + Number(pager.dataset.inqPage)); await load(); view.scrollToTop(); return; }
       const action = event.target.closest('[data-inq-id]');
       if(!action || busy) return;
+      if(action.dataset.inqState === 'archivada' && !await confirmar(InquiryViews.confirmations.archive)) return;
       busy = true; view.busy(action);
       const result = await service.advance(action.dataset.inqId, action.dataset.inqState);
       busy = false;
@@ -526,10 +632,10 @@ const AppController = (() => {
       clearTimeout(loadingTimer);
       view.pageBusy(false);
       if(route.screen==='admin') {
-        const screens = {mantenimientos:() => MaintenanceController.mount({root:page}), solicitudes:() => InquiryController.mount({root:page}), guias:() => CareGuideAdminController.mount({root:page}),
+        const screens = {flota:() => FleetController.mount({root:page}), soporte:() => ConsoleController.mount({root:page}), mantenimientos:() => MaintenanceController.mount({root:page}), solicitudes:() => InquiryController.mount({root:page}), guias:() => CareGuideAdminController.mount({root:page}),
           equipos:() => EquipmentController.mount({root:page,route}), ventas:() => SalesController.mount({root:page}), legales:() => LegalAdminController.mount({root:page,route}),
           consentimientos:() => ConsentController.mount({root:page}), administradores:() => AdminAccessController.mount({root:page})};
-        adminPanel = (screens[route.detail] || (() => AdminController.mount(route.detail,{root:page})))();
+        adminPanel = screens[route.detail]();
         return;
       }
       if(route.screen==='huerto') {
