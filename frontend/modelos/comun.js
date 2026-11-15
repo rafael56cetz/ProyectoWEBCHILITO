@@ -196,3 +196,13 @@ const AppService = Object.freeze({
     return {status:'error'};
   }
 });
+
+// ── Avisos ──
+// Reglas del aviso flotante (3.5): tipos permitidos, ícono y permanencia. El error no se oculta solo (ms: 0).
+const AvisoModel = Object.freeze({
+  tipos:Object.freeze({
+    exito:Object.freeze({icono:'check',rol:'status',ms:5000}),
+    info:Object.freeze({icono:'info',rol:'status',ms:5000}),
+    error:Object.freeze({icono:'alert',rol:'alert',ms:0})
+  })
+});

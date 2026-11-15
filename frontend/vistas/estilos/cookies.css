@@ -1,9 +1,5 @@
 /* Aviso de cookies en vidrio líquido. Base sólida legible; el vidrio se añade si el navegador lo soporta. */
 .cookies {
-  --cookies-solido:#142b24;--cookies-vidrio:rgba(16,36,29,.78);--cookies-vidrio-panel:rgba(16,36,29,.86);
-  --cookies-texto:#fff;--cookies-suave:rgba(255,255,255,.84);--cookies-linea:rgba(255,255,255,.16);
-  --cookies-activo:#d6e8a7;--cookies-error:#ffc4ba;
-  --cookies-filo:inset 0 1px 0 rgba(255,255,255,.34),inset 0 0 0 1px rgba(255,255,255,.14);
   font-family:var(--body);color:var(--cookies-texto);line-height:1.5;
 }
 .cookies h2,.cookies h3,.cookies p,.cookies ul { margin:0; }
@@ -11,7 +7,7 @@
 
 /* Aviso inicial */
 .cookies-aviso {
-  position:fixed;z-index:10000;inset-inline:16px;bottom:16px;
+  position:fixed;z-index:var(--z-cookies);inset-inline:16px;bottom:16px;
   display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;
   max-width:920px;max-height:calc(100dvh - 32px);margin-inline:auto;padding:20px 24px;overflow:auto;
   border-radius:20px;background:var(--cookies-solido);
@@ -75,20 +71,11 @@ html body .cookies-cerrar:hover { background:rgba(255,255,255,.12); }
 .cookies-detalle p { margin-top:6px; }
 .cookies-acciones--panel { grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;margin-top:20px; }
 
-/* Confirmación */
-.cookies-confirmacion {
-  position:fixed;z-index:10001;left:50%;bottom:24px;transform:translateX(-50%);
-  width:max-content;max-width:calc(100vw - 32px);padding:12px 20px;border-radius:999px;
-  font-size:14px;font-weight:600;color:#fff;background:var(--cookies-solido);
-  box-shadow:var(--cookies-filo),0 12px 32px -8px rgba(0,0,0,.5);
-}
-.cookies-confirmacion:focus { outline:none; }
-
 .cookies :is(a,button,summary):focus-visible,.cookies-interruptor input:focus-visible + span { outline:3px solid #fff;outline-offset:2px; }
 
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  .cookies-aviso,.cookies-confirmacion { background:var(--cookies-vidrio);-webkit-backdrop-filter:blur(22px) saturate(150%);backdrop-filter:blur(22px) saturate(150%); }
-  .cookies-panel { background:var(--cookies-vidrio-panel);-webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%); }
+  .cookies-aviso { background:var(--cookies-vidrio);-webkit-backdrop-filter:var(--desenfoque-cookies);backdrop-filter:var(--desenfoque-cookies); }
+  .cookies-panel { background:var(--cookies-vidrio-panel);-webkit-backdrop-filter:var(--desenfoque-cookies-panel);backdrop-filter:var(--desenfoque-cookies-panel); }
 }
 
 @media (max-width:720px) {
@@ -109,10 +96,10 @@ html body .cookies-cerrar:hover { background:rgba(255,255,255,.12); }
   html body .cookies-boton,.cookies-interruptor span,.cookies-interruptor span::after,.cookies-detalle summary::before { transition:none; }
 }
 @media (prefers-reduced-transparency:reduce) {
-  .cookies-aviso,.cookies-confirmacion,.cookies-panel { background:var(--cookies-solido);-webkit-backdrop-filter:none;backdrop-filter:none; }
+  .cookies-aviso,.cookies-panel { background:var(--cookies-solido);-webkit-backdrop-filter:none;backdrop-filter:none; }
 }
 @media (forced-colors:active) {
-  .cookies-aviso,.cookies-panel,.cookies-confirmacion { border:1px solid CanvasText; }
+  .cookies-aviso,.cookies-panel { border:1px solid CanvasText; }
   html body .cookies-boton { border:1px solid ButtonText; }
   .cookies-interruptor input:checked + span { background:Highlight;border-color:Highlight; }
   .cookies-interruptor input:checked + span::after { background:Canvas; }

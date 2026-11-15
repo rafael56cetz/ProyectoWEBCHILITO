@@ -1,14 +1,12 @@
 /* Access screens only. Buttons reuse the existing Liquid Glass implementation. */
 .auth-flow{
-  --text:#142419;--muted:#4a5d4e;--sage:#264d32;--focus:#264d32;
-  --disabled-fill:#e6eee7;--disabled-ink:#526658;--disabled-edge:#91aa98;
   background:radial-gradient(circle at 90% 12%,rgba(46,125,75,.07),transparent 48%),linear-gradient(180deg,#f6f9f6,#ebf1ec);
   color:var(--text);
 }
 .auth-flow .auth-main{min-width:0;padding:48px 40px}
 .auth-flow .auth-bento{
   max-width:480px;padding:32px;margin:auto;
-  background:#fff;border:1px solid rgba(28,49,34,.12);border-radius:22px;
+  background:#fff;border:1px solid rgba(28,49,34,.12);border-radius:var(--radio-tarjeta);
   box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 12px 32px -10px rgba(20,42,27,.07);
 }
 .auth-flow .auth-intro{color:var(--muted);font-size:16px;line-height:1.6;margin-bottom:24px}
@@ -59,9 +57,7 @@
 .auth-flow .verification-code{font-variant-numeric:tabular-nums;letter-spacing:.16em}
 .auth-flow .auth-result-icon{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:16px;color:#264d32;background:#e8f1e9;box-shadow:inset 0 1.5px 0 #fff;margin-bottom:20px}
 .auth-flow .auth-result p{font-size:16px;color:var(--muted);margin-bottom:24px;overflow-wrap:anywhere}
-.auth-flow .button{min-height:44px;--liquid-filter:blur(14px) saturate(175%)}
-.auth-flow .btn-liquid-brand{--liquid-shadow:inset 0 1.5px 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(16,35,22,.45),0 10px 24px -6px rgba(31,64,41,.38)}
-.auth-flow .btn-liquid-light{--liquid-fill:#f6f9f6;--liquid-ink:#264d32}
+.auth-flow .button{min-height:44px}
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .auth-flow .auth-bento{background:rgba(255,255,255,.84);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 }

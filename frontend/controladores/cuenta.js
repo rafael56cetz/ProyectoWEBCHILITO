@@ -82,15 +82,21 @@ const MfaController = (() => {
       const recovery = items.find(item => item.type === 'recovery_codes');
       view.methods({totp, keys, recovery, strong:Boolean(totp || keys.length), mfaRequired:AuthService.session?.profile?.mfaRequired === true});
     }
-    on(root,'click',event => {
+    on(root,'click',async event => {
       const remove = event.target.closest('[data-key-remove]');
-      if(remove) guarded(() => service.webauthnRemove([Number(remove.dataset.keyRemove)]),async () => { say('key-removed'); load(); });
       const action = event.target.closest('[data-mfa]')?.dataset.mfa;
+      if(remove && await confirmar(MfaViews.confirmations.keyRemove(view.keyName(remove)))) {
+        guarded(() => service.webauthnRemove([Number(remove.dataset.keyRemove)]),async () => { say('key-removed'); load(); });
+      }
       if(action === 'totp-start') guarded(service.totpStart,async result => {
         view.totpSetup(result.meta?.secret, await service.totpImage());
       });
-      if(action === 'totp-disable') guarded(service.totpDisable,async () => { say('totp-disabled'); load(); });
-      if(action === 'recovery-regenerate') guarded(service.recoveryRegenerate,async result => { view.showCodes(result.data?.unused_codes || []); load(); });
+      if(action === 'totp-disable' && await confirmar(MfaViews.confirmations.totpDisable)) {
+        guarded(service.totpDisable,async () => { say('totp-disabled'); load(); });
+      }
+      if(action === 'recovery-regenerate' && await confirmar(MfaViews.confirmations.recoveryRegenerate)) {
+        guarded(service.recoveryRegenerate,async result => { view.showCodes(result.data?.unused_codes || []); load(); });
+      }
     });
     on(view.reauthForm,'submit',async event => {
       event.preventDefault();

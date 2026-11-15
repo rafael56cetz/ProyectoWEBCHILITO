@@ -1,26 +1,19 @@
 /* Vidrio líquido: bordes de luz en todos los botones, refracción sobre fotos e indicador del menú.
    Adaptación propia en CSS de un componente de referencia; sin React ni dependencias. */
-:root {
-  --lg-dark:0 2px 6px rgba(0,0,0,.14),inset 3px 3px .5px -3.5px rgba(255,255,255,.09),inset -3px -3px .5px -3.5px rgba(255,255,255,.85),inset 1px 1px 1px -.5px rgba(255,255,255,.6),inset -1px -1px 1px -.5px rgba(255,255,255,.6),inset 0 0 6px 6px rgba(255,255,255,.12),inset 0 0 2px 2px rgba(255,255,255,.06),0 0 12px rgba(0,0,0,.15);
-  /* Rellenos: filos nítidos. El brillo difuso de --lg-dark sobre un color sólido se ve como niebla. */
-  --lg-solid:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.28),inset 1px 0 0 rgba(255,255,255,.14),inset -1px 0 0 rgba(255,255,255,.14),0 8px 18px -8px rgba(8,24,15,.55);
-  --lg-light:inset 0 0 0 1px rgba(28,49,34,.17),inset 0 1px 0 #fff,0 1px 2px rgba(20,42,27,.08),0 6px 14px -8px rgba(20,42,27,.22);
-  --display-weight:800;
-}
 .glass-filter { position:absolute; }
 
 /* Botones sobre superficies oscuras */
-html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid):not(:disabled) {
+html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid) {
   background:rgba(255,255,255,.05)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;
 }
 html body .sidebar .btn-liquid-sidebar:not([aria-current]),
 html body .sidebar .private-menu-logout { border-color:rgba(255,255,255,.14)!important;box-shadow:var(--lg-solid)!important; }
 /* Botón principal: el mismo verde limpio en todas las pantallas. */
-html body .btn-liquid-brand:not(:disabled) { background:linear-gradient(180deg,#3f7a55 0%,#285a3c 100%)!important;border-color:rgba(255,255,255,.2)!important;box-shadow:var(--lg-solid)!important;color:#fff!important; }
+html body .btn-liquid-brand { background:linear-gradient(180deg,#3f7a55 0%,#285a3c 100%)!important;border-color:rgba(255,255,255,.2)!important;box-shadow:var(--lg-solid)!important;color:#fff!important; }
 html body .btn-liquid-brand:not(:disabled):hover { background:linear-gradient(180deg,#478860 0%,#2d6444 100%)!important; }
 html body .btn-liquid-brand::before,html body .btn-liquid-brand::after { display:none!important; }
 /* Botones claros sobre superficies claras */
-html body .btn-liquid-light:not(:disabled) { background:rgba(255,255,255,.72)!important;border-color:transparent!important;box-shadow:var(--lg-light)!important; }
+html body .btn-liquid-light { background:rgba(255,255,255,.72)!important;border-color:transparent!important;box-shadow:var(--lg-light)!important; }
 
 /* La refracción solo se aprecia sobre imagen o contenido en movimiento. Safari no la dibuja. */
 @supports (backdrop-filter:url(#x)) and (not (-webkit-touch-callout:none)) {
@@ -59,7 +52,7 @@ html body .btn-liquid-light:not(:disabled) { background:rgba(255,255,255,.72)!im
 @keyframes letter-rise { from { transform:translateY(115%); } to { transform:none; } }
 
 @media (prefers-reduced-transparency:reduce) {
-  html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid):not(:disabled) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+  html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
 }
 @media (forced-colors:active) {
   html body .button { box-shadow:none!important;border:1px solid ButtonText!important; }
@@ -68,12 +61,11 @@ html body .btn-liquid-light:not(:disabled) { background:rgba(255,255,255,.72)!im
 
 /* Pantallas de acceso: el mismo fondo y vidrio de la portada. Los campos siguen sólidos y legibles. */
 .auth-quote h2 span { display:block; }
-.auth-layout.auth-flow { background:#0e1c14;isolation:isolate;--focus:#fff; }
+.auth-layout.auth-flow { background:#0e1c14;isolation:isolate; }
 .auth-layout::before { content:"";position:fixed;inset:-48px;z-index:-1;background:#0e1c14 url('../imagenes/habanero-fondo.webp') 70% 40%/cover no-repeat;filter:blur(36px) brightness(.4) saturate(.9); }
 @media (min-width:1025px) { .auth-layout { grid-template-columns:42% minmax(0,1fr); } }
 .auth-flow.auth-layout .auth-main { padding-inline:clamp(20px,3.4vw,48px); }
 .auth-layout .auth-bento {
-  --text:#fff;--muted:rgba(255,255,255,.84);--sage:#fff;--focus:#fff;
   width:100%;max-width:600px;padding:clamp(24px,3.2vw,44px);border-radius:28px;color:#fff;
   background:rgba(22,44,33,.86);border:1px solid rgba(255,255,255,.16);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 48px -24px rgba(0,0,0,.7);
@@ -99,9 +91,8 @@ html body .auth-layout .password-eye-btn { color:#fff!important;background:rgba(
 .auth-layout .password-check [data-password-check-icon] { border-color:rgba(255,255,255,.55);color:#fff; }
 .auth-layout .auth-feedback { color:#142419; }
 /* En acceso todos los botones son vidrio puro. */
-html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled) { background:rgba(255,255,255,.08)!important;color:#fff!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important; }
+html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand) { background:rgba(255,255,255,.08)!important;color:#fff!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important; }
 html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled):hover { background:rgba(255,255,255,.15)!important; }
-html body .auth-layout .auth-bento .button:disabled { background:rgba(255,255,255,.05)!important;color:rgba(255,255,255,.6)!important;border-color:rgba(255,255,255,.14)!important;box-shadow:none!important; }
 @media (prefers-reduced-transparency:reduce) {
   .auth-layout::before { display:none; }
   .auth-layout .auth-bento { background:#1c3327;-webkit-backdrop-filter:none;backdrop-filter:none; }
@@ -112,108 +103,22 @@ html body .auth-layout .auth-bento .button:disabled { background:rgba(255,255,25
 .access-help-contact { margin:0 0 20px;color:#fff; }
 .access-help-contact a { color:#fff;font-weight:600;text-underline-offset:3px; }
 
-/* Dashboards de usuario y administración: vidrio sobre un degradado propio. Sin desenfoques por
-   tarjeta: el fondo es fijo y liso, así que un fondo translúcido con filo de luz se ve igual y no gasta GPU. */
-body[data-private=true]:is([data-role=user],[data-role=admin]) {
-  --text:#fff;--muted:rgba(255,255,255,.8);--focus:#fff;--sage:#fff;
-  --garden-ink:#fff;--garden-muted:rgba(255,255,255,.8);--garden-line:rgba(255,255,255,.16);
-  --garden-green:#fff;--garden-surface:rgba(255,255,255,.08);--garden-tint:rgba(255,255,255,.1);
-  --glass-card:linear-gradient(180deg,rgba(255,255,255,.13) 0%,rgba(255,255,255,.06) 100%);
-  --glass-edge:inset 0 1px 0 rgba(255,255,255,.22),0 14px 30px -20px rgba(4,16,13,.7);
-  color:#fff;background:#17393a!important;background-attachment:scroll!important;
-}
+/* Panel de usuario y administración: la capa de luz fija se pinta en el bloque claro de abajo. */
 body[data-private=true]:is([data-role=user],[data-role=admin])::before {
   content:"";position:fixed;inset:0;z-index:-1;
-  background:
-    radial-gradient(60% 55% at 88% 8%,rgba(122,186,158,.34),transparent 70%),
-    radial-gradient(52% 60% at 6% 92%,rgba(70,142,150,.34),transparent 72%),
-    radial-gradient(42% 42% at 52% 48%,rgba(38,92,84,.5),transparent 75%),
-    linear-gradient(155deg,#17383a 0%,#1d4640 46%,#16343a 100%);
+}
+@media (prefers-reduced-transparency:reduce) {
+  body[data-private=true]:is([data-role=user],[data-role=admin])::before { display:none; }
 }
 body[data-private=true]:is([data-role=user],[data-role=admin]) .private-layout,
 body[data-private=true]:is([data-role=user],[data-role=admin]) .private-content { background:transparent!important; }
 
-/* Tarjetas */
-body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.user-care,.user-metric,.user-chart,.user-token,.user-support-callout,.notice-card,.user-log-panel) {
-  background:var(--glass-card)!important;border:1px solid rgba(255,255,255,.17)!important;box-shadow:var(--glass-edge)!important;color:#fff;
-  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
-}
-body[data-private=true]:is([data-role=user],[data-role=admin]) .plant-pedestal,
-body[data-private=true]:is([data-role=user],[data-role=admin]) .icon-medallion { background:rgba(255,255,255,.14)!important;border-color:rgba(255,255,255,.2)!important;box-shadow:none!important;color:#fff; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .auth-flow { background:transparent; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar :is(a,button):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
 
-/* Texto */
-body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page :is(h1,h2,h3,h4,strong,dd,th,legend,label,summary,.plant-reading strong) { color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page :is(p,dt,small,time,td,li,span:not(.skeleton-line):not(.icon-medallion)) { color:rgba(255,255,255,.84); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page a:not(.button) { color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .user-metric-icon,
-body[data-private=true]:is([data-role=user],[data-role=admin]) .plant-reading span { color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .garden-welcome h1 { color:#fff!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .garden-welcome-lead { color:#fff!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .garden-welcome-phrase { color:rgba(255,255,255,.86)!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .skeleton-line { background:rgba(255,255,255,.2); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .sensor-track { background:rgba(255,255,255,.18); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .sensor-track span { background:#fff; }
-
-/* Mensajes y avisos: fondo propio para que se lean sobre el vidrio. */
-body[data-private=true]:is([data-role=user],[data-role=admin]) :is(#app-feedback,.user-feedback,.user-data-warning,.notice-recommendation,.privacy-saved) {
-  background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;
-}
-body[data-private=true]:is([data-role=user],[data-role=admin]) :is(#app-feedback,.user-feedback)[role=alert] { background:rgba(180,60,48,.3)!important;border-color:rgba(255,190,180,.5)!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-meta,
-body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-meta span { color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-condition { padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff!important;font-weight:600; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-condition.active { background:rgba(214,120,60,.42); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .privacy-unsaved { color:#fff!important;font-weight:600; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .privacy-panel>[data-privacy-state] { color:#ffc4ba; }
-
-/* Tablas, gráficas y campos */
-body[data-private=true]:is([data-role=user],[data-role=admin]) .user-table :is(th,td) { border-color:rgba(255,255,255,.14); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.user-chart-grid text,.user-chart-labels text,.user-history-chart text) { fill:rgba(255,255,255,.8); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .user-history-chart line { stroke:rgba(255,255,255,.16); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page :is(input:not([type=checkbox]):not([type=radio]),select,textarea),
-body[data-private=true]:is([data-role=user],[data-role=admin]) dialog :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
-  color:#fff!important;background:rgba(255,255,255,.1)!important;border:1px solid rgba(255,255,255,.3)!important;border-radius:12px;
-}
-body[data-private=true]:is([data-role=user],[data-role=admin]) select option { color:#142419;background:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) :is(input,select,textarea)::placeholder { color:rgba(255,255,255,.66); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) input:is([type=radio],[type=checkbox]) { accent-color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .account-password { color:#fff; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .auth-flow { background:transparent;--text:#fff;--muted:rgba(255,255,255,.84);--sage:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .password-meter { background:rgba(255,255,255,.2); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .password-meter>span,
-body[data-private=true]:is([data-role=user],[data-role=admin]) .password-length.is-met .password-meter>span { background:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .password-input-group { background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3); }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .password-input-group input { background:transparent!important;border-color:transparent!important; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .password-eye-btn { color:#fff!important;background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.2)!important; }
-
-/* Diálogos: capa superior, así que llevan fondo casi opaco. */
-html body[data-private=true]:is([data-role=user],[data-role=admin]) dialog.app-dialog { background:#1b4042!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff;box-shadow:0 24px 60px -20px rgba(0,0,0,.7)!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) dialog :is(h2,h3,label,span) { color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) dialog p { color:rgba(255,255,255,.86); }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .logout-error { color:#ffc4ba; }
-
-/* Botones: vidrio puro en todo el dashboard. */
-html body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled),
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .account-tabs .button:not(.active),
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters .button {
-  background:rgba(255,255,255,.08)!important;color:#fff!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;
-}
-html body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled):hover { background:rgba(255,255,255,.16)!important; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .account-tabs .button.active,
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .user-range-control .btn-liquid-brand,
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters .btn-liquid-brand { background:rgba(255,255,255,.24)!important;color:#fff!important;box-shadow:var(--lg-dark)!important; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button:disabled { background:rgba(255,255,255,.05)!important;color:rgba(255,255,255,.6)!important;box-shadow:none!important;border-color:rgba(255,255,255,.14)!important; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button { --focus:#fff; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button span,
-html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button .icon { color:inherit; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .account-tabs,
-body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters,
-body[data-private=true]:is([data-role=user],[data-role=admin]) .user-range-control { background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.14)!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) :is(a,button,input,select,textarea,summary):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
-
-/* Panel lateral: vidrio tenue, sin bloque de verde. */
+/* Panel lateral: la estructura; el vidrio verde está en el bloque claro de abajo. */
 html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
-  background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.035))!important;border-right:1px solid rgba(255,255,255,.14)!important;box-shadow:none!important;
+  border-right:1px solid rgba(255,255,255,.14)!important;box-shadow:none!important;
 }
 .sidebar-top { display:none; }
 .private-topbar { display:none; }
@@ -225,25 +130,21 @@ html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
   html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { min-height:44px!important;padding:0 16px!important;gap:12px;font-size:15px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .icon { width:20px;height:20px; }
 }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button:not([aria-current]) { background:rgba(255,255,255,.06)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button[aria-current] { background:rgba(255,255,255,.24)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
 
 /* Perfil, avisos y menú: sin barra, flotan sobre el contenido. */
 body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar {
-  display:flex;align-items:center;justify-content:space-between;gap:8px;position:fixed;top:0;left:0;right:0;z-index:9999;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;position:fixed;top:0;left:0;right:0;z-index:var(--z-encabezado);
   padding:14px clamp(16px,3vw,36px) 0;pointer-events:none;
 }
 .private-topbar :is(a,button) { pointer-events:auto; }
 .topbar-start,.topbar-actions { display:flex;align-items:center;gap:8px; }
 .topbar-actions { margin-left:auto; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .button { -webkit-backdrop-filter:blur(12px)!important;backdrop-filter:blur(12px)!important;background:rgba(23,56,58,.55)!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .account-icon-link[aria-current] { background:rgba(255,255,255,.26)!important; }
 .topbar-brand { display:none!important; }
 body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.container { padding-top:76px!important; }
 @media (min-width:769px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar { left:260px; } }
 
 @media (max-width:768px) {
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { display:inline-flex!important;color:#fff!important;padding:4px 12px 4px 6px;border-radius:999px;background:rgba(23,56,58,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px); }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { display:inline-flex!important;color:#fff!important;padding:4px 12px 4px 6px;border-radius:999px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { flex:0 0 auto;white-space:nowrap; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-actions { flex:0 0 auto;gap:6px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-toggle { flex:0 0 auto;white-space:nowrap;padding-inline:12px!important; }
@@ -251,60 +152,28 @@ body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.contai
   html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-logout { min-height:44px!important;background:rgba(255,255,255,.06)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
 }
 @media (max-width:360px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand .brand-name { display:none; } }
-@media (prefers-reduced-transparency:reduce) {
-  body[data-private=true]:is([data-role=user],[data-role=admin])::before { display:none; }
-  body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.user-care,.user-metric,.user-chart,.sidebar) { background:#1f4a4b!important; }
-  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .button { background:#1f4a4b!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
-}
 @media (forced-colors:active) {
   body[data-private=true]:is([data-role=user],[data-role=admin])::before { display:none; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.sidebar,.button) { background:Canvas!important;color:CanvasText!important;border:1px solid CanvasText!important; }
 }
 
 /* Ajustes tras revisar cada pantalla */
-html:has(body[data-private=true]:is([data-role=user],[data-role=admin])) { background:#17393a; }
 html:has(.auth-layout) { background:#0e1c14; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .icon-medallion,
-body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .icon-medallion .icon { color:#fff; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .user-support-callout { border-radius:22px;padding:22px 24px; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .user-support-callout { border-radius:var(--radio-tarjeta);padding:22px 24px; }
 body[data-private=true]:is([data-role=user],[data-role=admin]) .notices-grid { gap:18px; }
 @media (min-width:769px) { html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { width:100%; } }
 html body[data-private=true]:is([data-role=user],[data-role=admin]) .notices-grid { display:grid!important;gap:18px!important; }
-@media (max-width:768px) {
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { background:rgba(23,56,58,.9)!important; }
-  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .button { background:rgba(23,56,58,.9)!important; }
-}
 
-/* Administración sobre el mismo vidrio: piezas propias del panel. */
-body[data-private=true][data-role=admin] .private-role-label { margin:4px 4px 0;color:rgba(255,255,255,.78);font-size:13px;font-weight:600;letter-spacing:.02em; }
-body[data-private=true][data-role=admin] :is(.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list) {
-  background:var(--glass-card)!important;border:1px solid rgba(255,255,255,.17)!important;box-shadow:var(--glass-edge)!important;color:#fff;
-}
-body[data-private=true][data-role=admin] .admin-selected-row { background:rgba(255,255,255,.12); }
-body[data-private=true][data-role=admin] .admin-table th[scope=row] { color:#fff;border-color:rgba(255,255,255,.14); }
-body[data-private=true][data-role=admin] :is(.admin-caption,.admin-service-note,.admin-inline-status,.admin-access-state) { color:rgba(255,255,255,.84); }
-body[data-private=true][data-role=admin] .admin-service-note { border-color:rgba(255,255,255,.16); }
-body[data-private=true][data-role=admin] .admin-connection:before { background:#9fdcb4; }
-body[data-private=true][data-role=admin] .admin-connection.offline:before { background:#f0c27a; }
-body[data-private=true][data-role=admin] #app-page pre { color:#fff;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.14); }
-body[data-private=true][data-role=admin] #app-page label { color:#fff; }
 body[data-private=true][data-role=admin] #app-page > .bento-panel + .bento-panel { margin-top:24px; }
 
 /* Dashboard claro (administración y usuario): dirección visual aprobada (2026-11-07).
    Fondo crema con luz de naranja y durazno, panel lateral de vidrio verde flotante y tarjetas translúcidas.
    Va después de dashboard-glass.css y sustituye sus colores oscuros; la estructura es la misma. */
 body[data-private=true]:is([data-role=admin],[data-role=user]) {
-  --claro-fondo:#fdf3e8;--claro-tinta:#1b231d;--claro-titulo:#13261b;--claro-suave:#4b423a;--claro-linea:rgba(70,40,20,.12);
-  --claro-tarjeta:rgba(255,250,244,.52);--claro-tarjeta-solida:rgba(255,250,244,.94);--claro-verde:#2f6a48;--claro-peligro:#a3321f;
-  --claro-borde:rgba(255,255,255,.72);
-  --claro-filo:inset 0 1px 0 rgba(255,255,255,.85),0 18px 40px -26px rgba(150,70,20,.42),0 2px 6px -2px rgba(150,70,20,.08);
-  --claro-desenfoque:blur(22px) saturate(150%);
-  --text:var(--claro-tinta);--muted:var(--claro-suave);--focus:var(--claro-verde);--sage:var(--claro-verde);
-  --garden-ink:var(--claro-tinta);--garden-muted:var(--claro-suave);--garden-line:var(--claro-linea);
   color:var(--claro-tinta);background:transparent!important;
 }
 /* El color base va en html: un fondo opaco en body taparía la capa de luz (z-index:-1). */
-html:has(body[data-private=true]:is([data-role=admin],[data-role=user])) { background:#fdf3e8; }
+html:has(body[data-private=true]:is([data-role=admin],[data-role=user])) { background:var(--claro-fondo); }
 /* Luz fija: naranja arriba a la derecha y abajo, durazno al centro y un rastro de hoja tras el panel. Sin animación. */
 body[data-private=true]:is([data-role=admin],[data-role=user])::before {
   background:
@@ -321,7 +190,7 @@ body[data-private=true]:is([data-role=admin],[data-role=user])::before {
 /* Panel lateral de vidrio verde: flota con margen, esquinas redondeadas y un reflejo discreto. */
 @media (min-width:769px) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
-    top:16px!important;left:16px!important;bottom:16px!important;width:268px!important;padding:24px 16px!important;border-radius:26px!important;
+    top:16px!important;left:16px!important;bottom:16px!important;width:268px!important;padding:24px 16px!important;border-radius:var(--radio-menu)!important;
     border:1px solid rgba(255,255,255,.2)!important;overflow:hidden auto;
     background:
       radial-gradient(120% 60% at 0% 0%,rgba(255,255,255,.16),transparent 55%),
@@ -361,7 +230,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-top
 
 /* Tarjetas translúcidas: desenfocan el fondo, filo claro y sombra cálida. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel,.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list,.admin-management) {
-  background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:22px!important;box-shadow:var(--claro-filo)!important;color:var(--claro-tinta);
+  background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:var(--radio-tarjeta)!important;box-shadow:var(--claro-filo)!important;color:var(--claro-tinta);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel,.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list,.admin-management) {
@@ -405,9 +274,27 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-fee
   background:rgba(47,106,72,.1)!important;border:1px solid rgba(47,106,72,.28)!important;color:#1d4a31!important;
 }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback)[role=alert],
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is([data-maint-error],.privacy-panel>[data-privacy-state],.logout-error) { color:var(--claro-peligro)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is([data-maint-error],.privacy-panel>[data-privacy-state]) { color:var(--claro-peligro)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback)[role=alert] { background:rgba(163,50,31,.08)!important;border-color:rgba(163,50,31,.3)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .privacy-unsaved { color:var(--claro-tinta)!important; }
+
+/* Insignias del panel (C4): cápsula de vidrio con cuatro tonos (verde, ámbar, rojo y gris) y siempre con texto.
+   Sin desenfoque propio: son elementos internos de una tarjeta. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.badge,.inquiry-state,.care-admin-state,.notice-condition):not(#_) {
+  --insignia-fondo:var(--insignia-gris-fondo);--insignia-texto:var(--insignia-gris-texto);--insignia-borde:var(--insignia-gris-borde);
+  display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:3px 10px;border-radius:var(--radio-insignia);
+  border:1px solid var(--insignia-borde);background:var(--insignia-fondo);color:var(--insignia-texto)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);font-size:12px!important;font-weight:700;line-height:1.4;white-space:nowrap;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-atendida,.care-admin-state.is-publicada):not(#_) {
+  --insignia-fondo:var(--insignia-verde-fondo);--insignia-texto:var(--insignia-verde-texto);--insignia-borde:var(--insignia-verde-borde);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-nueva,.care-admin-state.is-borrador,.notice-condition.active):not(#_) {
+  --insignia-fondo:var(--insignia-ambar-fondo);--insignia-texto:var(--insignia-ambar-texto);--insignia-borde:var(--insignia-ambar-borde);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.care-admin-state.is-retirada,.badge.error):not(#_) {
+  --insignia-fondo:var(--insignia-rojo-fondo);--insignia-texto:var(--insignia-rojo-texto);--insignia-borde:var(--insignia-rojo-borde);
+}
 
 /* Tablas y gráficas */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table :is(th,td) { border-color:var(--claro-linea); }
@@ -420,65 +307,62 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page pre { color:var(--claro-tinta);background:#f6f0e7;border:1px solid var(--claro-linea); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-facts>div,.admin-policy-list>div) { border-color:var(--claro-linea)!important; }
 
-/* Campos: vidrio oscuro con texto blanco, como en el inicio de sesión. */
+/* Campos del panel (C3): vidrio claro, texto oscuro y foco verde. Sin desenfoque propio: viven dentro de una tarjeta. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
-  color:#fff!important;-webkit-text-fill-color:#fff;caret-color:#fff;color-scheme:dark;
-  background:rgba(26,64,44,.95)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:14px!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px -12px rgba(20,50,30,.5)!important;
+  color:var(--claro-tinta)!important;-webkit-text-fill-color:var(--claro-tinta);caret-color:var(--claro-tinta);color-scheme:light;
+  background:var(--campo-fondo)!important;border:1px solid var(--campo-borde)!important;border-radius:var(--radio-campo)!important;
+  box-shadow:var(--campo-filo)!important;
 }
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { background:rgba(26,64,44,.9)!important;-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%); }
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,textarea)::placeholder { color:rgba(255,255,255,.62);-webkit-text-fill-color:rgba(255,255,255,.62); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input:-webkit-autofill { -webkit-text-fill-color:#fff;box-shadow:inset 0 0 0 40px #1f4a33!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input::-webkit-calendar-picker-indicator { filter:invert(1);opacity:.85;cursor:pointer; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { color:#fff;background:#1f4a33; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,textarea)::placeholder { color:var(--campo-placeholder);-webkit-text-fill-color:var(--campo-placeholder); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input:-webkit-autofill { -webkit-text-fill-color:var(--claro-tinta);box-shadow:inset 0 0 0 40px #fff6ea!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { color:var(--claro-tinta);background:#fffaf4; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,select,textarea):disabled { opacity:.55; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input:is([type=radio],[type=checkbox]) { accent-color:var(--claro-verde); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(a,button,summary):focus-visible { outline:3px solid var(--claro-verde)!important;outline-offset:3px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,select,textarea):focus-visible { outline:3px solid #f08a4b!important;outline-offset:2px; }
-/* Lista desplegable con el mismo vidrio (Chrome y Edge recientes). Otros navegadores usan la lista nativa en modo oscuro. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(a,button,summary,input,select,textarea):focus-visible { outline:3px solid var(--claro-verde)!important;outline-offset:3px; }
+/* El campo de contraseña dibuja su marco en el grupo; el input queda transparente dentro. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .password-input-group input:not([type=checkbox]):not([type=radio]) {
+  background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;outline:none!important;
+}
+/* Lista desplegable con el mismo vidrio claro (Chrome y Edge recientes). Otros navegadores usan la lista nativa. */
 @supports (appearance:base-select) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select { appearance:base-select;display:flex;align-items:center;gap:8px;min-height:46px;padding:0 14px!important; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker-icon { color:#fff;transition:rotate .18s ease-out; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker-icon { color:var(--claro-tinta);transition:rotate .18s ease-out; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select:open::picker-icon { rotate:180deg; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker(select) {
-    appearance:base-select;margin-block:6px;padding:6px;border:1px solid rgba(255,255,255,.22);border-radius:16px;color:#fff;
-    background:rgba(24,58,40,.9);-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 22px 44px -18px rgba(20,40,25,.6);
+    appearance:base-select;margin-block:6px;padding:6px;border:1px solid var(--campo-borde);border-radius:16px;color:var(--claro-tinta);
+    background:var(--campo-lista);-webkit-backdrop-filter:var(--claro-desenfoque);backdrop-filter:var(--claro-desenfoque);
+    box-shadow:var(--claro-filo);
   }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { min-height:40px;padding:8px 12px;border-radius:10px;color:#fff;background:transparent;cursor:pointer; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:is(:hover,:focus-visible) { background:rgba(255,255,255,.14);outline:none; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:checked { background:rgba(255,255,255,.22);font-weight:600; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option::checkmark { color:#ffb27a; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { min-height:40px;padding:8px 12px;border-radius:10px;color:var(--claro-tinta);background:transparent;cursor:pointer; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:is(:hover,:focus-visible) { background:rgba(47,106,72,.1);outline:none; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:checked { background:rgba(47,106,72,.16);font-weight:600; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option::checkmark { color:var(--claro-verde); }
 }
 
-/* Botones: un solo sistema, tomado de los botones claros y verdes de la portada.
-   Misma altura, radio y letra; solo cambia el material según su función. */
+/* Botones del panel (C1, C2): tres variantes de vidrio —Primaria, Secundaria y Peligro— y la compacta.
+   .btn-liquid-brand es la Primaria, .btn-liquid-light la Secundaria y [data-danger] el Peligro.
+   Deshabilitado es la misma variante a 45 % de opacidad (regla en base.css). */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button {
-  display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px!important;padding:0 20px!important;
-  border-radius:999px!important;font:600 14px/1.2 var(--body)!important;white-space:nowrap;
-  transition:transform 160ms ease-out,background-color 150ms ease,box-shadow 150ms ease;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--boton-alto)!important;padding:0 20px!important;
+  border-radius:var(--radio-boton)!important;font:600 14px/1.2 var(--body)!important;white-space:nowrap;
+  transition:transform var(--duracion-corta) ease-out,background-color var(--duracion-corta) ease,box-shadow var(--duracion-corta) ease;
 }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button.compact { min-height:var(--boton-alto-compacto)!important;padding:0 16px!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:active:not(:disabled) { transform:scale(.97); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-light:not(:disabled) {
-  background:rgba(255,252,247,.72)!important;color:var(--claro-titulo)!important;border:1px solid rgba(255,255,255,.85)!important;
-  box-shadow:inset 0 1px 0 #fff,0 6px 16px -10px rgba(150,70,20,.4),0 0 0 1px rgba(70,40,20,.06)!important;
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-light {
+  background:var(--boton-secundaria)!important;color:var(--claro-titulo)!important;border:1px solid var(--boton-secundaria-borde)!important;
+  box-shadow:var(--boton-secundaria-filo)!important;
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-light:not(:disabled):hover { background:rgba(255,255,255,.95)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-light:hover:not(:disabled) { background:var(--boton-secundaria-hover)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button .icon { width:20px;height:20px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-brand:not(:disabled) {
-  background:linear-gradient(180deg,#3f7a55 0%,#285a3c 100%)!important;color:#fff!important;border:0!important;box-shadow:var(--lg-solid)!important;
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-brand {
+  background:var(--boton-primaria)!important;color:#fff!important;border:0!important;box-shadow:var(--lg-solid)!important;
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-brand:not(:disabled):hover { background:linear-gradient(180deg,#478860 0%,#2d6444 100%)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true]:not(:disabled) {
-  color:#fff!important;border:0!important;background:linear-gradient(180deg,#c4553a 0%,#9c3220 100%)!important;box-shadow:var(--lg-solid)!important;
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-brand:hover:not(:disabled) { background:var(--boton-primaria-hover)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true] {
+  background:var(--boton-peligro)!important;color:#fff!important;border:0!important;box-shadow:var(--lg-solid)!important;
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true]:not(:disabled):hover { background:linear-gradient(180deg,#cf6146 0%,#a83826 100%)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:disabled {
-  background:rgba(31,25,21,.06)!important;color:rgba(31,25,21,.45)!important;box-shadow:none!important;border:0!important;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button :is(span,.icon) { color:inherit!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true]:hover:not(:disabled) { background:var(--boton-peligro-hover)!important; }
 
 /* Mi cuenta: selector de apartados tipo pestañas segmentadas. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs {
@@ -523,8 +407,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .m
 @media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-create] { grid-template-columns:1fr; } }
 
 /* Contraseña */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .auth-flow { --text:var(--claro-tinta);--muted:var(--claro-suave);--sage:var(--claro-verde); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-input-group { background:#fff;border-color:rgba(31,25,21,.22); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-input-group { background:var(--campo-fondo);border-color:var(--campo-borde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-eye-btn { color:var(--claro-tinta)!important;background:rgba(31,25,21,.05)!important;border-color:var(--claro-linea)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-meter { background:rgba(31,25,21,.12); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.password-meter>span,.password-length.is-met .password-meter>span) { background:var(--claro-verde); }
@@ -543,7 +426,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { margin:0 0 6px; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { margin:6px 0 8px;line-height:1; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading { margin-top:8px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button:not(.active) { -webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button::before,html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button::after { display:none!important; }
 
 /* Acceso a la página principal bajo el logotipo (sustituye al botón de ocultar). */
@@ -562,7 +444,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 }
 
 /* Componentes del usuario sobre el fondo claro */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:22px!important;box-shadow:var(--claro-filo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:var(--radio-tarjeta)!important;box-shadow:var(--claro-filo)!important; }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta)!important;-webkit-backdrop-filter:var(--claro-desenfoque)!important;backdrop-filter:var(--claro-desenfoque)!important; }
 }
@@ -570,11 +452,8 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .p
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track { background:rgba(70,40,20,.12); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track span { background:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .skeleton-line { background:rgba(70,40,20,.12); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-condition { background:rgba(70,40,20,.08);color:var(--claro-tinta)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-condition.active { background:rgba(240,138,75,.24); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1 { font-weight:800;color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-token-code { color:var(--claro-tinta)!important;background:rgba(255,255,255,.7);border:1px solid var(--claro-linea); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-locked .button:disabled { opacity:1; }
 
 /* Gráfica sin datos: el marco ocupa su espacio real y el aviso queda centrado. */
 .user-chart-frame { position:relative; }
@@ -600,7 +479,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .k
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form label { display:block;margin:0 0 8px;font-size:13px;font-weight:600; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row { position:relative;display:flex;gap:10px;align-items:center; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row input { flex:1;min-width:0;min-height:46px;padding-left:44px!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { position:absolute;left:14px;top:50%;translate:0 -50%;z-index:1;color:rgba(255,255,255,.8);pointer-events:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { position:absolute;left:14px;top:50%;translate:0 -50%;z-index:1;color:var(--claro-suave);pointer-events:none; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon .icon { width:18px;height:18px; }
 @media (max-width:520px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row { flex-wrap:wrap; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row .button { width:100%; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { top:23px; } }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-diagnosis-mark,.user-support-callout>div>.icon,.user-support-callout .icon) { color:var(--claro-titulo)!important;background:transparent!important; }
@@ -608,7 +487,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > .account-session { max-width:none;width:100%; }
 /* El texto de los botones hereda su color: gana a la regla general de texto suave. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:not(#_) :is(span,.icon) { color:inherit!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon:not(#_) { color:rgba(255,255,255,.82)!important; }
 
 /* Acceso externo al correo de soporte, en el grupo Gestión del panel. */
 .private-mail-link { display:grid;grid-template-columns:20px minmax(0,1fr) 16px;column-gap:12px;align-items:center;min-height:44px;padding:9px 16px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;line-height:1.3;text-decoration:none;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
@@ -627,12 +505,9 @@ html body .sidebar .private-mail-link:not(#_) :is(span,.icon) { color:#fff!impor
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .inquiry-item { padding:22px 24px; }
 .inquiry-head { display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:8px; }
 .inquiry-folio { font-size:15px;letter-spacing:.02em; }
-.inquiry-state { padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(70,40,20,.08); }
-.inquiry-state.is-nueva { background:rgba(240,138,75,.22); }
-.inquiry-state.is-atendida { background:rgba(47,106,72,.16); }
 .inquiry-date { margin-left:auto;font-size:13px; }
 .inquiry-who { margin:0 0 10px!important;overflow-wrap:anywhere; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .inquiry-message { margin:0 0 12px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.6);border:1px solid var(--claro-linea);color:var(--claro-tinta)!important;white-space:pre-wrap;overflow-wrap:anywhere; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .inquiry-message { margin:0 0 12px;padding:14px 16px;border-radius:var(--radio-campo);background:rgba(255,255,255,.6);border:1px solid var(--claro-linea);color:var(--claro-tinta)!important;white-space:pre-wrap;overflow-wrap:anywhere; }
 .inquiry-meta { margin:0 0 4px!important;font-size:13px; }
 .inquiry-pager { display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px 18px;margin-top:32px;padding-top:20px;border-top:1px solid rgba(70,40,20,.1); }
 .inquiry-pager[hidden] { display:none; }
@@ -652,16 +527,16 @@ html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .mai
 html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field input { width:100%;min-height:46px;padding-inline:10px 46px!important;font-variant-numeric:tabular-nums; }
 html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button {
   position:absolute;inset:1px 1px 1px auto;display:grid;place-items:center;width:44px;min-height:44px;padding:0;
-  color:#fffdf3;background:transparent;border:0;border-radius:12px!important;box-shadow:none;
+  color:var(--claro-tinta);background:transparent;border:0;border-radius:12px!important;box-shadow:none;
 }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:hover { background:rgba(255,255,255,.14); }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:focus-visible { outline:2px solid #fffdf3!important;outline-offset:-4px; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field .icon { width:21px;height:21px;color:#fffdf3!important; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:hover { background:rgba(47,106,72,.1); }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:focus-visible { outline:2px solid var(--claro-verde)!important;outline-offset:-4px; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field .icon { width:21px;height:21px;color:var(--claro-tinta)!important; }
 html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field input[aria-invalid=true] { outline:2px solid var(--claro-peligro);outline-offset:2px; }
 
 /* Se monta fuera de la tarjeta para evitar sus recortes y su contexto de desenfoque. */
 .maint-calendar {
-  position:fixed;inset:auto;z-index:1200;margin:0;padding:14px;width:min(340px,calc(100vw - 16px));max-width:calc(100vw - 16px);
+  position:fixed;inset:auto;z-index:var(--z-calendario);margin:0;padding:14px;width:min(340px,calc(100vw - 16px));max-width:calc(100vw - 16px);
   max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow:auto;overscroll-behavior:contain;
   color:#1b231d;background:rgba(255,250,244,.97);border:1px solid rgba(255,255,255,.85);border-radius:20px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 16px 40px -18px rgba(60,45,25,.38),0 0 0 1px rgba(47,106,72,.12);
@@ -726,7 +601,7 @@ html body[data-private=true][data-role=admin] .maint-calendar :is(button,input,s
 .binding-row { display:flex;flex-wrap:wrap;gap:12px;align-items:stretch; }
 .binding-row input { flex:1 1 280px;min-width:0;min-height:48px;padding-inline:14px!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase; }
 .binding-help { margin:0!important;font-size:13px; }
-.binding-support { margin-top:16px;padding:0 16px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:18px;background:rgba(255,255,255,.34);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%); }
+.binding-support { margin-top:16px;padding:0 16px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:18px;background:rgba(255,255,255,.34); }
 .binding-support summary { min-height:44px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;cursor:pointer; }
 .binding-support summary::before { content:"›";font-size:18px;line-height:1;transition:transform .16s ease; }
 .binding-support[open] summary::before { transform:rotate(90deg); }
@@ -743,21 +618,21 @@ html body[data-private=true][data-role=admin] .maint-calendar :is(button,input,s
 .binding-support-address { display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
 .binding-support-address strong { overflow-wrap:anywhere;user-select:all; }
 @media (prefers-reduced-motion:reduce) { .binding-support summary::before { transition:none; } }
-@media (prefers-reduced-transparency:reduce) { .binding-support { background:var(--claro-tarjeta-solida,#fff);-webkit-backdrop-filter:none;backdrop-filter:none; } }
+@media (prefers-reduced-transparency:reduce) { .binding-support { background:var(--claro-tarjeta-solida,#fff); } }
 .binding-status { margin:4px 0 0!important;font-size:14px;font-weight:600; }
 .binding-status[hidden] { display:none; }
 .binding-form[aria-busy=true] .binding-status { font-weight:500; }
 .binding-issue-form { display:grid;gap:10px;max-width:560px;margin-top:14px; }
 .binding-issue-form label { font-weight:600;font-size:14px; }
 .binding-issue-form > button { justify-self:start;margin-top:6px; }
-.binding-delivery { margin:6px 0 0;padding:12px 14px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:14px;display:grid;gap:8px; }
+.binding-delivery { margin:6px 0 0;padding:12px 14px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:var(--radio-campo);display:grid;gap:8px; }
 .binding-delivery legend { padding:0 6px;font-weight:600;font-size:14px; }
 .binding-delivery label { display:flex;gap:10px;align-items:flex-start;font-weight:500; }
 .binding-delivery input { margin-top:3px;accent-color:#2f6a48; }
 .binding-reveal { margin-top:24px;padding-top:20px;border-top:1px solid var(--claro-linea,rgba(70,40,20,.14));display:grid;gap:10px;justify-items:start; }
 .binding-reveal[hidden] { display:none; }
 .binding-reveal h3 { margin:0;font-size:17px; }
-.binding-code { margin:0!important;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.75);border:1px solid rgba(47,106,72,.25);
+.binding-code { margin:0!important;padding:14px 18px;border-radius:var(--radio-campo);background:rgba(255,255,255,.75);border:1px solid rgba(47,106,72,.25);
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(17px,2.2vw,24px);font-weight:700;letter-spacing:.08em;overflow-wrap:anywhere;user-select:all; }
 .binding-list { margin-top:20px; }
 .binding-list h2 { margin-bottom:4px; }
@@ -804,10 +679,6 @@ html body[data-private=true] #app-page .care-guide-answer .care-guide-source { f
 .care-admin-row-main { flex:1 1 320px;min-width:0; }
 .care-admin-row h3 { margin:8px 0 4px;font-size:17px;overflow-wrap:anywhere; }
 .care-admin-meta { margin:0!important;font-size:13px;overflow-wrap:anywhere; }
-.care-admin-state { display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid currentColor;font-size:12px;font-weight:700; }
-.care-admin-state.is-publicada { color:#1f5b3a; }
-.care-admin-state.is-borrador { color:#6b4a12; }
-.care-admin-state.is-retirada { color:#7a2e20; }
 @media (max-width:520px) {
   .care-guide summary { padding:16px; font-size:16px; }
   .care-guide-answer { padding:0 16px 18px; }

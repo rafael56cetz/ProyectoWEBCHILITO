@@ -448,8 +448,7 @@ const CookieViews = (() => {
         ${error()}
         <div class="cookies-acciones cookies-acciones--panel">${button('','Guardar preferencias','submit')}${button('rechazar','Rechazar estadísticas')}</div>
       </form>
-    </dialog>
-    <div class="cookies-confirmacion" data-cookies-confirmacion role="status" tabindex="-1" hidden></div>`;
+    </dialog>`;
   return Object.freeze({
     root() {
       const node = document.createElement('div');
@@ -467,8 +466,6 @@ const CookieViews = (() => {
       const banner = root.querySelector('[data-cookies-aviso]');
       const dialog = root.querySelector('[data-cookies-panel]');
       const form = root.querySelector('[data-cookies-form]');
-      const notice = root.querySelector('[data-cookies-confirmacion]');
-      let noticeTimer = null;
       document.body.append(root);
       // Un aviso fijo no debe tapar el elemento que recibe el foco.
       const reserveSpace = () => { document.documentElement.style.scrollPaddingBottom = banner.hidden ? '' : `${banner.offsetHeight + 32}px`; };
@@ -490,13 +487,10 @@ const CookieViews = (() => {
         },
         closePreferences() { if(dialog.open) dialog.close(); },
         saved() {
-          notice.textContent = 'Preferencias guardadas';
-          notice.hidden = false;
+          const aviso = mostrarAviso('exito','Preferencias guardadas');
           // Si el foco estaba en el aviso que acaba de ocultarse, no se pierde al inicio de la página.
           const active = document.activeElement;
-          if(active === document.body || banner.contains(active)) notice.focus({preventScroll:true});
-          clearTimeout(noticeTimer);
-          noticeTimer = setTimeout(() => { notice.hidden = true; },4500);
+          if(active === document.body || banner.contains(active)) aviso.focus({preventScroll:true});
         }};
     }
   });

@@ -212,6 +212,12 @@ const AuthViews = (() => {
 // ── Mfa ──
 // Pantallas de segundo factor. Lo que viene del servidor se pinta con textContent.
 const MfaViews = Object.freeze({
+  // Textos de las confirmaciones de Mi cuenta › Seguridad (las pinta confirmar()).
+  confirmations: Object.freeze({
+    totpDisable: {titulo:'¿Desactivar la app autenticadora?',texto:'Ya no se pedirá su código al iniciar sesión. Puedes activarla de nuevo cuando quieras.',accion:'Desactivar',peligro:true},
+    keyRemove: name => ({titulo:'¿Quitar esta llave de acceso?',texto:`No podrás entrar con «${name}». No se puede deshacer.`,accion:'Quitar',peligro:true}),
+    recoveryRegenerate: {titulo:'¿Generar códigos nuevos?',texto:'Los códigos actuales dejarán de servir. Guarda los nuevos en un lugar seguro. No se puede deshacer.',accion:'Generar códigos'}
+  }),
   step(kind) {
     const byMail = kind === 'login_by_code';
     return `<form data-step class="login-form" novalidate><div class="field"><label for="code">${byMail?'Código de 6 dígitos':'Código de tu app o de recuperación'}</label>
@@ -290,6 +296,7 @@ const MfaViews = Object.freeze({
       'key-not-created':'No se creó la llave.','key-not-saved':'No se pudo guardar la llave.','key-added':'Llave agregada.'};
     return {
       reauthForm: q('[data-reauth]'), totpForm: q('[data-totp-form]'), keyForm: q('[data-key-form]'),
+      keyName: button => button.closest('.key-item')?.querySelector('.key-item-name')?.textContent || 'tu llave',
       say(code, failed = false) {
         const box = q('#mfa-feedback');
         box.hidden = false; box.textContent = texts[code] || texts.failed; box.setAttribute('role',failed?'alert':'status'); box.focus();

@@ -13,7 +13,7 @@
     bottom:auto!important;left:max(12px,env(safe-area-inset-left))!important;right:max(12px,env(safe-area-inset-right))!important;
     width:auto!important;max-height:calc(100vh - var(--header-height,80px) - 30px - env(safe-area-inset-bottom));
     max-height:calc(100dvh - var(--header-height,80px) - 30px - env(safe-area-inset-bottom));
-    min-height:0!important;z-index:9998!important;padding:14px!important;
+    min-height:0!important;z-index:var(--z-menu)!important;padding:14px!important;
     border:1px solid #4d6c59!important;border-radius:24px;
     background:#173c2f!important;box-shadow:inset 0 1px rgba(255,255,255,.15),0 20px 45px -16px rgba(11,34,23,.5)!important;
     overflow:hidden!important;flex-direction:column!important;
@@ -136,7 +136,7 @@ body[data-private=true] .site-header .account-icon-link[aria-current] { backgrou
   .public-header #public-navigation .public-menu-icon { display:inline-flex;flex:0 0 20px; }
   .public-header #public-navigation .public-menu-login { margin-top:12px!important; }
   .public-header .public-menu-toggle:focus-visible,.public-header #public-navigation .button:focus-visible { outline:3px solid #d6e8a7!important;outline-offset:3px; }
-  .public-menu-shade:not([hidden]) { display:block;position:fixed;inset:var(--header-height,80px) 0 0;z-index:9998;background:rgba(18,37,27,.24); }
+  .public-menu-shade:not([hidden]) { display:block;position:fixed;inset:var(--header-height,80px) 0 0;z-index:var(--z-menu);background:rgba(18,37,27,.24); }
   body.public-menu-open { overflow:hidden; }
 }
 @media (forced-colors:active) {

@@ -219,8 +219,8 @@ const AppController = (() => {
     const view = AppViews.frame(root, route, navigation(route, authService.session));
     WelcomeController.offer(root,authService.session,() => personalize());
     const lifetime = new AbortController();
-    let pageLifetime = new AbortController(), loadingTimer = null, logoutOrigin = null;
-    const {page, logoutDialog} = view;
+    let pageLifetime = new AbortController(), loadingTimer = null;
+    const {page} = view;
     let adminPanel = null, userGarden = null, auth = null, privacy = null, security = null, filter = 'all', data = null, sequence = 0, busy = false;
     async function request(action, payload = {}) {
       const controller = new AbortController();
@@ -297,36 +297,16 @@ const AppController = (() => {
       data = route.screen === 'avisos' ? AppModel.notices(response) : AppModel.profile(response);
       draw();
     }
-    function closeLogout(returnFocus = true) {
-      let target = null;
-      if(returnFocus) {
-        const visibleOrigin=logoutOrigin?.isConnected&&logoutOrigin.getClientRects().length;
-        target = visibleOrigin?logoutOrigin:isUserMobile()?toggle:view.logoutButton();
-      }
-      view.closeLogout(target);
-      logoutOrigin = null;
-    }
-    function openLogout(trigger) {
-      if(logoutDialog.open) return;
-      logoutOrigin = trigger;
-      view.openLogout();
-    }
-    async function confirmLogout() {
-      if(busy || !logoutDialog.open) return;
+    async function logout() {
+      if(busy || !await confirmar(AppViews.confirmaciones.cerrarSesion)) return;
       const id = sequence;
       busy = true;
-      view.logoutBusy(true);
       const response = await request('logout');
       if(lifetime.signal.aborted || id !== sequence) return;
       busy = false;
-      view.logoutBusy(false);
-      if(response.status === 'accepted') { closeLogout(false); onLogout?.(); return; }
+      if(response.status === 'accepted') { onLogout?.(); return; }
       view.logoutFailed();
     }
-    logoutDialog.addEventListener('cancel', event => {
-      event.preventDefault();
-      if(!busy) closeLogout();
-    }, {signal:lifetime.signal});
     function releasePage() {
       sequence++;
       clearTimeout(loadingTimer);
@@ -337,9 +317,7 @@ const AppController = (() => {
       auth?.dispose(); auth = null;
       privacy?.dispose(); privacy = null;
       security?.dispose(); security = null;
-      closeLogout(false);
       busy = false;
-      view.logoutBusy(false);
     }
     function update(nextRoute) {
       setMenuOpen(false);
@@ -362,9 +340,7 @@ const AppController = (() => {
       if(action === 'toggle-menu') { setMenuOpen(!menuOpen); return; }
       if(action === 'close-menu') { setMenuOpen(false,true); return; }
       if(action === 'reload') { await load(); if(!lifetime.signal.aborted) view.focusMain(); return; }
-      if(action === 'logout') { openLogout(target); return; }
-      if(action === 'cancel-logout') { closeLogout(); return; }
-      if(action === 'confirm-logout') { await confirmLogout(); return; }
+      if(action === 'logout') { await logout(); return; }
       if(action !== 'mark-read') return;
       const id = sequence;
       busy = true;
@@ -407,13 +383,13 @@ const AppController = (() => {
       if(link.getAttribute('href')===location.hash)view.focusMain({preventScroll:true});
     },{signal:lifetime.signal});
     document.addEventListener('keydown',event=>{
-      if(event.key==='Escape'&&menuOpen&&!logoutDialog.open){event.preventDefault();setMenuOpen(false,true);}
+      if(event.key==='Escape'&&menuOpen&&!document.querySelector('dialog[open]')){event.preventDefault();setMenuOpen(false,true);}
     },{signal:lifetime.signal});
     document.addEventListener('click',event=>{
-      if(menuOpen&&!event.target.closest('dialog')&&!nav.contains(event.target)&&!toggle.contains(event.target)&&!logoutDialog.open)setMenuOpen(false);
+      if(menuOpen&&!event.target.closest('dialog')&&!nav.contains(event.target)&&!toggle.contains(event.target)&&!document.querySelector('dialog[open]'))setMenuOpen(false);
     },{signal:lifetime.signal});
     document.addEventListener('focusin',event=>{
-      if(menuOpen&&!event.target.closest('dialog')&&!nav.contains(event.target)&&!toggle.contains(event.target)&&!logoutDialog.open)setMenuOpen(false);
+      if(menuOpen&&!event.target.closest('dialog')&&!nav.contains(event.target)&&!toggle.contains(event.target)&&!document.querySelector('dialog[open]'))setMenuOpen(false);
     },{signal:lifetime.signal});
     mobileScreen.addEventListener('change',syncMenuMode,{signal:lifetime.signal});
     syncMenuMode();
