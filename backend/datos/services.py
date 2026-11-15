@@ -183,7 +183,6 @@ def _caso_dto(caso):
             'createdAt': _fecha(caso.creado_en), 'authorizedUntil': _fecha(caso.autorizacion_vence_en),
             'revokedAt': _fecha(caso.autorizacion_revocada_en), 'closedAt': _fecha(caso.cerrado_en),
             'result': caso.resultado, 'resolutionNote': caso.nota_resolucion or None,
-            'attendedBy': (caso.atendido_por.alias or None) if caso.atendido_por_id else None,
             'diagnosticId': str(caso.autodiagnostico_id) if caso.autodiagnostico_id else None}
 
 
@@ -207,8 +206,7 @@ def autodiagnostico_dto(diagnostico):
 
 def soporte(actor, huerto_id):
     huerto = huerto_propio(actor, huerto_id)
-    casos = list(SoporteCaso.objects.filter(huerto_id=huerto.pk, solicitante_id=actor.pk).select_related('atendido_por')
-                 .order_by('-creado_en')[:HISTORIAL_CASOS + 1])
+    casos = list(SoporteCaso.objects.filter(huerto_id=huerto.pk, solicitante_id=actor.pk).order_by('-creado_en')[:HISTORIAL_CASOS + 1])
     activo = next((caso for caso in casos if caso.estado in CASOS_ACTIVOS), None)
     ordenes = (Comando.objects.filter(sesion__caso_id=activo.pk, origen='soporte').order_by('-creado_en')[:50] if activo else [])
     ultimo = Autodiagnostico.objects.filter(huerto_id=huerto.pk, solicitado_por_id=actor.pk).order_by('-iniciado_en').first()

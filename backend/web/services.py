@@ -41,7 +41,7 @@ def dentro_de_cuota(actor, ruta):
 
 def _sin_secretos(valor):
     if isinstance(valor, dict):
-        return {k: (None if k in {'token', 'verificador', 'password', 'data', 'code'} else _sin_secretos(v)) for k, v in valor.items()}
+        return {k: (None if k in {'token', 'verificador', 'password', 'data', 'code', 'credential'} else _sin_secretos(v)) for k, v in valor.items()}
     if isinstance(valor, list):
         return [_sin_secretos(v) for v in valor]
     return valor

@@ -5,7 +5,7 @@ from functools import wraps
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, RequestDataTooBig, ValidationError
 from django.db import DatabaseError, IntegrityError
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from allauth.core import ratelimit
@@ -15,7 +15,7 @@ from datos import services as s
 from datos.paginacion import paginar
 
 from . import services as operacion
-from .respuestas import EntradaInvalida as InputError, error as failure, leer_json as body, respuesta_de_base
+from .respuestas import EntradaInvalida as InputError, ReglaDeNegocio, error as failure, leer_json as body, respuesta_de_base
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,8 @@ def endpoint(methods=('GET',), fields=(), cap=None):
                 if cap:
                     s.require_cap(request.user, cap)
                 if request.method == 'GET':
-                    return JsonResponse(func(request, {}, *args, **kwargs))
+                    resultado = func(request, {}, *args, **kwargs)
+                    return resultado if isinstance(resultado, HttpResponse) else JsonResponse(resultado)
                 data = body(request, fields)
                 if not operacion.dentro_de_cuota(request.user, request.path):
                     return failure(429, 'rate-limited')
@@ -72,6 +73,8 @@ def endpoint(methods=('GET',), fields=(), cap=None):
                 return failure(409, 'stale-record')
             except s.FactorRequerido:
                 return failure(403, 'mfa-required')
+            except ReglaDeNegocio as regla:
+                return JsonResponse({'status': 409, 'code': regla.code, 'message': regla.message}, status=409)
             except Http404:
                 return failure(404, 'not-found')
             except (PermissionDenied, ObjectDoesNotExist):

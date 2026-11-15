@@ -15,7 +15,7 @@ from datos.models import Auditoria, ConsultaProducto, GuiaCuidado
 from tests import aceptar_vigentes, cuenta, publicar_textos
 from web.middleware import ActorDeBase
 
-ENDPOINTS_ACTUALIZACION = ['/api/admin/vinculacion', '/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
+ENDPOINTS_ACTUALIZACION = ['/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
 
 
 class BaseWeb(TestCase):

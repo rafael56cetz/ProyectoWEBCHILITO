@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 
 from datos import services as datos
+from datos import administradores as administradores_admin, equipos as equipos_admin, ventas as ventas_admin
 from huerto import services as huerto
 from privacidad import services as privacidad
 from web.api import bounds, endpoint
@@ -105,3 +106,95 @@ def link_device(request):
     except DatabaseError as fallo:
         logger.exception('vinculacion-no-disponible')
         return respuesta_de_base(fallo) or error(503, 'service-unavailable')
+
+
+# Administración: cada vista pide su capacidad (y el segundo factor) en @endpoint; el servicio la vuelve a exigir.
+def _filtro(request, nombre):
+    return request.GET.get(nombre) or None
+
+
+@endpoint(('GET', 'POST'), ('identifier', 'mac', 'firmware'), cap='gestionar_dispositivos')
+def admin_devices(request, data):
+    if request.method == 'POST':
+        return equipos_admin.crear(request.user, data.get('identifier'), data.get('mac'), data.get('firmware'))
+    pagina = bounds(request, allowed=('busqueda', 'estado', 'conexion', 'vendido', 'page'))
+    return equipos_admin.listar(request.user, _filtro(request, 'busqueda'), _filtro(request, 'estado'), _filtro(request, 'conexion'), _filtro(request, 'vendido'), pagina)
+
+
+@endpoint(cap='gestionar_dispositivos')
+def admin_device(request, data, equipo_id):
+    return equipos_admin.detalle(request.user, equipo_id, bounds(request))
+
+
+@endpoint(('POST',), cap='gestionar_dispositivos')
+def admin_device_unlink(request, data, equipo_id):
+    return equipos_admin.desvincular(request.user, equipo_id)
+
+
+@endpoint(('POST',), cap='gestionar_dispositivos')
+def admin_device_rotate(request, data, equipo_id):
+    return equipos_admin.rotar_credencial(request.user, equipo_id)
+
+
+@endpoint(('POST',), cap='gestionar_dispositivos')
+def admin_device_retire(request, data, equipo_id):
+    return equipos_admin.retirar(request.user, equipo_id)
+
+
+@endpoint(cap='gestionar_administradores')
+def admin_admins(request, data):
+    return administradores_admin.listar(request.user, bounds(request))
+
+
+@endpoint(cap='gestionar_administradores')
+def admin_admins_history(request, data):
+    pagina = bounds(request, allowed=('cuenta', 'capacidad', 'desde', 'hasta', 'page'))
+    return administradores_admin.historial(request.user, _filtro(request, 'cuenta'), _filtro(request, 'capacidad'), _filtro(request, 'desde'), _filtro(request, 'hasta'), pagina)
+
+
+@endpoint(cap='gestionar_administradores')
+def admin_admins_activity(request, data):
+    pagina = bounds(request, allowed=('cuenta', 'page'))
+    return administradores_admin.actividad(request.user, _filtro(request, 'cuenta'), pagina)
+
+
+@endpoint(('POST',), ('email', 'capabilities', 'reason'), cap='gestionar_administradores')
+def admin_admins_change(request, data):
+    return administradores_admin.cambiar_capacidades(request.user, data.get('email'), data.get('capabilities'), data.get('reason'))
+
+
+CAMPOS_VENTA = ('device', 'buyer', 'email', 'municipality', 'price', 'received', 'reference', 'method', 'soldAt', 'plannedDelivery', 'note')
+
+
+@endpoint(('GET', 'POST'), CAMPOS_VENTA, cap='gestionar_ventas')
+def admin_sales(request, data):
+    if request.method == 'POST':
+        return ventas_admin.registrar(request.user, data)
+    pagina = bounds(request, allowed=('desde', 'hasta', 'pago', 'entrega', 'municipio', 'busqueda', 'estado', 'page'))
+    return ventas_admin.listar(request.user, *(_filtro(request, nombre) for nombre in ('desde', 'hasta', 'pago', 'entrega', 'municipio', 'busqueda', 'estado')), pagina)
+
+
+@endpoint(cap='gestionar_ventas')
+def admin_sales_summary(request, data):
+    bounds(request, allowed=('desde', 'hasta'))
+    return ventas_admin.resumen(request.user, _filtro(request, 'desde'), _filtro(request, 'hasta'))
+
+
+@endpoint(('POST',), ('received', 'reference'), cap='gestionar_ventas')
+def admin_sale_payment(request, data, venta_id):
+    return ventas_admin.registrar_pago(request.user, venta_id, data.get('received'), data.get('reference'))
+
+
+@endpoint(('POST',), ('deliveredAt',), cap='gestionar_ventas')
+def admin_sale_delivery(request, data, venta_id):
+    return ventas_admin.entregar(request.user, venta_id, data.get('deliveredAt'))
+
+
+@endpoint(('POST',), ('note',), cap='gestionar_ventas')
+def admin_sale_note(request, data, venta_id):
+    return ventas_admin.editar_nota(request.user, venta_id, data.get('note'))
+
+
+@endpoint(('POST',), cap='gestionar_ventas')
+def admin_sale_cancel(request, data, venta_id):
+    return ventas_admin.cancelar(request.user, venta_id)

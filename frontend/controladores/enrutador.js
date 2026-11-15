@@ -20,7 +20,10 @@ const SiteController = (() => {
       const [part, encodedDetail, encodedExtra] = path.split('/');
       let detail, extra;
       try { detail = decodeURIComponent(encodedDetail || ''); extra = decodeURIComponent(encodedExtra || ''); } catch { detail = extra = ''; }
-      if(part==='admin') return {screen:'admin',detail:['flota','soporte','mantenimientos','solicitudes','guias'].includes(detail)?detail:'flota'};
+      if(part==='admin') {
+        const target = AppModel.adminRedirects[detail] || detail;
+        return {screen:'admin',detail:AppModel.adminDestinations.some(item=>item.id==='admin/'+target)?target:'flota',extra};
+      }
       // La pantalla de solicitudes se retiró: el Aviso explica estos derechos y sus medios.
       if(path === 'derechos-arco') { replaceHash('#privacidad'); return {screen:'privacidad'}; }
       if(part === 'cuenta' && detail === 'seguridad') return {screen:'cuenta',detail:'seguridad',invalidSecurity:path.split('/').length !== 2};

@@ -594,3 +594,16 @@ body[data-role=admin] .app-actions .button { white-space:normal; }
 .diagnostic-list { display:grid;gap:8px;margin:0;padding:0;list-style:none; }
 .diagnostic-list li { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px; }
 .deletion-panel h2 { margin-top:0; }
+
+/* Administración: textos legales, consentimientos y diálogos */
+.admin-dialog { width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto; }
+.admin-dialog form { display:grid;gap:10px; }
+.legal-list { display:grid;gap:12px;margin:0;padding:0;list-style:none; }
+.legal-list li { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px; }
+.legal-editor { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start; }
+@media (max-width:900px) { .legal-editor { grid-template-columns:1fr; } }
+.legal-toolbar { display:flex;flex-wrap:wrap;gap:8px; }
+.legal-editor textarea { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-height:320px; }
+.legal-preview { overflow-wrap:anywhere; }
+.consent-figure { font-size:20px; }
+.link-code.is-long { font-size:18px;letter-spacing:.03em;overflow-wrap:anywhere; }

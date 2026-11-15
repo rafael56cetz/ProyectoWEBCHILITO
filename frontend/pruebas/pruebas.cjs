@@ -20,66 +20,87 @@ const cargar = (contexto, ...archivos) => archivos.forEach(a => vm.runInContext(
 const suites = [];
 const suite = (titulo, ejecutar) => suites.push([titulo, ejecutar]);
 
-// ── Comercial: validaciones y borradores, sin red, DOM ni almacenamiento ──────────────────────
-suite('comercial', () => {
-  const forbidden = () => { throw new Error('El modelo comercial no debe consultar red, DOM ni almacenamiento'); };
-  const context = vm.createContext({structuredClone, ChilitoHTTP:{request:forbidden}, fetch:forbidden,
-    get document() { return forbidden(); }, get localStorage() { return forbidden(); }, get sessionStorage() { return forbidden(); }});
-  cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/huerto.js', 'modelos/administracion.js');
-  const model = vm.runInContext('CommerceModel', context), app = vm.runInContext('AppModel', context);
-  let checks = 0;
-  function check(title, run) { run(); checks++; console.log('PASS ' + title); }
-  check('Importes exactos en unidades menores; punto o coma decimal', () => {
-    for(const [raw, expected] of [['0',0],['0.01',1],['0,10',10],['19.99',1999],[' 123,45 ',12345],['999999999.99',99999999999]]) assert.equal(model.amount(raw), expected);
-    assert.equal(model.amount('0.10') + model.amount('0.20'), 30);
-  });
-  check('Rechaza negativos, exponentes, miles, fracciones excesivas y desbordamiento', () => {
-    for(const raw of ['',null,1,'-1','+1','1e3','Infinity','NaN','1,000.00','1.000,00','0.001','0,001','.50','1.','1000000000.00']) assert.equal(model.amount(raw), null, String(raw));
-  });
-  const base = {equipment:'EQ-UNIT-1',email:'persona@example.test',saleDate:'2026-11-10',total:'0.30',received:'0.10',reference:'Referencia declarada',deliveryMode:'domicilio',deliveryDate:'2026-11-11'};
-  check('Saldo de borrador exacto y sin estados persistidos de venta o pago', () => {
-    const result = model.sale(base, '2026-11-11'); assert.equal(Object.keys(result.errors).length, 0); assert.equal(result.data.balanceMinor, 20);
-    for(const key of ['paid','delivered','linked','saleId','saved']) assert.equal(Object.hasOwn(result.data, key), false);
-    assert.equal(Object.keys(model.sale({...base, received:'0.30'}, '2026-11-11').errors).length, 0);
-  });
-  check('Precio positivo, recibido obligatorio y sin sobrepago', () => {
-    for(const [patch, key] of [[{total:'0'},'total'],[{received:''},'received'],[{received:'-0.01'},'received'],[{received:'0.31'},'received']]) assert.ok(model.sale({...base, ...patch}, '2026-11-11').errors[key]);
-    assert.equal(Object.keys(model.sale({...base, received:'0'}, '2026-11-11').errors).length, 0);
-  });
-  check('Fechas reales, bisiestos, venta no futura y entrega no anterior', () => {
-    for(const [patch, key] of [[{saleDate:'2026-02-29'},'saleDate'],[{saleDate:'2026-11-12'},'saleDate'],[{deliveryDate:'2026-04-31'},'deliveryDate'],[{deliveryDate:'2026-11-09'},'deliveryDate']]) assert.ok(model.sale({...base, ...patch}, '2026-11-11').errors[key]);
-    assert.equal(Object.keys(model.sale({...base, saleDate:'2024-02-29', deliveryDate:''}, '2026-11-11').errors).length, 0);
-  });
-  check('Identificador, destinatario, modalidad y referencia validados sin consultar cuentas', () => {
-    for(const [patch, key] of [[{equipment:' '},'equipment'],[{email:'a@'},'email'],[{email:'a b@c.test'},'email'],[{email:'<a>@c.test'},'email'],[{email:'a)b@c.test'},'email'],[{email:'.a@b.test'},'email'],[{email:'a..b@c.test'},'email'],[{email:'a@-b.test'},'email'],[{email:'a\n@b.test'},'email'],[{email:'a'.repeat(255) + '@b.test'},'email'],[{reference:'x'.repeat(121)},'reference'],[{reference:'a\nb'},'reference'],[{deliveryMode:'envio-inventado'},'deliveryMode']]) assert.ok(model.sale({...base, ...patch}, '2026-11-11').errors[key]);
-    assert.equal(Object.keys(model.sale({...base, email:'persona+etiqueta@example.test', deliveryMode:'recogida', reference:''}, '2026-11-11').errors).length, 0);
-  });
-  check('Equipo: no inventa vinculación o conexión; rechaza controles y disponibilidad ajena', () => {
-    const result = model.equipment({identifier:'ESP32:ABC-01', gardenName:'Huerto uno', availability:'disponible'});
-    assert.equal(Object.keys(result.errors).length, 0); assert.equal(Object.hasOwn(result.data, 'connected'), false);
-    for(const [patch, key] of [[{identifier:'a b'},'identifier'],[{gardenName:'\n'},'gardenName'],[{gardenName:'x'.repeat(121)},'gardenName'],[{availability:'conectado'},'availability']]) assert.ok(model.equipment({...result.data, ...patch}).errors[key]);
-  });
-  check('Rangos de filtros y periodos civiles sin conversión UTC del dato escrito', () => {
-    assert.ok(model.period({since:'2026-11-11', until:'2026-11-10'}).until);
-    assert.ok(model.period({since:'2026-02-29', until:''}).since);
-    assert.equal(Object.keys(model.period({since:'2024-02-29', until:'2024-02-29'})).length, 0);
-    const current = model.periodPreset('current'); assert.equal(current.until, model.today()); assert.ok(current.since.endsWith('-01'));
-  });
-  check('Los borradores sobreviven a pestañas; una edición invalida su revisión', () => {
-    const local = model.create(); local.edit('equipment', {identifier:'EQ-UNIT-1', gardenName:'Huerto de prueba', availability:'disponible'}); local.review('equipment');
-    local.select('ventas'); local.edit('sale', {...base, saleDate:model.today(), deliveryDate:''}); local.review('sale');
-    for(const tab of ['resumen','vinculacion','equipos','ventas']) local.select(tab);
-    assert.equal(local.read().equipmentReview.identifier, 'EQ-UNIT-1'); assert.equal(local.read().saleReview.email, base.email);
-    const snapshot = local.read(); snapshot.sale.email = 'alterado@example.test'; assert.equal(local.read().sale.email, base.email);
-    local.edit('sale', {received:'0.20'}); assert.equal(local.read().saleReview, null); assert.ok(local.read().equipmentReview);
-    local.dispose(); assert.equal(local.read().saleReview, null); assert.equal(Object.keys(local.read().sale).length, 0);
-    assert.equal(model.create().read().sale.email, '');
-  });
-  check('Visibilidad provisional solo con capacidad existente; no por is_staff ni por rol', () => {
-    for(const session of [{role:'admin',capabilities:[]},{is_staff:true,is_superuser:true},{capabilities:['ver_flota']},{capabilities:['atender_soporte']}]) assert.ok(!app.allowedAdmin(session).some(x => x.id === 'admin/comercial'));
-    assert.ok(app.allowedAdmin({capabilities:['vincular_huertos']}).some(x => x.id === 'admin/comercial'));
-  });
-  console.log(`PASS comercial: ${checks} grupos, sin operaciones externas.`);
+// ── Administración nueva: inventario, ventas, administradores, legales y consentimientos ─────────
+suite('administración: inventario, ventas, administradores, legales y consentimientos', async () => {
+  const context = vm.createContext({console, crypto:webcrypto, structuredClone, DOMException, AbortController, AbortSignal, Date, Map, Set, Object, Array, JSON, Number, String, RegExp, Error, Intl, encodeURIComponent, decodeURIComponent,
+    URLSearchParams, document:{cookie:'csrftoken=test-csrf'}, window:{dispatchEvent() {}}, Event, fetch:async () => { throw new Error('Sin red en esta prueba'); }});
+  cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/huerto.js', 'modelos/equipos.js', 'modelos/administracion.js',
+    'vistas/comun.js', 'vistas/publico.js', 'vistas/cuenta.js', 'vistas/huerto.js', 'vistas/equipos.js', 'vistas/administracion.js');
+  const run = code => vm.runInContext(code, context);
+  // Menú 2.2: cada destino con su capacidad, agrupado y filtrado; las rutas viejas se redirigen.
+  const menu = capabilities => { context.session = {capabilities}; return JSON.parse(JSON.stringify(run('AppModel.adminMenu(session)'))).map(group => [group.label, group.items.map(item => item.id)]); };
+  assert.deepEqual(menu(['gestionar_ventas', 'ver_flota']), [['Operación', ['admin/flota']], ['Gestión', ['admin/ventas']]]);
+  assert.deepEqual(menu(['gestionar_administradores']), [['Super admin', ['admin/administradores']]]);
+  assert.deepEqual(menu([]), []);
+  assert.equal(run('AppModel.adminDestinations.length'), 10);
+  assert.equal(run('new Set(AppModel.adminDestinations.map(item => item.capability)).size'), 10);
+  assert.equal(run("AppModel.adminRedirects.vinculacion"), 'equipos'); assert.equal(run("AppModel.adminRedirects.comercial"), 'ventas');
+  assert.deepEqual(Array.from(run("AppModel.allowedAdmin({capabilities:['gestionar_dispositivos','gestionar_legales']}).map(item => item.id)")), ['admin/equipos', 'admin/legales']);
+  // Validaciones previas al envío (el servidor y la base vuelven a validar).
+  assert.equal(run("EquipmentModel.validate({identifier:'ESP32-A1B2', mac:'AA:BB:CC:DD:EE:FF', firmware:'1.0.0'})"), null);
+  for(const bad of [{identifier:'ab'}, {identifier:'con espacio'}, {mac:'nada'}, {mac:'AA:BB:CC:DD:EE'}, {firmware:'con espacio'}]) {
+    context.values = {identifier:'ESP32-A1B2', mac:'AA:BB:CC:DD:EE:FF', firmware:'', ...bad};
+    assert.ok(run('EquipmentModel.validate(values)'), JSON.stringify(bad));
+  }
+  for(const [amount, ok] of [['3500', true], ['3500.5', true], ['3500.50', true], ['0.01', true], ['3500.999', false], ['-1', false], ['1e3', false], ['', false], ['mil', false], ['123456789', false]]) assert.equal(run(`SalesModel.amount(${JSON.stringify(amount)})`) !== null, ok, amount);
+  assert.deepEqual({...run("SalesModel.period('all')")}, {desde:'', hasta:''});
+  assert.match(run("SalesModel.period('month').desde"), /^\d{4}-\d{2}-01$/);
+  assert.equal(run("ConsentService.exportUrl({documento:'terminos', cuenta:''})"), '/api/admin/consentimientos/exportar?documento=terminos');
+  // Los identificadores entran en la ruta: solo dígitos o UUID; con otra cosa no se hace ninguna llamada.
+  for(const call of ["EquipmentService.detail('1/../x', 1)", "EquipmentService.rotate('abc')", "SalesService.cancel('x')", "LegalAdminService.detail('no-es-uuid')"]) assert.deepEqual({...await run(call)}, {status:'error', code:'invalid-input'}, call);
+  // Vistas: texto del servidor siempre escapado y paginación visible.
+  context.bad = '<img src=x onerror=alert(1)>';
+  const equipo = {id:'5', identifier:context.bad, mac:'aa:bb:cc:dd:ee:01', state:'vinculado', connection:'en_linea', lastConnectionAt:null, firmware:null, gardenId:'1', garden:context.bad, owner:'a@b.test', sale:{id:'9', buyer:context.bad}};
+  context.equipmentState = {status:'ready', list:{items:[equipo], page:1, total:1, counts:{disponible:0, vinculado:1, retirado:0}}, filters:{busqueda:context.bad}};
+  const inventory = run('EquipmentViews.list(equipmentState)');
+  assert.ok(!inventory.includes('<img src=x') && inventory.includes('Página 1 de 1') && inventory.includes('+ Dar de alta equipo') && inventory.includes('Inventario de equipos'));
+  context.deviceState = {status:'ready', data:{device:{...equipo, registeredAt:'2026-11-08T11:00:00Z', registeredBy:null, retiredAt:null, linkedAt:null, garden:{id:'1', name:context.bad}, sale:null}, events:{items:[{type:'alta', detail:context.bad, actor:null, at:'2026-11-08T11:00:00Z'}], page:1, total:1}, diagnostics:[]}};
+  const detail = run('EquipmentViews.detailScreen(deviceState)');
+  assert.ok(!detail.includes('<img src=x') && detail.includes('Desvincular') && detail.includes('Rotar credencial') && !detail.includes('Retirar equipo'));
+  const credential = run("EquipmentViews.credential('ESP32-1', 'AbC123_secreto-largo-de-prueba-0123456789')");
+  assert.ok(credential.includes('Solo se muestra ahora.') && credential.includes('No se volverá a mostrar.') && credential.includes('copy-code') && !credential.includes('Vence en'));
+  const sale = {id:'3', device:{id:'5', identifier:'ESP32-1'}, buyer:context.bad, email:'x@y.test', accountLinked:true, municipality:'Mérida', price:'3500.00', received:'1000.00', reference:context.bad, payment:'parcial', delivery:'por_entregar',
+    method:'domicilio', plannedDelivery:null, deliveredAt:null, soldAt:'2026-11-08', state:'vigente', cancelledAt:null, note:context.bad};
+  context.salesState = {status:'ready', tab:'ventas', list:{items:[sale], page:1, total:1}, catalog:{municipalities:['Mérida', 'Valladolid'], sellable:[{id:'5', identifier:'ESP32-1'}]}, filters:{busqueda:context.bad}, summary:null, preset:'month'};
+  const salesScreen = run('SalesViews.screen(salesState)');
+  assert.ok(!salesScreen.includes('<img src=x') && salesScreen.includes('Página 1 de 1') && salesScreen.includes('+ Registrar venta') && salesScreen.includes('Parcial'));
+  context.sale = sale;
+  const saleDetail = run('SalesViews.detail(sale)');
+  assert.ok(!saleDetail.includes('<img src=x') && saleDetail.includes('Registrar pago') && saleDetail.includes('Marcar entregada') && saleDetail.includes('Cancelar venta'));
+  assert.ok(!run('SalesViews.detail({...sale, state:"cancelada", cancelledAt:"2026-11-09"})').includes('Cancelar venta'), 'una venta cancelada ya no ofrece acciones');
+  context.salesSummary = {status:'ready', tab:'resumen', list:{items:[], page:1, total:0}, catalog:{municipalities:[], sellable:[]}, filters:{}, preset:'month',
+    summary:{sales:2, sold:'4500.00', collected:'2000.00', pending:'2500.00', byMunicipality:[{municipality:'Mérida', sales:2, sold:'4500.00', collected:'2000.00', pending:'2500.00'}]}};
+  const summary = run('SalesViews.screen(salesSummary)');
+  assert.ok(summary.includes('Por municipio') && !/ganancia/i.test(summary));
+  assert.ok(run('SalesViews.createForm({municipalities:["Mérida"], sellable:[]})').includes('Fecha prevista de entrega'));
+  const admins = {items:[{id:'1', email:'otro@b.test', name:context.bad, superAdmin:false, capabilities:['gestionar_ventas'], secondFactor:true, lastAccess:null}, {id:'2', email:'yo@b.test', name:null, superAdmin:true, capabilities:['gestionar_administradores'], secondFactor:true, lastAccess:null}], page:1, total:2, editable:[]};
+  context.accessState = {status:'ready', tab:'administradores', admins, history:{items:[], page:1, total:0}, activity:{items:[], page:1, total:0}, filters:{}, ownEmail:'yo@b.test'};
+  const accessScreen = run('AdminAccessViews.screen(accessState)');
+  assert.ok(!accessScreen.includes('<img src=x') && accessScreen.includes('Tu cuenta') && accessScreen.includes('Página 1 de 1') && accessScreen.includes('+ Dar acceso a una cuenta'));
+  const accessForm = run("AdminAccessViews.accessForm({})");
+  assert.ok(!accessForm.includes('value="gestionar_administradores"') && accessForm.includes('solo se asigna desde la base de datos') && accessForm.includes('Motivo'));
+  assert.equal(run("AdminAccessViews.confirmation(['gestionar_ventas'], ['ver_flota']).texto"), 'Darás: Ventas. Quitarás: Flota. ¿Continuar?');
+  const draft = {id:'a', type:'terminos', version:'1.1', title:context.bad, state:'borrador', createdAt:'2026-11-08T11:00:00Z', updatedAt:'2026-11-08T11:00:00Z', publishedAt:null, publishedBy:null, sha256:'a'.repeat(64)};
+  context.legalState = {status:'ready', type:'terminos', data:{current:{...draft, id:'b', version:'1.0', state:'publicada', publishedAt:'2026-11-01T11:00:00Z', publishedBy:'a@b.test'}, drafts:[draft], history:[]}};
+  const legalList = run('LegalAdminViews.listScreen(legalState)');
+  assert.ok(!legalList.includes('<img src=x') && legalList.includes('Versión vigente') && legalList.includes('Publicar') && legalList.includes('+ Nueva versión'));
+  context.editorState = {status:'ready', type:'terminos', document:{...draft, content:'<p>' + context.bad + '</p>', html:'<p>servidor</p>'}};
+  const editor = run('LegalAdminViews.editorScreen(editorState)');
+  assert.ok(editor.includes('&lt;img src=x') && !editor.includes('<img src=x') && editor.includes('<p>servidor</p>'), 'el contenido va escapado en el editor; la vista previa es el HTML del servidor');
+  assert.ok(run('LegalAdminViews.confirmations.publish("politica_cookies", "2.0").texto').includes('volver a decidir sobre cookies'));
+  assert.ok(!run('LegalAdminViews.editorScreen({...editorState, document:{...editorState.document, state:"publicada", publishedAt:"2026-11-08T11:00:00Z"}})').includes('Guardar borrador'));
+  context.consentState = {status:'ready', summary:{terms:{version:'1.1', accepted:3, accounts:5}, privacy:{version:'1.1', accepted:3, accounts:5}, statistics:{browsers:2, accepted:1, percent:50}}, filters:{}, exportUrl:'/api/admin/consentimientos/exportar', exportLimit:50000,
+    list:{items:[{id:'7', at:'2026-11-08T11:00:00Z', account:context.bad, scope:'cuenta', what:'Cookies', version:'1.0', decision:'Aceptó', purpose:null, ip:'189.203.45.0', browser:context.bad}], page:1, total:1}};
+  const consent = run('ConsentViews.screen(consentState)');
+  assert.ok(!consent.includes('<img src=x') && consent.includes('Exportar CSV') && consent.includes('3 de 5 cuentas') && consent.includes('50% (1 de 2)') && consent.includes('Página 1 de 1'));
+  assert.ok(run('AdminTableViews.pager({page:2, total:60})').includes('Página 2 de 3'));
+  context.bigConsent = {...context.consentState, list:{...context.consentState.list, total:50001}};
+  assert.ok(run('ConsentViews.screen(bigConsent)').includes('disabled>Exportar CSV'), 'un filtro demasiado grande no ofrece una descarga que fallaría');
+  // Lo viejo ya no existe.
+  const sources = ['modelos', 'vistas', 'controladores'].map(dir => ['administracion', 'equipos'].map(name => read(`${dir}/${name}.js`)).join('\n')).join('\n') + read('index.html');
+  for(const gone of ['Commerce', 'BindingService', 'BindingViews', 'BindingAdminController', 'comercial.css', 'admin/comercial', 'admin/vinculacion']) assert.ok(!sources.includes(gone), gone);
+  assert.ok(!fs.existsSync(path.join(FRONT, 'vistas/estilos/comercial.css')));
+  console.log('PASS administración: menú por grupos, validaciones, rutas seguras, texto escapado y paginación visible');
 });
 
 // ── Fechas civiles y contrato HTTP de los filtros de mantenimientos ───────────────────────────

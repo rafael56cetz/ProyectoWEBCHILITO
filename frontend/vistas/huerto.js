@@ -143,8 +143,9 @@ const GardenViews = (() => {
   }
 
   const progress = step => `<ol class="link-progress" aria-label="Pasos">${['Código', 'Conecta tu equipo', 'Listo'].map((label, index) => `<li${index + 1 === step ? ' aria-current="step"' : ''}>${index + 1}. ${label}</li>`).join('')}</ol>`;
-  const codeBox = (code, seconds) => `<div class="link-code-box"><p class="link-code" aria-label="Tu código de vinculación">${escaparHTML(GardenModel.groupCode(code))}</p>
-    <p class="user-small-copy">Vence en <span data-countdown>${GardenModel.clock(seconds)}</span> · Solo se muestra ahora.</p>${button('copy-code', 'Copiar')}</div>`;
+  // Componente 3.8: el secreto en grande, con «Copiar». Con `seconds` muestra además cuánto falta para que venza.
+  const codeBox = (code, {seconds = null, label = 'Tu código de vinculación'} = {}) => `<div class="link-code-box"><p class="link-code${code.length > 12 ? ' is-long' : ''}" aria-label="${label}">${escaparHTML(GardenModel.groupCode(code))}</p>
+    <p class="user-small-copy">${seconds === null ? '' : `Vence en <span data-countdown>${GardenModel.clock(seconds)}</span> · `}Solo se muestra ahora.</p>${button('copy-code', 'Copiar')}</div>`;
 
   // Asistente 4.3. `wizard.step`: 1 código, 2 conexión, 3 listo; `wizard.code` solo existe mientras se muestra.
   function linkWizard(wizard) {
@@ -154,7 +155,7 @@ const GardenViews = (() => {
     if(step === 1) return `${head}<section class="bento-panel garden-form"><h2>Genera tu código</h2><p>Genera el código que escribirás en tu equipo. Vence en 10 minutos y solo sirve una vez.</p>${button('generate', 'Generar código', 'brand')}<a class="button btn-liquid-light" href="${withGarden('huerto', garden.id)}">Cancelar</a></section>`;
     const waiting = expired ? '<p role="alert">El código venció. Genera otro.</p>'
       : `<p role="status" class="link-waiting">Esperando a tu equipo… (vence en <span data-countdown>${GardenModel.clock(seconds)}</span>)</p>`;
-    return `${head}<section class="bento-panel garden-form">${code ? codeBox(code, seconds) : ''}
+    return `${head}<section class="bento-panel garden-form">${code ? codeBox(code, {seconds}) : ''}
       <ol class="garden-steps"><li>Enchufa tu equipo El Chilito. Si ya lo habías configurado, mantén presionado su botón de configuración hasta que la pantalla lo indique.</li>
       <li>En tu celular o computadora, conéctate a la red Wi-Fi <strong>Huerto-Setup-XXXX</strong> con la contraseña de la etiqueta del equipo.</li>
       <li>Abre <strong>192.168.4.1</strong> en tu navegador.</li><li>Escribe el nombre y la contraseña de tu Wi-Fi y el código que ves arriba.</li><li>Vuelve aquí: veremos cuando tu equipo quede conectado.</li></ol>
@@ -262,7 +263,7 @@ const GardenViews = (() => {
     archivar: name => ({titulo:`¿Archivar ${name}?`, texto:'Dejarás de verlo. Su historial se conserva.', accion:'Archivar huerto', peligro:true})};
 
   return Object.freeze({
-    tag, button, selector, statusLine, loading, noGarden, noDevice, orderTitle, orderStateTag, lineChart, chart,
+    tag, button, selector, statusLine, loading, noGarden, codeBox, noDevice, orderTitle, orderStateTag, lineChart, chart,
     errorText, summary, summaryList, orderCard, newGarden, linkWizard, plantPage, plantDialogs, myGardens, renameDialog, confirmations, failed,
     paint(root, html) { root.innerHTML = html; },
     fillSlot(root, selector, html) { const slot = root.querySelector(selector); if(slot) slot.innerHTML = html; },
@@ -353,7 +354,9 @@ const TechnicalViews = (() => {
 
   const waterConfirmation = (plant, seconds) => ({titulo:`¿Regar ${plant}?`, texto:`Se enviará la orden a tu equipo para regar ${seconds} segundos. Si el depósito no tiene agua, no regará.`, accion:'Regar'});
 
-  return Object.freeze({screen, logPanel, waterConfirmation});
+  const eventLabel = type => EVENTS[type] || type;
+
+  return Object.freeze({screen, logPanel, waterConfirmation, eventLabel});
 })();
 
 const CareViews = (() => {
@@ -484,7 +487,7 @@ const SupportViews = (() => {
       : Date.parse(caso.authorizedUntil) > Date.now() ? `Autorización vigente · vence en ${GardenModel.lapse(caso.authorizedUntil)}` : 'La autorización venció.';
     const orders = data.orders.length ? `<ul class="user-history-list">${data.orders.map(order => `<li><span>${icon('tool')}</span><div><p>${when(order.createdAt)} · ${escaparHTML(orderTitle(order))}</p>${orderStateTag(order.state)}${order.error ? `<small>${escaparHTML(order.error)}</small>` : ''}</div></li>`).join('')}</ul>` : '<p>Soporte todavía no ha hecho nada en tu equipo.</p>';
     return `<section class="bento-panel garden-form" aria-labelledby="support-case-title"><h2 id="support-case-title">Caso ${escaparHTML(caso.folio)} · ${GardenModel.INCIDENTS[caso.incident] || escaparHTML(caso.incident)}</h2>
-      <p>${tag(label, tone)}</p><p>${authorization}</p>${caso.state === 'en_atencion' ? `<p>${escaparHTML(caso.attendedBy || 'Soporte')} está revisando tu equipo.</p>` : ''}
+      <p>${tag(label, tone)}</p><p>${authorization}</p>${caso.state === 'en_atencion' ? `<p>Soporte está revisando tu equipo.</p>` : ''}
       <h3>Lo que soporte ha hecho</h3>${orders}
       <div class="app-actions">${button('revoke', 'Revocar acceso', 'light', `data-danger="true" data-case="${escaparHTML(caso.id)}"${caso.revokedAt ? ' disabled' : ''}`)}${button('cancel-case', 'Cancelar solicitud', 'light', `data-case="${escaparHTML(caso.id)}"`)}</div></section>`;
   }

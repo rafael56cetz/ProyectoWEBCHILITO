@@ -1,5 +1,5 @@
 // VISTA · Común: iconos, escape de HTML, plantilla del panel y calendario de filtros. Va primero entre las vistas.
-// Define: icons, icon, iconEye, iconEyeOff, escaparHTML, mostrarAviso, confirmar, AppViews, DateFilterViews.
+// Define: icons, icon, iconEye, iconEyeOff, escaparHTML, mostrarAviso, confirmar, AppViews, DateFilterViews, AdminTableViews.
 
 // ── Componentes ──
 const icons={leaf:'<path d="M19 4C9 3 3 8 5 15s14 4 14-11Z"/><path d="M4 21 15 9M7 16h6"/>',drop:'<path d="M12 3C9 8 5 11 5 15a7 7 0 0 0 14 0c0-4-4-7-7-12Z"/><path d="M9 15a3 3 0 0 0 3 3"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>',temp:'<path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0Z"/><path d="M12 8v9"/>',bell:'<path d="M5 17h14l-2-4V9a5 5 0 0 0-10 0v4l-2 4Zm5 3h4"/>',user:'<circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',play:'<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/>',arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',wifi:'<path d="M3 8a15 15 0 0 1 18 0M6 12a10 10 0 0 1 12 0m-9 4a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".7"/>',off:'<path d="m3 3 18 18M3 8a15 15 0 0 1 5-2m6-1a15 15 0 0 1 7 3M6 12a10 10 0 0 1 6-2m-3 6a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".7"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',tank:'<path d="M6 5h12l2 4v11H4V9l2-4Zm3 0V2h6v3M4 13h16"/>',check:'<path d="m5 12 4 4L19 6"/>',alert:'<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4m0 3v.5"/>',plus:'<path d="M12 4v16M4 12h16"/>',sparkle:'<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/>',shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3M18.5 4.5l3 3"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>',external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',list:'<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/>',inbox:'<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5l2.5-8Z"/>',refresh:'<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/>'};
@@ -114,7 +114,7 @@ const AppViews = (() => {
   const accountTabs = active => `<nav class="account-tabs" aria-label="Apartados de mi cuenta">${[['perfil','','Perfil'],['huertos','/huertos','Mis huertos'],['seguridad','/seguridad','Seguridad'],['privacidad','/privacidad','Privacidad']].map(([key,path,label])=>`<a class="button ${key===active?'btn-liquid-brand active':'btn-liquid-light'}" href="#cuenta${path}"${key===active?' aria-current="page"':''}>${label}</a>`).join('')}</nav>`;
   const accountGreeting = greeting => greeting?(greeting==='Bienvenido'?greeting:'Hola, '+greeting):'Tu información de acceso.';
   // `nav` lo prepara AppController según la sesión y sus capacidades; la vista solo pinta los enlaces.
-  function shell(route,{isAdmin,links,account}) {
+  function shell(route,{isAdmin,links,groups=[],account}) {
     const selected=route.screen==='admin'?'admin/'+route.detail:route.screen;
     const link=item=>`<a class="button btn-liquid-sidebar" href="#${item.id}"${selected===item.id?' aria-current="page"':''}>${icon(item.icon)}<span>${item.label}</span></a>`;
     const accountLink=`<a class="button compact btn-liquid-nav account-icon-link" href="#cuenta" aria-label="Mi cuenta" title="Mi cuenta">${icon('user')}</a>`;
@@ -126,12 +126,9 @@ const AppViews = (() => {
     const sidebarTop=`<div class="sidebar-top">${brand('#inicio','El Chilito, inicio','sidebar-brand')}</div><a class="sidebar-home" href="#inicio">${icon('home')}<span>Ver página principal</span></a>${isAdmin?'<p class="private-role-label">Administración</p>':''}`;
     // Enlace externo: abre otra pestaña y el panel sigue abierto. Si no hay correo configurado, no se muestra.
     const mailLink=()=>{const url=AppModel.supportMailUrl();return url?`<a class="private-mail-link" href="${escaparHTML(url)}" target="_blank" rel="noopener noreferrer">${icon('mail')}<span>Abrir correo de soporte</span>${icon('external')}<span class="sr-only">(se abre en otra pestaña)</span></a>`:'';};
-    // Grupo «Gestión»: correo de soporte y buzón de consultas (este solo con atender_consultas).
-    const inbox=links.find(item=>item.id==='admin/solicitudes');
-    const guides=links.find(item=>item.id==='admin/guias');
-    const adminGroup=isAdmin?`<p class="private-role-label private-group-label">Gestión</p><div class="private-pending">${mailLink()}${inbox?link(inbox):''}${guides?link(guides):''}</div>`:'';
-    // En administración, el grupo «Gestión» va antes de Mi cuenta, que queda al pie del panel.
-    const navigation=isAdmin?links.filter(item=>item!==account&&item!==inbox&&item!==guides).map(link).join('')+adminGroup+link(account):links.map(link).join('');
+    // Administración: los grupos del menú llegan ya filtrados por capacidad; el correo de soporte va antes de Mi cuenta.
+    const groupHtml=group=>`<p class="private-role-label private-group-label">${escaparHTML(group.label)}</p><div class="private-group">${group.items.map(link).join('')}</div>`;
+    const navigation=isAdmin?groups.map(groupHtml).join('')+mailLink()+link(account):links.map(link).join('');
     // La página principal ya tiene acceso fijo bajo el logotipo, también en móvil.
     const menuFooter=`<div class="private-menu-footer"><button class="button private-menu-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></div>`;
     return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="deletion-banner" class="deletion-banner" data-deletion-banner hidden></div><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
@@ -385,4 +382,35 @@ const DateFilterViews = (() => {
     return {validate,close};
   }
   return Object.freeze({mount});
+})();
+
+// ── Tablas de administración ──
+// Piezas que comparten las pantallas de administración: tabla, paginación visible, pestañas, calendario y diálogo.
+const AdminTableViews = (() => {
+  const PAGE_SIZE = 25;
+  const button = (action, label, kind = 'light', attrs = '') => `<button type="button" class="button btn-liquid-${kind}" data-admin-action="${action}" ${attrs}>${label}</button>`;
+  const table = (label, heads, rows) => `<div class="user-table-scroll" tabindex="0" role="region" aria-label="${label}"><table class="user-table admin-table"><thead><tr>${heads.map(head => `<th scope="col">${head}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  // La paginación siempre se ve, también con una sola página.
+  function pager({page, total}, action = 'page') {
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    return `<nav class="user-pager" aria-label="Páginas">${button(action, 'Anterior', 'light', `data-page="${page - 1}"${page <= 1 ? ' disabled' : ''}`)}<span>Página ${page} de ${pages} · ${total} en total</span>${button(action, 'Siguiente', 'light', `data-page="${page + 1}"${page >= pages ? ' disabled' : ''}`)}</nav>`;
+  }
+  const tabs = (items, active) => `<div class="user-range-control" role="group" aria-label="Apartados">${items.map(([id, label]) => button('tab', label, id === active ? 'brand' : 'light', `data-tab="${id}" aria-pressed="${id === active}"`)).join('')}</div>`;
+  const status = state => state === 'loading' ? AppViews.state('Cargando', 'Consultando la información.', true) : AppViews.state('No pudimos cargar esta pantalla', 'Inténtalo de nuevo.', false, true);
+  const dialog = '<dialog class="bento-panel app-dialog admin-dialog" aria-labelledby="admin-dialog-title"><div data-admin-dialog-content></div></dialog>';
+  const dateField = (name, label) => `<div class="maint-date-control"><label for="admin-${name}">${label}</label>
+    <div class="maint-date-field"><input type="text" name="${name}" id="admin-${name}" placeholder="aaaa-mm-dd" maxlength="10" autocomplete="off" spellcheck="false">
+    <button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div></div>`;
+  const day = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString('es-MX', {dateStyle:'medium'}) : '—';
+  const merida = value => new Date(value).toLocaleString('es-MX', {timeZone:'America/Merida', dateStyle:'medium', timeStyle:'short'});
+  const money = value => new Intl.NumberFormat('es-MX', {style:'currency', currency:'MXN'}).format(Number(value));
+  function open(root, html) {
+    const box = root.querySelector('.admin-dialog');
+    box.querySelector('[data-admin-dialog-content]').innerHTML = html;
+    if(!box.open) box.showModal();
+    box.querySelector('input:not([readonly]),select,textarea,button')?.focus();
+  }
+  function dismiss(root) { const box = root.querySelector('.admin-dialog'); if(box?.open) box.close(); }
+  const paint = (root, html) => { root.innerHTML = html; };
+  return Object.freeze({button, table, pager, tabs, status, dialog, dateField, day, merida, money, open, dismiss, paint});
 })();

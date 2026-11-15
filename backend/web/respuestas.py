@@ -16,11 +16,23 @@ REGLAS_CON_CODIGO = (('Máximo 3 huertos activos', 'huerto-limite', 'Ya tienes 3
                      ('Desvincula el equipo antes de archivar', 'huerto-con-equipo',
                       'Desvincula el equipo antes de archivar este huerto.'),
                      ('Este huerto ya tiene equipo', 'huerto-con-equipo', 'Este huerto ya tiene un equipo vinculado.'),
-                     ('El equipo no está vinculado', 'equipo-no-vinculado', 'Este huerto no tiene un equipo vinculado.'))
+                     ('El equipo no está vinculado', 'equipo-no-vinculado', 'Este huerto no tiene un equipo vinculado.'),
+                     ('La versión debe ser mayor', 'version-no-mayor', 'La versión debe ser mayor que la vigente.'),
+                     ('Nadie puede cambiar sus propias capacidades', 'capacidad-propia', 'No puedes cambiar tus propias capacidades.'),
+                     ('Solo se dan capacidades a cuentas activas', 'cuenta-no-elegible', 'La cuenta debe estar activa y con el correo verificado.'),
+                     ('La cuenta debe tener el correo verificado', 'cuenta-no-elegible', 'La cuenta debe estar activa y con el correo verificado.'))
 
 
 class EntradaInvalida(ValueError):
     pass
+
+
+class ReglaDeNegocio(Exception):
+    """Una regla que la persona puede entender y corregir: responde 409 con un código y un mensaje claros."""
+
+    def __init__(self, code, message):
+        super().__init__(code)
+        self.code, self.message = code, message
 
 
 def error(status, code):

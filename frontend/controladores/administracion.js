@@ -1,5 +1,5 @@
-// CONTROLADOR · Administración: paneles de administración, consultas, comercial y el panel general.
-// Define: AdminController, InquiryController, CommerceController, AppController.
+// CONTROLADOR · Administración: paneles de operación, consultas, ventas, administradores, textos legales, consentimientos y el panel general.
+// Define: AdminController, InquiryController, SalesController, AdminAccessController, LegalAdminController, ConsentController, AppController.
 
 // ── Administracion ──
 const AdminController = (() => {
@@ -116,93 +116,356 @@ const InquiryController = (() => {
   return Object.freeze({mount});
 })();
 
-// ── Comercial ──
-// Coordinación local exclusivamente. No tiene transporte ni acceso al servicio de emisión.
-const CommerceController = (() => {
-  function mount({root,session=AuthService.session}={}) {
-    // Visibilidad provisional; no sustituye autorización del servidor para futuras operaciones.
-    if(!AppModel.allowedAdmin(session).some(item=>item.id==='admin/comercial')) {
-      CommerceViews.unavailable(root);
-      return {dispose(){}};
+// ── Ventas ──
+// Ventas de equipos: lista, resumen y las operaciones sobre cada venta. El servidor valida y confirma.
+const SalesController = (() => {
+  function mount({root, service = SalesService}) {
+    const life = new AbortController();
+    let state = {status:'loading', tab:'ventas', list:{items:[], page:1, total:0}, catalog:{municipalities:[], sellable:[]}, filters:{}, summary:null, preset:'month', period:SalesModel.period('month')};
+    let datesLife = null, dates = null, serial = 0, working = false;
+    function paint() {
+      AdminTableViews.paint(root, SalesViews.screen(state));
+      datesLife?.abort();
+      if(state.status !== 'ready') return;
+      datesLife = new AbortController();
+      dates = DateFilterViews.mount(root, datesLife.signal);
+      if(state.tab === 'resumen') SalesViews.periodDates(root, state.period);
     }
-    const life=new AbortController(), model=CommerceModel.create();
-    const {workspace,tablist,forms}=CommerceViews.mount(root);
-    const calendars=DateFilterViews.mount(workspace,life.signal);
-    function activate(key,focus=false) {
-      calendars.close(false);
-      model.select(key); CommerceViews.activate(root,key);
-      if(focus) CommerceViews.focusTab(root,key);
+    async function loadSales(page = 1) {
+      const result = await service.list(state.filters, page);
+      if(life.signal.aborted) return false;
+      if(result.status !== 'ready') return false;
+      state = {...state, list:{items:result.items, page:result.page, total:result.total}, catalog:{municipalities:result.municipalities, sellable:result.sellable}};
+      return true;
     }
-    function reviewChanged(kind) {
-      CommerceViews.renderReview(root,kind,null);
-      CommerceViews.bindingContext(root,model.read());
+    async function loadSummary() {
+      const result = await service.summary(state.period);
+      if(life.signal.aborted || result.status !== 'ready') return false;
+      state = {...state, summary:result};
+      return true;
     }
-    function edit(event) {
-      const form=event.target.closest('[data-commerce-form]');
-      const kind=form?.dataset.commerceForm;
-      if(kind==='sale' || kind==='equipment') {
-        model.edit(kind,CommerceViews.read(form)); reviewChanged(kind);
-        // Al corregir, retira solo el error de ese campo; los demás siguen visibles.
-        const issues=Object.fromEntries([...form.querySelectorAll('[aria-invalid=true]')]
-          .filter(field=>field!==event.target).map(field=>[field.name,field.validationMessage]));
-        CommerceViews.formErrors(form,issues);
-      } else if(kind==='salesFilter' || kind==='summaryFilter') {
-        if(kind==='summaryFilter' && event.target.name==='preset') {
-          const value=event.target.value;
-          if(value!=='custom') CommerceViews.fill(form,CommerceModel.periodPreset(value||'all'));
-        } else if(kind==='summaryFilter' && ['since','until'].includes(event.target.name)) CommerceViews.customPeriod(form);
-        CommerceViews.formErrors(form,CommerceModel.period(CommerceViews.read(form)));
-        CommerceViews.filterStatus(root,kind,'changed');
-      }
+    async function load(page = 1) {
+      const id = ++serial;
+      const ready = state.tab === 'resumen' ? await loadSummary() : await loadSales(page);
+      if(life.signal.aborted || id !== serial) return;
+      state = {...state, status:ready ? 'ready' : 'error'};
+      paint();
     }
-    root.addEventListener('input',edit,{signal:life.signal});
-    root.addEventListener('change',edit,{signal:life.signal});
-    root.addEventListener('submit',event=>{
-      const form=event.target.closest('[data-commerce-form]');
-      if(!form) return;
+    const fail = result => mostrarAviso('error', SalesViews.errorText(result.code));
+    function openSale(id) {
+      const sale = state.list.items.find(item => item.id === id);
+      if(sale) AdminTableViews.open(root, SalesViews.detail(sale));
+    }
+    async function afterChange(result, message) {
+      if(result.status !== 'accepted') { fail(result); return; }
+      mostrarAviso('exito', message);
+      state = {...state, list:{...state.list, items:state.list.items.map(item => item.id === result.sale.id ? result.sale : item)}};
+      AdminTableViews.open(root, SalesViews.detail(result.sale));
+      await loadSales(state.list.page);
+      paint();
+    }
+    function saleValues(form) {
+      const read = name => form.elements[name].value.trim();
+      const values = {device:read('device'), buyer:read('buyer'), email:read('email'), municipality:read('municipality'), price:read('price'), received:read('received') || '0',
+        reference:read('reference'), method:read('method'), soldAt:read('soldAt'), note:read('note'), ...(read('plannedDelivery') ? {plannedDelivery:read('plannedDelivery')} : {})};
+      return SalesModel.amount(values.price) && SalesModel.amount(values.received) ? values : null;
+    }
+    async function create(form) {
+      const values = saleValues(form);
+      if(!values) { mostrarAviso('error', 'Escribe los importes con hasta 2 decimales, por ejemplo 3500.00.'); return; }
+      const result = await service.create(values);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { fail(result); return; }
+      AdminTableViews.dismiss(root);
+      mostrarAviso('exito', result.sale.accountLinked ? 'Venta registrada. Cuenta encontrada: la venta quedó enlazada.' : 'Venta registrada.');
+      await load(1);
+    }
+    async function filter(form) {
+      const invalid = dates.validate();
+      if(invalid) { mostrarAviso('error', invalid); return; }
+      const values = Object.fromEntries(new FormData(form));
+      state.filters = {busqueda:values.busqueda, desde:values.since, hasta:values.until, pago:values.pago, entrega:values.entrega, municipio:values.municipio};
+      await load(1);
+    }
+    async function period(form) {
+      const invalid = dates.validate();
+      if(invalid) { mostrarAviso('error', invalid); return; }
+      const preset = form.elements.preset.value;
+      state = {...state, preset, period:preset === 'custom' ? {desde:form.elements.since.value.trim(), hasta:form.elements.until.value.trim()} : SalesModel.period(preset)};
+      await load(1);
+    }
+    async function cancel(id) {
+      const sale = state.list.items.find(item => item.id === id);
+      if(!sale || !await confirmar(SalesViews.confirmations.cancel(sale))) return;
+      await afterChange(await service.cancel(id), 'Venta cancelada.');
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, page, tab, id} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'tab') { state = {...state, tab}; await load(1); }
+        else if(action === 'page') await load(Number(page));
+        else if(action === 'clear') { state.filters = {}; SalesViews.resetFilters(root); await load(1); }
+        else if(action === 'create') AdminTableViews.open(root, SalesViews.createForm(state.catalog));
+        else if(action === 'sale') openSale(id);
+        else if(action === 'cancel-sale') await cancel(id);
+        else if(action === 'close-dialog') AdminTableViews.dismiss(root);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
       event.preventDefault();
-      const kind=form.dataset.commerceForm;
-      if(kind==='equipment' || kind==='sale') {
-        model.edit(kind,CommerceViews.read(form));
-        const result=model.review(kind);
-        CommerceViews.formErrors(form,result.errors);
-        CommerceViews.renderReview(root,kind,Object.keys(result.errors).length?null:result.data);
-        CommerceViews.bindingContext(root,model.read());
-        if(Object.keys(result.errors).length) { CommerceViews.focusInvalid(form); return; }
-        calendars.close(false); CommerceViews.focusReview(root,kind);
-      } else {
-        const issues=kind==='inventoryFilter'?{}:CommerceModel.period(CommerceViews.read(form));
-        CommerceViews.formErrors(form,issues);
-        if(Object.keys(issues).length) { CommerceViews.focusInvalid(form); return; }
-        CommerceViews.filterStatus(root,kind,'ready');
-      }
-    },{signal:life.signal});
-    root.addEventListener('click',event=>{
-      const tab=event.target.closest('[data-commerce-tab]');
-      if(tab) { activate(tab.dataset.commerceTab); return; }
-      const editor=event.target.closest('[data-edit]');
-      if(editor) { CommerceViews.focusFirstInput(forms[editor.dataset.edit]); return; }
-      if(event.target.closest('[data-use-equipment]')) {
-        const equipment=model.read().equipmentReview;
-        if(!equipment) return;
-        CommerceViews.setEquipment(forms.sale,equipment.identifier);
-        model.edit('sale',CommerceViews.read(forms.sale)); reviewChanged('sale');
-        CommerceViews.formErrors(forms.sale,{});
-        activate('ventas'); CommerceViews.focusEquipment(forms.sale);
-      }
-    },{signal:life.signal});
-    tablist.addEventListener('keydown',event=>{
-      const tab=event.target.closest('[data-commerce-tab]');
-      if(!tab || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
-      event.preventDefault();
-      const keys=CommerceModel.tabs.map(([key])=>key), current=keys.indexOf(tab.dataset.commerceTab);
-      const index=event.key==='Home'?0:event.key==='End'?keys.length-1:(current+(event.key==='ArrowRight'?1:-1)+keys.length)%keys.length;
-      activate(keys[index],true);
-    },{signal:life.signal});
-    CommerceViews.bindingContext(root,model.read());
-    return {dispose(){life.abort(); model.dispose();}};
+      const form = event.target.closest('[data-admin-form]');
+      if(!form || working) return;
+      const {adminForm: kind, id} = form.dataset;
+      const read = name => form.elements[name]?.value.trim();
+      working = true;
+      try {
+        if(kind === 'sales-filter') await filter(form);
+        else if(kind === 'sales-period') await period(form);
+        else if(kind === 'sale-create') await create(form);
+        else if(kind === 'sale-payment') await afterChange(await service.pay(id, read('received'), read('reference')), 'Pago registrado.');
+        else if(kind === 'sale-delivery') await afterChange(await service.deliver(id, read('deliveredAt')), 'Venta marcada como entregada.');
+        else if(kind === 'sale-note') await afterChange(await service.note(id, read('note')), 'Nota guardada.');
+      } finally { working = false; }
+    }, {signal:life.signal});
+    load(1);
+    return {redraw() {}, dispose() { serial++; datesLife?.abort(); life.abort(); }};
   }
-  return Object.freeze({mount});
+  return {mount};
+})();
+
+// ── Administradores ──
+// Quién puede qué en el panel. La base y el servidor rechazan lo prohibido; aquí solo se arma la petición y se pide confirmación.
+const AdminAccessController = (() => {
+  function mount({root, service = AdminAccessService}) {
+    const life = new AbortController();
+    const ownEmail = (AuthService.session?.profile?.email || '').toLowerCase();
+    const empty = () => ({items:[], page:1, total:0});
+    let state = {status:'loading', tab:'administradores', admins:{...empty(), editable:[]}, history:empty(), activity:empty(), filters:{historial:{}, actividad:{}}, ownEmail};
+    let datesLife = null, dates = null, serial = 0, working = false;
+    function paint() {
+      AdminTableViews.paint(root, AdminAccessViews.screen({...state, filters:state.filters[state.tab] || {}}));
+      datesLife?.abort();
+      if(state.status === 'ready' && state.tab === 'historial') { datesLife = new AbortController(); dates = DateFilterViews.mount(root, datesLife.signal); }
+    }
+    async function fetchTab(page) {
+      const filters = state.filters[state.tab] || {};
+      if(state.tab === 'administradores') return service.list(page);
+      return state.tab === 'historial' ? service.history(filters, page) : service.activity(filters, page);
+    }
+    async function load(page = 1) {
+      const id = ++serial;
+      const result = await fetchTab(page);
+      if(life.signal.aborted || id !== serial) return;
+      if(result.status !== 'ready') { state = {...state, status:'error'}; paint(); return; }
+      const section = state.tab === 'administradores' ? 'admins' : state.tab;
+      state = {...state, status:'ready', [section]:{items:result.items, page:result.page, total:result.total, ...(result.editable ? {editable:result.editable} : {})}};
+      paint();
+    }
+    const currentOf = email => state.admins.items.find(item => item.email.toLowerCase() === email.toLowerCase())?.capabilities.filter(code => code !== 'gestionar_administradores') || [];
+    async function change(form) {
+      const email = form.elements.email.value.trim(), reason = form.elements.reason.value.trim();
+      const wanted = new FormData(form).getAll('capability'), current = currentOf(email);
+      if(!email || !reason) { mostrarAviso('error', 'Escribe el correo y el motivo.'); return; }
+      const granted = wanted.filter(code => !current.includes(code)), revoked = current.filter(code => !wanted.includes(code));
+      if(!granted.length && !revoked.length) { mostrarAviso('error', 'No hay cambios que guardar.'); return; }
+      if(!await confirmar(AdminAccessViews.confirmation(granted, revoked))) return;
+      const result = await service.change(email, wanted, reason);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { mostrarAviso('error', AdminAccessViews.errorText(result.code)); return; }
+      AdminTableViews.dismiss(root);
+      mostrarAviso('exito', 'Capacidades actualizadas.');
+      await load(1);
+    }
+    async function filter(kind, form) {
+      if(kind === 'historial') {
+        const invalid = dates.validate();
+        if(invalid) { mostrarAviso('error', invalid); return; }
+        const values = Object.fromEntries(new FormData(form));
+        state.filters.historial = {cuenta:values.cuenta, capacidad:values.capacidad, desde:values.since, hasta:values.until};
+      } else state.filters.actividad = {cuenta:form.elements.cuenta.value.trim()};
+      await load(1);
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, page, tab, email} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'tab') { state = {...state, tab}; await load(1); }
+        else if(action === 'page') await load(Number(page));
+        else if(action === 'grant') AdminTableViews.open(root, AdminAccessViews.accessForm({}));
+        else if(action === 'edit') AdminTableViews.open(root, AdminAccessViews.accessForm({email, capabilities:currentOf(email), editing:true}));
+        else if(action === 'close-dialog') AdminTableViews.dismiss(root);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.target.closest('[data-admin-form]');
+      if(!form || working) return;
+      working = true;
+      try {
+        if(form.dataset.adminForm === 'access') await change(form);
+        else if(form.dataset.adminForm === 'history-filter') await filter('historial', form);
+        else if(form.dataset.adminForm === 'activity-filter') await filter('actividad', form);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    load(1);
+    return {redraw() {}, dispose() { serial++; datesLife?.abort(); life.abort(); }};
+  }
+  return {mount};
+})();
+
+// ── Legales ──
+// Textos legales: lista por tipo y editor. El HTML que se muestra lo devuelve el servidor ya saneado.
+const LegalAdminController = (() => {
+  const NEW_PREFIX = 'nuevo-';
+  function mount({root, route, service = LegalAdminService}) {
+    const life = new AbortController();
+    const creating = route.extra?.startsWith(NEW_PREFIX), documentId = creating ? '' : route.extra || '';
+    const newType = creating && service.TYPES.includes(route.extra.slice(NEW_PREFIX.length)) ? route.extra.slice(NEW_PREFIX.length) : 'terminos';
+    let state = {status:'loading', type:'terminos', data:null, document:null, preview:null};
+    let serial = 0, working = false;
+    const paint = () => AdminTableViews.paint(root, route.extra ? LegalAdminViews.editorScreen({...state, type:newType}) : LegalAdminViews.listScreen(state));
+    const fail = result => mostrarAviso('error', LegalAdminViews.errorText(result.code));
+    async function load() {
+      const id = ++serial;
+      const result = await (route.extra ? (creating ? Promise.resolve({status:'ready', document:null}) : service.detail(documentId)) : service.byType(state.type));
+      if(life.signal.aborted || id !== serial) return;
+      state = result.status !== 'ready' ? {...state, status:'error'} : route.extra ? {...state, status:'ready', document:result.document} : {...state, status:'ready', data:result};
+      paint();
+    }
+    const fields = form => ({version:form.elements.version.value.trim(), title:form.elements.title.value.trim(), content:form.elements.content.value});
+    async function save(form) {
+      const values = fields(form);
+      const result = await (creating ? service.create({type:newType, ...values}) : service.edit(documentId, {expectedAt:state.document.updatedAt, ...values}));
+      if(life.signal.aborted) return null;
+      if(result.status !== 'accepted') { fail(result); return null; }
+      if(creating) { location.hash = `#admin/legales/${result.document.id}`; return result.document; }
+      state = {...state, document:result.document};
+      LegalAdminViews.showPreview(root, result.document.html);
+      return result.document;
+    }
+    async function previewOf(id) {
+      const result = await service.detail(id);
+      if(life.signal.aborted) return;
+      if(result.status !== 'ready') { fail(result); return; }
+      AdminTableViews.open(root, LegalAdminViews.previewDialog(result.document.html));
+    }
+    async function publish(id, expectedAt, type, version) {
+      if(!await confirmar(LegalAdminViews.confirmations.publish(type, version))) return false;
+      const result = await service.publish(id, expectedAt);
+      if(life.signal.aborted) return false;
+      if(result.status !== 'accepted') { fail(result); return false; }
+      mostrarAviso('exito', `Versión ${version} publicada. Se avisó a ${result.notified} cuentas.`);
+      return true;
+    }
+    async function publishFromEditor(form) {
+      const type = state.document.type, version = form.elements.version.value.trim();
+      if(!await confirmar(LegalAdminViews.confirmations.publish(type, version))) return;
+      const saved = await save(form);
+      if(!saved) return;
+      const result = await service.publish(saved.id, saved.updatedAt);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { fail(result); return; }
+      mostrarAviso('exito', `Versión ${version} publicada. Se avisó a ${result.notified} cuentas.`);
+      location.hash = '#admin/legales';
+    }
+    async function remove(id, expectedAt) {
+      if(!await confirmar(LegalAdminViews.confirmations.remove)) return;
+      const result = await service.remove(id, expectedAt);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { fail(result); return; }
+      mostrarAviso('exito', 'Borrador eliminado.');
+      await load();
+    }
+    async function previewEditor(form) {
+      const result = await service.preview(form.elements.content.value);
+      if(life.signal.aborted) return;
+      if(result.status === 'ready') LegalAdminViews.showPreview(root, result.html); else fail(result);
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, tab, id, at, version} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'tab') { state = {...state, type:tab}; await load(); }
+        else if(action === 'preview') await previewOf(id);
+        else if(action === 'publish' && await publish(id, at, state.type, version)) await load();
+        else if(action === 'remove') await remove(id, at);
+        else if(action === 'tag') LegalAdminViews.insertTag(root, trigger.dataset.tag);
+        else if(action === 'preview-editor') await previewEditor(root.querySelector('[data-admin-form="legal"]'));
+        else if(action === 'publish-editor') await publishFromEditor(root.querySelector('[data-admin-form="legal"]'));
+        else if(action === 'close-dialog') AdminTableViews.dismiss(root);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      if(working || event.target.closest('[data-admin-form]')?.dataset.adminForm !== 'legal') return;
+      working = true;
+      try {
+        if(await save(event.target) && !creating) mostrarAviso('exito', 'Borrador guardado.');
+      } finally { working = false; }
+    }, {signal:life.signal});
+    load();
+    return {redraw() {}, dispose() { serial++; life.abort(); }};
+  }
+  return {mount};
+})();
+
+// ── Consentimientos ──
+// Bitácora de solo lectura con resumen y exportación. La exportación es una descarga del navegador, no una llamada de aquí.
+const ConsentController = (() => {
+  function mount({root, service = ConsentService}) {
+    const life = new AbortController();
+    let state = {status:'loading', summary:null, list:{items:[], page:1, total:0}, filters:{}, exportUrl:service.exportUrl({}), exportLimit:Infinity};
+    let datesLife = null, dates = null, serial = 0, working = false;
+    function paint() {
+      AdminTableViews.paint(root, ConsentViews.screen(state));
+      datesLife?.abort();
+      if(state.status === 'ready') { datesLife = new AbortController(); dates = DateFilterViews.mount(root, datesLife.signal); }
+    }
+    async function load(page = 1) {
+      const id = ++serial;
+      const [list, summary] = await Promise.all([service.list(state.filters, page), state.summary ? Promise.resolve({status:'ready', ...state.summary}) : service.summary()]);
+      if(life.signal.aborted || id !== serial) return;
+      if(list.status !== 'ready' || summary.status !== 'ready') { state = {...state, status:'error'}; paint(); return; }
+      state = {...state, status:'ready', summary, list:{items:list.items, page:list.page, total:list.total}, exportLimit:list.exportLimit, exportUrl:service.exportUrl(state.filters)};
+      paint();
+    }
+    async function filter(form) {
+      const invalid = dates.validate();
+      if(invalid) { mostrarAviso('error', invalid); return; }
+      const values = Object.fromEntries(new FormData(form));
+      state.filters = {documento:values.documento, decision:values.decision, desde:values.since, hasta:values.until, cuenta:values.cuenta.trim(), version:values.version.trim()};
+      await load(1);
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, page, id, account} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'page') await load(Number(page));
+        else if(action === 'clear') { state.filters = {}; ConsentViews.resetFilters(root); await load(1); }
+        else if(action === 'row') AdminTableViews.open(root, ConsentViews.detail(state.list.items.find(item => item.id === id)));
+        else if(action === 'account-history') { AdminTableViews.dismiss(root); state.filters = {cuenta:account}; await load(1); }
+        else if(action === 'close-dialog') AdminTableViews.dismiss(root);
+      } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      if(working || event.target.closest('[data-admin-form]')?.dataset.adminForm !== 'consent-filter') return;
+      working = true;
+      try { await filter(event.target); } finally { working = false; }
+    }, {signal:life.signal});
+    load(1);
+    return {redraw() {}, dispose() { serial++; datesLife?.abort(); life.abort(); }};
+  }
+  return {mount};
 })();
 
 // ── Panel ──
@@ -212,7 +475,7 @@ const AppController = (() => {
     const isAdmin = route.screen==='admin' || session?.role==='admin';
     const account = AppModel.destinations.find(item=>item.id==='cuenta');
     const links = isAdmin ? [...AppModel.allowedAdmin(session), account] : AppModel.destinations.filter(item=>item.id!=='avisos');
-    return {isAdmin, links, account};
+    return {isAdmin, links, groups:isAdmin ? AppModel.adminMenu(session) : [], account};
   }
   // Preferencia de esta visita: no se guarda en el navegador ni en el servidor.
   function mount(route, {root, service = AppService, authService = AuthService, config = AuthConfig, review = false, onLogout} = {}) {
@@ -263,7 +526,10 @@ const AppController = (() => {
       clearTimeout(loadingTimer);
       view.pageBusy(false);
       if(route.screen==='admin') {
-        adminPanel=route.detail==='comercial'?CommerceController.mount({root:page,session:authService.session}):route.detail==='mantenimientos'?MaintenanceController.mount({root:page}):route.detail==='solicitudes'?InquiryController.mount({root:page}):route.detail==='vinculacion'?BindingAdminController.mount({root:page}):route.detail==='guias'?CareGuideAdminController.mount({root:page}):AdminController.mount(route.detail,{root:page});
+        const screens = {mantenimientos:() => MaintenanceController.mount({root:page}), solicitudes:() => InquiryController.mount({root:page}), guias:() => CareGuideAdminController.mount({root:page}),
+          equipos:() => EquipmentController.mount({root:page,route}), ventas:() => SalesController.mount({root:page}), legales:() => LegalAdminController.mount({root:page,route}),
+          consentimientos:() => ConsentController.mount({root:page}), administradores:() => AdminAccessController.mount({root:page})};
+        adminPanel = (screens[route.detail] || (() => AdminController.mount(route.detail,{root:page})))();
         return;
       }
       if(route.screen==='huerto') {

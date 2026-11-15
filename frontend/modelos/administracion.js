@@ -1,5 +1,5 @@
-// MODELO · Administración: paneles de administración, buzón de consultas y gestión comercial.
-// Define: AdminService, InquiryService, CommerceModel.
+// MODELO · Administración: paneles de operación, buzón de consultas, ventas, administradores, textos legales y consentimientos.
+// Define: AdminService, InquiryService, AdminHTTP, SalesModel, SalesService, AdminAccessService, LegalAdminService, ConsentService.
 
 // ── Administracion ──
 // Los datos de administración en memoria solo contienen respuestas autorizadas por Django.
@@ -134,87 +134,87 @@ const InquiryService = (() => {
   });
 })();
 
-// ── Comercial ──
-// Contrato de presentación comercial. Sin red, DOM ni almacenamiento del navegador.
-// Cada montaje posee sus borradores; ninguna revisión acredita un pago o autoriza vincular.
-const CommerceModel = (() => {
-  const availability = Object.freeze({disponible:'Disponible',reservado:'Reservado',no_disponible:'No disponible'});
-  const deliveryModes = Object.freeze({domicilio:'Entrega a domicilio',recogida:'Recogida acordada'});
-  const tabs = Object.freeze([['equipos','Equipos'],['ventas','Ventas y entregas'],['vinculacion','Vinculación'],['resumen','Resumen económico']]);
-  const clean = value => typeof value === 'string' ? value.trim() : '';
-  const printable = value => !/[\u0000-\u001f\u007f-\u009f]/u.test(value);
-  // Unidades menores enteras: no se multiplica una fracción binaria de JavaScript.
-  function amount(raw) {
-    const value = clean(raw);
-    if(!/^\d{1,9}(?:[.,]\d{1,2})?$/.test(value)) return null;
-    const [units,fraction=''] = value.replace(',','.').split('.');
-    return Number(units)*100 + Number(fraction.padEnd(2,'0'));
+// ── Transporte ──
+// Llamadas de las pantallas de administración. El servidor decide con la capacidad y el segundo factor; aquí solo se adapta la respuesta.
+const AdminHTTP = (() => {
+  const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
+  const validUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
+  const query = values => { const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== '' && value != null)); return params.size ? `?${params}` : ''; };
+  async function call(path, {method = 'GET', body, signal} = {}) {
+    if(!path) return {status:'error', code:'invalid-input'};
+    try {
+      const response = await ChilitoHTTP.request(path, {method, body, signal});
+      if(response.http === 401) { ChilitoHTTP.sessionExpired(); return {status:'error', code:'unauthenticated'}; }
+      return response.http === 200 ? response.body : {status:'error', code:response.body?.code || 'unavailable'};
+    } catch { return {status:'error', code:'network'}; }
   }
-  const money = cents => new Intl.NumberFormat('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}).format(cents/100);
-  const today = () => MaintenanceDates.format(MaintenanceDates.today());
-  function identifier(value) {
-    return /^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$/.test(value);
-  }
-  function equipment(raw) {
-    const data = {identifier:clean(raw.identifier),gardenName:clean(raw.gardenName),availability:clean(raw.availability)};
-    const errors = {};
-    if(!identifier(data.identifier)) errors.identifier = 'Usa de 3 a 80 caracteres: letras, números, punto, guion, dos puntos o guion bajo; empieza por letra o número.';
-    if(!data.gardenName || [...data.gardenName].length > 120 || !printable(data.gardenName)) errors.gardenName = 'Escribe un nombre de huerto de 1 a 120 caracteres, sin saltos de línea ni controles.';
-    if(!Object.hasOwn(availability,data.availability)) errors.availability = 'Elige la disponibilidad propuesta.';
-    return {data,errors};
-  }
-  function sale(raw, currentDay=today()) {
-    const data = Object.fromEntries(['equipment','email','saleDate','total','received','reference','deliveryMode','deliveryDate'].map(key=>[key,clean(raw[key])]));
-    const errors = {};
-    if(!identifier(data.equipment)) errors.equipment = 'Escribe el identificador del equipo (3 a 80 caracteres, sin espacios).';
-    if(!hasEmailFormat(data.email) || !/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+$/i.test(data.email.split('@')[0]) || !printable(data.email)) errors.email = 'Escribe un correo válido. Su cuenta y verificación se comprobarán en el servidor.';
-    if(!MaintenanceDates.parse(data.saleDate)) errors.saleDate = 'Escribe una fecha de venta válida con formato AAAA-MM-DD.';
-    else if(data.saleDate > currentDay) errors.saleDate = 'La fecha de venta no puede ser posterior a hoy.';
-    data.totalMinor = amount(data.total); data.receivedMinor = amount(data.received);
-    if(data.totalMinor === null || data.totalMinor <= 0) errors.total = 'El precio debe ser mayor que cero, sin miles y con hasta dos decimales (máximo 999999999.99).';
-    if(data.receivedMinor === null) errors.received = 'Escribe un importe desde cero, sin miles y con hasta dos decimales (máximo 999999999.99).';
-    else if(data.totalMinor !== null && data.receivedMinor > data.totalMinor) errors.received = 'El importe recibido declarado no puede superar el precio total.';
-    if([...data.reference].length > 120 || !printable(data.reference)) errors.reference = 'Usa hasta 120 caracteres, sin saltos de línea ni controles.';
-    if(!Object.hasOwn(deliveryModes,data.deliveryMode)) errors.deliveryMode = 'Elige entrega a domicilio o recogida acordada.';
-    if(data.deliveryDate && !MaintenanceDates.parse(data.deliveryDate)) errors.deliveryDate = 'Escribe una fecha de entrega válida con formato AAAA-MM-DD o déjala por acordar.';
-    else if(data.deliveryDate && MaintenanceDates.parse(data.saleDate) && data.deliveryDate < data.saleDate) errors.deliveryDate = 'La fecha de entrega prevista no puede ser anterior a la venta.';
-    if(!Object.keys(errors).length) data.balanceMinor = data.totalMinor-data.receivedMinor;
-    return {data,errors};
-  }
-  function period(raw) {
-    const errors = {};
-    for(const key of ['since','until']) if(raw[key] && !MaintenanceDates.parse(raw[key])) errors[key] = 'Escribe una fecha válida con formato AAAA-MM-DD.';
-    if(!errors.since && !errors.until && raw.since && raw.until && raw.until < raw.since) errors.until = 'Hasta debe ser igual o posterior a Desde.';
-    return errors;
-  }
-  function periodPreset(value) {
-    if(value === 'all') return {since:'',until:''};
-    const now = MaintenanceDates.today();
-    const start = MaintenanceDates.make(now.getUTCFullYear(),now.getUTCMonth()-(value === 'previous' ? 1 : 0),1);
-    const end = value === 'previous' ? MaintenanceDates.shift(MaintenanceDates.make(now.getUTCFullYear(),now.getUTCMonth(),1),-1) : now;
-    return {since:MaintenanceDates.format(start),until:MaintenanceDates.format(end)};
-  }
-  function create() {
-    let state = {
-      tab:'equipos',equipment:{identifier:'',gardenName:'',availability:''},
-      sale:{equipment:'',email:'',saleDate:'',total:'',received:'',reference:'',deliveryMode:'',deliveryDate:''},
-      equipmentReview:null,saleReview:null
-    };
-    return Object.freeze({
-      read:()=>structuredClone(state),
-      select(tab) { if(tabs.some(([key])=>key===tab)) state.tab=tab; },
-      edit(kind, values) {
-        if(!['equipment','sale'].includes(kind)) return;
-        for(const key of Object.keys(state[kind])) if(Object.hasOwn(values,key)) state[kind][key]=String(values[key]);
-        state[kind+'Review']=null;
-      },
-      review(kind) {
-        const result = kind === 'equipment' ? equipment(state.equipment) : sale(state.sale);
-        state[kind+'Review'] = Object.keys(result.errors).length ? null : result.data;
-        return result;
-      },
-      dispose() { state={tab:'equipos',equipment:{},sale:{},equipmentReview:null,saleReview:null}; }
-    });
-  }
-  return Object.freeze({tabs,availability,deliveryModes,amount,money,today,equipment,sale,period,periodPreset,create});
+  return Object.freeze({validId, validUuid, query, call});
+})();
+
+// ── Ventas ──
+// Ventas de equipos. Los importes viajan como texto («3500.00»): el servidor valida y la base calcula el estado del pago.
+const SalesModel = Object.freeze({
+  // Periodos del resumen: «Este mes», «Mes anterior» y «Todo»; el personalizado usa las fechas escritas.
+  period(preset) {
+    const today = MaintenanceDates.today(), first = MaintenanceDates.make(today.getUTCFullYear(), today.getUTCMonth(), 1);
+    if(preset === 'month') return {desde:MaintenanceDates.format(first), hasta:MaintenanceDates.format(today)};
+    if(preset === 'previous') {
+      const start = MaintenanceDates.make(today.getUTCFullYear(), today.getUTCMonth() - 1, 1), end = MaintenanceDates.make(today.getUTCFullYear(), today.getUTCMonth(), 0);
+      return {desde:MaintenanceDates.format(start), hasta:MaintenanceDates.format(end)};
+    }
+    return {desde:'', hasta:''};
+  },
+  amount: value => /^\d{1,8}(\.\d{1,2})?$/.test(String(value).trim()) ? String(value).trim() : null
+});
+
+const SalesService = (() => {
+  const base = '/api/admin/ventas';
+  const sale = (id, rest) => AdminHTTP.validId(id) ? `${base}/${id}/${rest}` : null;
+  return Object.freeze({
+    list: (filters, page) => AdminHTTP.call(base + AdminHTTP.query({...filters, page})),
+    summary: filters => AdminHTTP.call(`${base}/resumen${AdminHTTP.query(filters)}`),
+    create: values => AdminHTTP.call(base, {method:'POST', body:values}),
+    pay: (id, received, reference) => AdminHTTP.call(sale(id, 'pago'), {method:'POST', body:{received, reference}}),
+    deliver: (id, deliveredAt) => AdminHTTP.call(sale(id, 'entrega'), {method:'POST', body:{deliveredAt}}),
+    note: (id, note) => AdminHTTP.call(sale(id, 'nota'), {method:'POST', body:{note}}),
+    cancel: id => AdminHTTP.call(sale(id, 'cancelar'), {method:'POST', body:{}})
+  });
+})();
+
+// ── Administradores ──
+const AdminAccessService = (() => {
+  const base = '/api/admin/administradores';
+  return Object.freeze({
+    list: page => AdminHTTP.call(base + AdminHTTP.query({page})),
+    history: (filters, page) => AdminHTTP.call(`${base}/historial${AdminHTTP.query({...filters, page})}`),
+    activity: (filters, page) => AdminHTTP.call(`${base}/actividad${AdminHTTP.query({...filters, page})}`),
+    change: (email, capabilities, reason) => AdminHTTP.call(`${base}/cuenta`, {method:'POST', body:{email, capabilities, reason}})
+  });
+})();
+
+// ── Legales ──
+const LegalAdminService = (() => {
+  const base = '/api/admin/legales';
+  const document = (id, rest = '') => AdminHTTP.validUuid(id) ? `${base}/${id}${rest}` : null;
+  return Object.freeze({
+    TYPES: ['terminos', 'aviso_privacidad', 'politica_cookies'],
+    byType: type => AdminHTTP.call(base + AdminHTTP.query({tipo:type})),
+    detail: id => AdminHTTP.call(document(id)),
+    create: values => AdminHTTP.call(base, {method:'POST', body:values}),
+    edit: (id, values) => AdminHTTP.call(document(id, '/editar'), {method:'POST', body:values}),
+    remove: (id, expectedAt) => AdminHTTP.call(document(id, '/eliminar'), {method:'POST', body:{expectedAt}}),
+    publish: (id, expectedAt) => AdminHTTP.call(document(id, '/publicar'), {method:'POST', body:{expectedAt}}),
+    preview: content => AdminHTTP.call(`${base}/vista-previa`, {method:'POST', body:{content}})
+  });
+})();
+
+// ── Consentimientos ──
+const ConsentService = (() => {
+  const base = '/api/admin/consentimientos';
+  return Object.freeze({
+    list: (filters, page) => AdminHTTP.call(base + AdminHTTP.query({...filters, page})),
+    summary: () => AdminHTTP.call(`${base}/resumen`),
+    // La exportación es una descarga del navegador, no una llamada: aquí solo se arma su dirección.
+    exportUrl: filters => `${base}/exportar${AdminHTTP.query(filters)}`
+  });
 })();

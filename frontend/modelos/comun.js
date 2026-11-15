@@ -65,15 +65,29 @@ const AppModel = (() => {
     {id:'avisos',label:'Avisos',icon:'bell'},
     {id:'cuenta',label:'Mi cuenta',icon:'user'}
   ];
-  const adminDestinations = [
-    {id:'admin/flota',label:'Telemetría de flota',icon:'grid'},
-    {id:'admin/soporte',label:'Consola remota',icon:'support'},
-    {id:'admin/mantenimientos',label:'Mantenimientos',icon:'tool'},
-    {id:'admin/solicitudes',label:'Solicitudes del producto',icon:'inbox'},
-    {id:'admin/guias',label:'Guías de cuidado',icon:'list'}
+  // Destinos de administración por grupo (plan 2.2). Cada uno se ve solo con su capacidad; el servidor la vuelve a exigir en cada endpoint.
+  const adminGroups = [
+    {label:'Operación', items:[
+      {id:'admin/flota',label:'Telemetría de flota',icon:'grid',capability:'ver_flota'},
+      {id:'admin/soporte',label:'Consola remota',icon:'support',capability:'atender_soporte'},
+      {id:'admin/mantenimientos',label:'Mantenimientos',icon:'tool',capability:'gestionar_mantenimientos'}]},
+    {label:'Gestión', items:[
+      {id:'admin/solicitudes',label:'Solicitudes del producto',icon:'inbox',capability:'atender_consultas'},
+      {id:'admin/equipos',label:'Inventario de equipos',icon:'wifi',capability:'gestionar_dispositivos'},
+      {id:'admin/ventas',label:'Ventas',icon:'leaf',capability:'gestionar_ventas'},
+      {id:'admin/guias',label:'Guías de cuidado',icon:'list',capability:'gestionar_guias'}]},
+    {label:'Legal', items:[
+      {id:'admin/legales',label:'Textos legales',icon:'shield',capability:'gestionar_legales'},
+      {id:'admin/consentimientos',label:'Bitácora de consentimientos',icon:'check',capability:'ver_consentimientos'}]},
+    {label:'Super admin', items:[
+      {id:'admin/administradores',label:'Administradores',icon:'key',capability:'gestionar_administradores'}]}
   ];
-  const adminCapabilities={'admin/flota':'ver_flota','admin/soporte':'atender_soporte','admin/mantenimientos':'gestionar_mantenimientos','admin/solicitudes':'atender_consultas','admin/guias':'gestionar_guias'};
-  const allowedAdmin=(session=AuthService.session)=>adminDestinations.filter(item=>(session.capabilities||[]).includes(adminCapabilities[item.id]));
+  const adminDestinations = adminGroups.flatMap(group=>group.items);
+  const adminCapabilities = Object.fromEntries(adminDestinations.map(item=>[item.id,item.capability]));
+  const allowedAdmin=(session=AuthService.session)=>adminDestinations.filter(item=>(session.capabilities||[]).includes(item.capability));
+  const adminMenu=session=>adminGroups.map(group=>({label:group.label,items:group.items.filter(item=>(session?.capabilities||[]).includes(item.capability))})).filter(group=>group.items.length);
+  // Rutas que cambiaron de nombre: la vinculación de huertos pasó al inventario y la maqueta comercial, a Ventas.
+  const adminRedirects = {vinculacion:'equipos',comercial:'ventas'};
   // Gmail en otra pestaña con la cuenta de soporte seleccionada. Sin API ni credenciales: Gmail autentica por su cuenta.
   const supportMailUrl=()=>{const contact=ChilitoHTTP.configuration?.supportContact;
     return typeof contact==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)?'https://mail.google.com/mail/?authuser='+encodeURIComponent(contact):null;};
@@ -110,7 +124,7 @@ const AppModel = (() => {
   // Fecha en que se borrará la cuenta, si la persona la pidió (la fija el servidor).
   const deletionDate = session => dateValid(session?.profile?.deletionDate) ? session.profile.deletionDate : null;
   return {
-    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminHome,panelHome,alias,addressed,gardenGreeting,notices,notice,idValid,deletionDate,NOTICE_FILTERS,
+    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminMenu,adminRedirects,adminHome,panelHome,alias,addressed,gardenGreeting,notices,notice,idValid,deletionDate,NOTICE_FILTERS,
     isPrivate(screen) { return screen === 'admin' || destinations.some(item=>item.id===screen); },
     profile(data={}) { return data.status==='ready' && text(data.email) && data.verified===true
       ? {email:data.email,verified:true,status:'ready',firstName:(data.profile||data).firstName||'',lastName:(data.profile||data).lastName||'',alias:(data.profile||data).alias||'',greeting:(data.profile||data).greeting||''} : {email:null,verified:null,status:'error'}; },

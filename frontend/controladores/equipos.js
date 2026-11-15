@@ -1,96 +1,76 @@
-// CONTROLADOR · Equipos: emisión de códigos de vinculación por el operador.
-// Define: BindingAdminController.
+// CONTROLADOR · Equipos: inventario de equipos (lista, alta, detalle y acciones). El servidor confirma; aquí nunca se supone un éxito.
+// Define: EquipmentController.
 
-// ── Vinculacion ──
-// Vinculación de huertos: eventos y coordinación. El servidor confirma; aquí nunca se supone un éxito.
-const BindingAdminController = (() => {
-  const messages = {forbidden:'Tu cuenta no tiene la capacidad para vincular huertos.', stale:'Ese código ya estaba cerrado. Se actualizó la lista.',
-    busy:'Demasiadas operaciones seguidas. Espera un momento.', invalid:'Revisa los datos del formulario.',
-    network:'No se pudo comunicar con el servidor. Inténtalo de nuevo.'};
-  function mount({root, service = BindingService, mfa = MfaService} = {}) {
+// ── Inventario ──
+const EquipmentController = (() => {
+  function mount({root, route, service = EquipmentService}) {
     const life = new AbortController();
-    const view = BindingViews.mountAdmin(root);
-    const {form, dialog, totpForm} = view, say = view.say;
-    let busy = false, waiting = null;
-    async function load() {
-      const result = await service.panel();
+    const detailId = route.extra || '';
+    let state = {status:'loading', list:{items:[], page:1, total:0, counts:{disponible:0, vinculado:0, retirado:0}}, filters:{}, data:null};
+    let serial = 0, working = false, secret = null;
+    const paint = () => EquipmentViews.paint(root, detailId ? EquipmentViews.detailScreen(state) : EquipmentViews.list(state));
+    async function load(page = 1) {
+      const id = ++serial;
+      const result = await (detailId ? service.detail(detailId, page) : service.list(state.filters, page));
+      if(life.signal.aborted || id !== serial) return;
+      if(result.status !== 'ready') { state = {...state, status:'error'}; paint(); return; }
+      state = detailId ? {...state, status:'ready', data:result} : {...state, status:'ready', list:{items:result.items, page:result.page, total:result.total, counts:result.counts}};
+      paint();
+    }
+    const fail = result => mostrarAviso('error', EquipmentViews.errorText(result.code));
+    async function create(form) {
+      const values = {identifier:form.elements.identifier.value.trim(), mac:form.elements.mac.value.trim(), firmware:form.elements.firmware.value.trim()};
+      const invalid = EquipmentModel.validate(values);
+      if(invalid) { mostrarAviso('error', invalid.message); return; }
+      const result = await service.create(values);
       if(life.signal.aborted) return;
-      if(result.status !== 'ready') { say(messages[result.status] || 'No se pudo consultar la vinculación.', true); return; }
-      view.panel(result, service);
+      if(result.status !== 'accepted') { fail(result); return; }
+      secret = result.credential;
+      EquipmentViews.openDialog(root, EquipmentViews.credential(values.identifier, secret));
     }
-    // Una operación sensible: si falta la confirmación reciente del segundo factor, se pide y se repite.
-    async function sensitive(action, done) {
-      const result = await action();
+    async function act(kind) {
+      const device = state.data.device;
+      if(!await confirmar(EquipmentViews.confirmations[kind](device.identifier))) return;
+      const result = await service[kind](device.id);
       if(life.signal.aborted) return;
-      if(result.status === 'reauthenticate') {
-        waiting = {action, done};
-        view.askReauth();
-        return;
-      }
-      await done(result);
+      if(result.status !== 'accepted') { fail(result); return; }
+      if(kind === 'rotate') { secret = result.credential; EquipmentViews.openDialog(root, EquipmentViews.credential(device.identifier, secret)); return; }
+      mostrarAviso('exito', kind === 'unlink' ? 'Equipo desvinculado.' : 'Equipo retirado.');
+      await load(1);
     }
-    async function confirmed(outcome) {
-      if(outcome.status !== 'ok') { view.reauthFailed(outcome.status); return; }
-      view.closeReauth();
-      const next = waiting; waiting = null;
-      if(next) await sensitive(next.action, next.done);
+    async function copy() {
+      try { await navigator.clipboard.writeText(secret); mostrarAviso('exito', 'Credencial copiada.'); }
+      catch { mostrarAviso('error', 'No se pudo copiar. Selecciónala y cópiala a mano.'); }
     }
-    async function issued(result) {
-      busy = false; view.issuing(false);
-      if(result.status === 'issued') {
-        view.issued(result, service);
-        say(result.code ? 'Código emitido. Díctalo o cópialo ahora: no se volverá a mostrar.' : 'Código emitido para envío por correo.');
-        await load();
-        view.focusCode();
-        return;
-      }
-      if(result.status === 'refused') { say(service.refusals[result.reason] || 'No se puede emitir el código.', true); return; }
-      say(messages[result.status] || 'No se pudo emitir el código.', true);
-    }
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      if(busy) return;
-      const garden = form.elements.garden.value, email = form.elements.email.value.trim(), delivery = form.elements.delivery.value;
-      if(!garden || !email) { say('Elige un huerto y escribe el correo de la cuenta.', true); return; }
-      busy = true; view.issuing(true);
-      await sensitive(() => service.issue(garden, email, delivery), issued);
-      if(waiting) { busy = false; view.issuing(false); }
-    }, {signal:life.signal});
     root.addEventListener('click', async event => {
-      const copy = event.target.closest('[data-binding-copy]');
-      if(copy) {
-        try { await navigator.clipboard.writeText(view.codeText()); say('Código copiado.'); }
-        catch { say('No se pudo copiar. Selecciona el código y cópialo a mano.', true); }
-        return;
-      }
-      const revoke = event.target.closest('[data-binding-revoke]');
-      if(revoke && !busy) {
-        busy = true; view.revoking(revoke, true);
-        await sensitive(() => service.revoke(revoke.dataset.bindingRevoke), async result => {
-          say(result.status === 'revoked' ? 'Código revocado.' : (messages[result.status] || 'No se pudo revocar.'), result.status !== 'revoked');
-          await load();
-        });
-        busy = false; view.revoking(revoke, false);
-      }
+      if(event.target.closest('[data-garden-action="copy-code"]')) { await copy(); return; }
+      const trigger = event.target.closest('[data-admin-action]');
+      if(!trigger || working) return;
+      const {adminAction: action, page} = trigger.dataset;
+      working = true;
+      try {
+        if(action === 'page') await load(Number(page));
+        else if(action === 'clear') { state.filters = {}; EquipmentViews.resetFilters(root); await load(1); }
+        else if(action === 'create') EquipmentViews.openDialog(root, EquipmentViews.createForm());
+        else if(action === 'close-dialog') EquipmentViews.closeDialog(root);
+        else if(action === 'close-credential') EquipmentViews.closeDialog(root);
+        else if(['unlink', 'rotate', 'retire'].includes(action)) await act(action);
+      } finally { working = false; }
     }, {signal:life.signal});
-    totpForm.addEventListener('submit', async event => {
+    root.addEventListener('submit', async event => {
       event.preventDefault();
-      const code = totpForm.elements.code.value.trim();
-      if(!/^[0-9]{6}$/.test(code)) { view.reauthFailed('format'); return; }
-      await confirmed(await mfa.reauthenticateCode(code));
+      const kind = event.target.closest('[data-admin-form]')?.dataset.adminForm;
+      if(working) return;
+      working = true;
+      try {
+        if(kind === 'equipment-filter') { state.filters = Object.fromEntries(new FormData(event.target)); await load(1); }
+        else if(kind === 'equipment-create') await create(event.target);
+      } finally { working = false; }
     }, {signal:life.signal});
-    view.passkeyButton.addEventListener('click', async () => {
-      if(!WebAuthnBrowser.supported()) { await confirmed({status:'unsupported'}); return; }
-      const options = await mfa.webauthnReauthOptions();
-      if(options.status !== 'ok' || !options.data?.request_options) { await confirmed({status:'unavailable'}); return; }
-      try { await confirmed(await mfa.webauthnReauthenticate(await WebAuthnBrowser.get(options.data.request_options))); }
-      catch { await confirmed({status:'cancelled'}); }
-    }, {signal:life.signal});
-    const cancel = () => { waiting = null; view.closeReauth(); say('Operación cancelada: no se emitió ni revocó nada.'); };
-    view.cancelButton.addEventListener('click', cancel, {signal:life.signal});
-    dialog.addEventListener('cancel', event => { event.preventDefault(); cancel(); }, {signal:life.signal});
-    load();
-    return {dispose() { life.abort(); view.closeReauth(); }};
+    // Al cerrarse el diálogo de la credencial (también con Esc) el secreto se olvida y se vuelve a leer el inventario.
+    root.addEventListener('close', () => { if(secret) { secret = null; load(1); } }, {capture:true, signal:life.signal});
+    load(1);
+    return {redraw() {}, dispose() { secret = null; serial++; life.abort(); }};
   }
-  return Object.freeze({mount});
+  return {mount};
 })();

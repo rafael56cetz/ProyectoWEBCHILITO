@@ -1,5 +1,5 @@
-// VISTA · Administración: paneles de administración, buzón de consultas y gestión comercial.
-// Define: AdminViews, InquiryViews, CommerceViews.
+// VISTA · Administración: paneles de operación, buzón de consultas, ventas, administradores, textos legales y consentimientos.
+// Define: AdminViews, InquiryViews, SalesViews, AdminAccessViews, LegalAdminViews, ConsentViews.
 
 // ── Administracion ──
 const AdminViews = (() => {
@@ -176,142 +176,266 @@ const InquiryViews = (() => {
   return Object.freeze({shell, item, mount});
 })();
 
-// ── Comercial ──
-// Vistas comerciales: markup fijo y datos variables por textContent/value. Sin red.
-const CommerceViews = (() => {
-  const el = (tag, props={}, ...children) => { const node=Object.assign(document.createElement(tag),props); node.append(...children); return node; };
-  const hint = (id,text) => `<p class="commerce-hint" id="${id}">${text}</p>`;
-  const field = (kind,name,label,attrs='',help='') => {
-    const id=`commerce-${kind}-${name}`;
-    return `<div class="commerce-field"><label for="${id}">${label}</label><input id="${id}" name="${name}" ${attrs} aria-describedby="${id}-error${help?' '+id+'-help':''}">${help?hint(id+'-help',help):''}<span class="commerce-error" id="${id}-error" data-error="${name}" hidden></span></div>`;
-  };
-  function select(kind,name,label,entries,blank='Todos') {
-    const id=`commerce-${kind}-${name}`;
-    return `<div class="commerce-field"><label for="${id}">${label}</label><select id="${id}" name="${name}" aria-describedby="${id}-error"><option value="">${blank}</option>${Object.entries(entries).map(([key,text])=>`<option value="${key}">${escaparHTML(text)}</option>`).join('')}</select><span class="commerce-error" id="${id}-error" data-error="${name}" hidden></span></div>`;
+// ── Ventas ──
+// Ventas de equipos (5.6). Los importes y fechas llegan del servidor como texto; todo se escapa.
+const SalesViews = (() => {
+  const T = AdminTableViews;
+  const {tag} = GardenViews;
+  const PAYMENTS = {pendiente:['Pendiente', 'rojo'], parcial:['Parcial', 'ambar'], completo:['Completo', 'verde']};
+  const METHODS = {domicilio:'Entrega a domicilio', recogida:'Recogida acordada'};
+  const ERRORS = {'equipo-vendido':'Ese equipo ya tiene una venta vigente.', 'importe-no-valido':'El importe recibido no puede bajar ni superar el precio.', 'venta-cancelada':'Esta venta está cancelada y ya no cambia.',
+    'venta-entregada':'Esta venta ya se marcó como entregada.', 'fecha-no-valida':'La entrega debe caer entre la fecha de venta y hoy.'};
+  const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
+  const options = (items, selected = '') => items.map(([value, label]) => `<option value="${escaparHTML(value)}"${value === selected ? ' selected' : ''}>${escaparHTML(label)}</option>`).join('');
+  const today = () => MaintenanceDates.format(MaintenanceDates.today());
+
+  function filters(values, municipalities) {
+    return `<form class="care-filters" data-admin-form="sales-filter" novalidate>
+      <div><label for="sale-search">Buscar</label><input id="sale-search" name="busqueda" type="search" maxlength="60" placeholder="Comprador, correo o equipo" value="${escaparHTML(values.busqueda || '')}"></div>
+      ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}
+      <div><label for="sale-payment">Pago</label><select id="sale-payment" name="pago">${options([['', 'Todos'], ...Object.entries(PAYMENTS).map(([value, [label]]) => [value, label])], values.pago)}</select></div>
+      <div><label for="sale-delivery">Entrega</label><select id="sale-delivery" name="entrega">${options([['', 'Todas'], ['por_entregar', 'Por entregar'], ['entregada', 'Entregada']], values.entrega)}</select></div>
+      <div><label for="sale-municipality">Municipio</label><select id="sale-municipality" name="municipio">${options([['', 'Todos'], ...municipalities.map(name => [name, name])], values.municipio)}</select></div>
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${T.button('clear', 'Limpiar')}</div></form>`;
   }
-  function dateField(kind,name,label,required=false) {
-    const id=`commerce-${kind}-${name}`;
-    return `<div class="commerce-field maint-date-control"><label for="${id}">${label}</label><div class="maint-date-field"><input id="${id}" type="text" name="${name}" placeholder="AAAA-MM-DD" maxlength="10" autocomplete="off" spellcheck="false" ${required?'required':''} aria-describedby="commerce-date-help ${id}-error"><button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-haspopup="dialog" aria-expanded="false">${icon('calendar')}</button></div><span class="commerce-error" id="${id}-error" data-error="${name}" hidden></span></div>`;
+
+  function row(sale) {
+    const delivery = sale.delivery === 'entregada' ? tag('Entregada', 'verde') : `${tag('Por entregar', 'ambar')}${sale.plannedDelivery ? ` <small>${T.day(sale.plannedDelivery)}</small>` : ''}`;
+    return `<tr><td>${escaparHTML(sale.device.identifier)}</td><td>${escaparHTML(sale.buyer)}</td><td>${escaparHTML(sale.municipality)}</td><td>${T.day(sale.soldAt)}</td><td>${T.money(sale.price)}</td>
+      <td>${tag(...PAYMENTS[sale.payment])}<br><small>${T.money(sale.received)} de ${T.money(sale.price)}</small></td><td>${delivery}</td><td>${tag(sale.state === 'vigente' ? 'Vigente' : 'Cancelada', sale.state === 'vigente' ? 'verde' : 'gris')}</td>
+      <td>${T.button('sale', 'Ver', 'light', `data-id="${sale.id}"`)}</td></tr>`;
   }
-  const errors = kind => `<p class="commerce-errors" data-errors="${kind}" role="alert" tabindex="-1" hidden></p>`;
-  const review = kind => `<section class="bento-panel commerce-review" data-review="${kind}" aria-labelledby="commerce-${kind}-review-title" hidden><div data-review-content></div><div class="app-actions"><button class="button btn-liquid-light" type="button" data-edit="${kind}">Seguir editando</button></div></section>`;
-  function table(headers,message) {
-    return `<div class="user-table-scroll" tabindex="0" role="region" aria-label="${headers[0]==='Equipo'?'Listado de equipos':'Listado de ventas'}"><table class="user-table admin-table"><thead><tr>${headers.map(text=>`<th scope="col">${text}</th>`).join('')}</tr></thead><tbody><tr><td colspan="${headers.length}">${message}</td></tr></tbody></table></div>`;
+
+  function salesTab(state) {
+    const {list, catalog} = state;
+    const body = list.items.length ? T.table('Ventas', ['Equipo', 'Comprador', 'Municipio', 'Fecha', 'Precio', 'Pago', 'Entrega', 'Estado', ''], list.items.map(row))
+      : '<div class="user-empty-inline"><p>No hay ventas con estos filtros.</p></div>';
+    return `<div class="app-actions">${T.button('create', '+ Registrar venta', 'brand')}</div><section class="bento-panel">${filters(state.filters, catalog.municipalities)}${body}${T.pager(list)}</section>`;
   }
-  function equipmentPanel() {
-    return `<section class="bento-panel" aria-labelledby="commerce-inventory"><div class="commerce-section-head"><div><h2 id="commerce-inventory">Equipos registrados</h2><p>Identidad del equipo y disponibilidad comercial.</p></div>${icon('grid')}</div>
-      <form data-commerce-form="inventoryFilter" class="commerce-form commerce-filter" novalidate>${field('inventoryFilter','query','Buscar equipo o huerto','type="search" maxlength="120"')}${select('inventoryFilter','availability','Disponibilidad',CommerceModel.availability)}<div class="commerce-field commerce-filter-action"><button class="button btn-liquid-light" type="submit">Aplicar filtros</button></div></form>
-      <p data-filter-status="inventoryFilter" class="commerce-hint" role="status">La consulta del inventario todavía no está disponible.</p>
-      ${table(['Equipo','Huerto','Disponibilidad','Vinculación','Conexión','Detalle'],'Listado pendiente de servicio. Los borradores no son equipos registrados.')}
-      </section><section class="bento-panel" aria-labelledby="commerce-equipment-form-title"><h2 id="commerce-equipment-form-title">Preparar alta de equipo</h2><p>El identificador es visible; no es una contraseña ni acredita conexión.</p>
-      <form data-commerce-form="equipment" class="commerce-form" novalidate>${errors('equipment')}
-      ${field('equipment','identifier','Identificador del equipo','type="text" required maxlength="80" autocomplete="off" spellcheck="false"','De 3 a 80 caracteres: letras, números, punto, guion, dos puntos o guion bajo.')}
-      ${field('equipment','gardenName','Nombre del huerto','type="text" required maxlength="120" autocomplete="off"')}
-      ${select('equipment','availability','Disponibilidad propuesta',CommerceModel.availability,'Selecciona una opción')}
-      <div class="commerce-form-footer"><button class="button btn-liquid-brand" type="submit">Revisar borrador de equipo</button><p class="commerce-hint">El registro definitivo todavía no está disponible. No se creará ningún dispositivo.</p></div></form></section>${review('equipment')}`;
+
+  function summaryTab(state) {
+    const {summary, preset} = state;
+    const periods = [['month', 'Este mes'], ['previous', 'Mes anterior'], ['all', 'Todo'], ['custom', 'Personalizado']];
+    const tiles = [['Ventas', summary.sales], ['Importe vendido', T.money(summary.sold)], ['Cobrado', T.money(summary.collected)], ['Por cobrar', T.money(summary.pending)]]
+      .map(([label, value]) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong>${value}</strong></article>`).join('');
+    const rows = summary.byMunicipality.map(item => `<tr><td>${escaparHTML(item.municipality)}</td><td>${item.sales}</td><td>${T.money(item.sold)}</td><td>${T.money(item.collected)}</td><td>${T.money(item.pending)}</td></tr>`);
+    return `<section class="bento-panel"><form class="care-filters" data-admin-form="sales-period" novalidate><div><label for="sale-preset">Periodo</label><select id="sale-preset" name="preset">${options(periods, preset)}</select></div>
+      ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Aplicar</button></div></form></section>
+      <section class="user-summary-metrics" aria-label="Resumen de ventas">${tiles}</section>
+      <section class="bento-panel"><h2>Por municipio</h2>${rows.length ? T.table('Ventas por municipio', ['Municipio', 'Ventas', 'Vendido', 'Cobrado', 'Por cobrar'], rows) : '<p>No hay ventas en este periodo.</p>'}</section>`;
   }
-  function salesPanel() {
-    return `<section class="bento-panel" aria-labelledby="commerce-sales-list"><div class="commerce-section-head"><div><h2 id="commerce-sales-list">Ventas y entregas</h2><p>Venta presencial con registro manual; entrega a domicilio o recogida acordada.</p></div>${icon('list')}</div>
-      <form data-commerce-form="salesFilter" class="commerce-form commerce-filter" novalidate>${field('salesFilter','query','Equipo o correo','type="search" maxlength="254" autocomplete="off"')}${dateField('salesFilter','since','Desde')}${dateField('salesFilter','until','Hasta')}
-      ${select('salesFilter','saleState','Venta',{registrada:'Registrada'})}${select('salesFilter','paymentState','Pago',{pendiente:'Pendiente',completo:'Completo'})}${select('salesFilter','deliveryState','Entrega',{por_acordar:'Por acordar',programada:'Programada',entregada:'Entregada'})}${select('salesFilter','bindingState','Vinculación',{sin_vincular:'Sin vincular',vinculado:'Vinculado'})}
-      ${errors('salesFilter')}<div class="commerce-form-footer"><button class="button btn-liquid-light" type="submit">Aplicar filtros</button></div></form>
-      <p data-filter-status="salesFilter" class="commerce-hint" role="status">La consulta de ventas todavía no está disponible.</p>
-      ${table(['Venta / equipo','Destinatario','Fecha','Precio total','Venta','Pago','Entrega','Vinculación'],'Listado pendiente de servicio. No se incluyen borradores en ventas ni cobros.')}
-      </section><section class="bento-panel" aria-labelledby="commerce-sale-form-title"><h2 id="commerce-sale-form-title">Preparar registro de venta</h2><p>El precio corresponde al equipo completo, sin desglose de componentes.</p>
-      <form data-commerce-form="sale" class="commerce-form" novalidate>${errors('sale')}
-      ${field('sale','equipment','Identificador del equipo','type="text" required maxlength="80" autocomplete="off" spellcheck="false"','La existencia y disponibilidad del equipo se comprobarán en el servidor.')}
-      ${field('sale','email','Correo de la cuenta destinataria','type="email" required maxlength="254" autocomplete="off"','La vinculación requiere una cuenta verificada y admite un solo huerto activo por cuenta.')}
-      ${dateField('sale','saleDate','Fecha de venta',true)}
-      ${field('sale','total','Precio total del equipo','type="text" required inputmode="decimal" maxlength="12" autocomplete="off"','Mayor que cero. Sin separadores de miles y con hasta dos decimales; punto o coma decimal.')}
-      ${field('sale','received','Importe recibido declarado','type="text" required inputmode="decimal" maxlength="12" autocomplete="off"','Desde cero y hasta el precio total. Esta revisión no registra movimientos de pago.')}
-      ${field('sale','reference','Referencia textual del pago (opcional)','type="text" maxlength="120" autocomplete="off"','La referencia no demuestra recepción bancaria. No incluyas datos bancarios ni documentos.')}
-      ${select('sale','deliveryMode','Modalidad de entrega',CommerceModel.deliveryModes,'Selecciona una opción')}${dateField('sale','deliveryDate','Fecha prevista de entrega (opcional)')}
-      <p class="commerce-hint commerce-full">La fecha de entrega puede quedar por acordar. Una fecha prevista no confirma que el equipo se entregó. La moneda se definirá para la integración.</p>
-      <div class="commerce-form-footer"><button class="button btn-liquid-brand" type="submit">Revisar borrador de venta</button><p class="commerce-hint">El registro definitivo de venta, cobro y entrega todavía no está disponible. El borrador dura solo esta visita y se pierde al recargar.</p></div></form></section>${review('sale')}`;
+
+  function screen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    return `${AppViews.heading('Ventas', 'Registra ventas, pagos y entregas de equipos.')}${T.tabs([['ventas', 'Ventas'], ['resumen', 'Resumen']], state.tab)}${state.tab === 'resumen' ? summaryTab(state) : salesTab(state)}${T.dialog}`;
   }
-  function bindingPanel() {
-    return `<section class="bento-panel" aria-labelledby="commerce-binding-title"><h2 id="commerce-binding-title">Del equipo a la vinculación</h2><p>Cada paso tiene un estado propio. Un borrador comercial no autoriza la emisión de códigos.</p>
-      <ol class="commerce-chain"><li><strong>Equipo</strong><span>Registro y disponibilidad por consultar.</span></li><li><strong>Venta</strong><span>Registro comercial por integrar.</span></li><li><strong>Pago</strong><span>Pago completo: condición futura por validar en Django.</span></li><li><strong>Entrega</strong><span>Modalidad y fecha no acreditan recepción física.</span></li><li><strong>Vinculación</strong><span>Cuenta verificada, un huerto activo y controles actuales del servidor.</span></li></ol>
-      <div data-binding-context class="commerce-context" aria-live="polite"></div>
-      <div class="app-actions"><a class="button btn-liquid-light" href="#admin/vinculacion">Abrir Vinculación de huertos ${icon('arrow')}</a></div><p class="commerce-hint">Abre el apartado existente. No transfiere el borrador ni emite un código. La comprobación comercial del pago sigue pendiente de integración.</p></section>`;
+
+  function createForm(catalog) {
+    return `<h2 id="admin-dialog-title">Registrar venta</h2><form data-admin-form="sale-create" novalidate>
+      <label for="sc-device">Equipo</label><select id="sc-device" name="device" required>${options([['', 'Elige un equipo'], ...catalog.sellable.map(item => [item.id, item.identifier])])}</select>
+      <label for="sc-buyer">Nombre del comprador</label><input id="sc-buyer" name="buyer" type="text" maxlength="120" required>
+      <label for="sc-email">Correo del comprador</label><input id="sc-email" name="email" type="email" maxlength="254" required>
+      <label for="sc-municipality">Municipio</label><select id="sc-municipality" name="municipality" required>${options([['', 'Elige un municipio'], ...catalog.municipalities.map(name => [name, name])])}</select>
+      <label for="sc-price">Precio total (MXN)</label><input id="sc-price" name="price" type="text" inputmode="decimal" placeholder="3500.00" required>
+      <label for="sc-received">Importe recibido (MXN)</label><input id="sc-received" name="received" type="text" inputmode="decimal" value="0">
+      <label for="sc-reference">Referencia del pago</label><input id="sc-reference" name="reference" type="text" maxlength="120">
+      <label for="sc-method">Modalidad de entrega</label><select id="sc-method" name="method">${options(Object.entries(METHODS))}</select>
+      <label for="sc-sold">Fecha de venta</label><input id="sc-sold" name="soldAt" type="date" max="${today()}" value="${today()}" required>
+      <label for="sc-planned">Fecha prevista de entrega (opcional)</label><input id="sc-planned" name="plannedDelivery" type="date">
+      <label for="sc-note">Nota (opcional)</label><textarea id="sc-note" name="note" maxlength="500" rows="3"></textarea>
+      <div class="app-dialog-actions">${T.button('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit">Registrar venta</button></div></form>`;
   }
-  function summaryPanel() {
-    return `<section class="bento-panel" aria-labelledby="commerce-summary-title"><h2 id="commerce-summary-title">Resumen por periodo</h2><form data-commerce-form="summaryFilter" class="commerce-form commerce-filter" novalidate>
-      ${select('summaryFilter','preset','Periodo',{current:'Mes actual hasta hoy',previous:'Mes anterior',custom:'Personalizado'},'Todo el periodo')}${dateField('summaryFilter','since','Desde')}${dateField('summaryFilter','until','Hasta')}${errors('summaryFilter')}
-      <div class="commerce-form-footer"><button class="button btn-liquid-light" type="submit">Consultar periodo</button><p class="commerce-hint">La consulta económica todavía no está disponible.</p></div></form><p data-filter-status="summaryFilter" role="status" class="commerce-hint">Sin datos consultados. Los borradores no forman parte del resumen.</p></section>
-      <div class="commerce-metrics">${[['Cantidad de ventas','Requiere ventas registradas.'],['Importe vendido','Requiere moneda y ventas confirmadas.'],['Cobros','Requiere registros y fechas de cobro.'],['Saldo','Requiere contrato de ventas y cobros.']].map(([title,note])=>`<section class="bento-panel"><h3>${title}</h3><p class="commerce-metric-value" aria-label="Sin datos consultados">—</p><p class="commerce-hint">${note}</p></section>`).join('')}</div>
-      <section class="bento-panel"><h2>Ganancias</h2><p>Pendientes de definir costos y gastos. El precio de venta por sí solo no permite calcularlas.</p></section>`;
+
+  function detail(sale) {
+    const open = sale.state === 'vigente';
+    const facts = [['Equipo', escaparHTML(sale.device.identifier)], ['Comprador', `${escaparHTML(sale.buyer)} · ${escaparHTML(sale.email)}${sale.accountLinked ? ' · con cuenta' : ''}`], ['Municipio', escaparHTML(sale.municipality)],
+      ['Precio', T.money(sale.price)], ['Recibido', `${T.money(sale.received)} · ${PAYMENTS[sale.payment][0]}`], ['Referencia del pago', sale.reference ? escaparHTML(sale.reference) : '—'],
+      ['Entrega', `${METHODS[sale.method]}${sale.deliveredAt ? ` · entregada el ${T.day(sale.deliveredAt)}` : sale.plannedDelivery ? ` · prevista ${T.day(sale.plannedDelivery)}` : ''}`],
+      ['Fecha de venta', T.day(sale.soldAt)], ['Estado', open ? 'Vigente' : `Cancelada el ${T.day(sale.cancelledAt)}`], ['Nota', sale.note ? escaparHTML(sale.note) : '—']];
+    const forms = !open ? '' : `<form data-admin-form="sale-payment" data-id="${sale.id}" novalidate><h3>Registrar pago</h3><label for="sp-received">Importe recibido acumulado (MXN)</label><input id="sp-received" name="received" type="text" inputmode="decimal" value="${sale.received}">
+        <label for="sp-reference">Referencia (opcional)</label><input id="sp-reference" name="reference" type="text" maxlength="120"><button class="button btn-liquid-light" type="submit">Registrar pago</button></form>
+      ${sale.deliveredAt ? '' : `<form data-admin-form="sale-delivery" data-id="${sale.id}" novalidate><h3>Marcar entregada</h3><label for="sd-date">Fecha de entrega</label><input id="sd-date" name="deliveredAt" type="date" min="${sale.soldAt}" max="${today()}" value="${today()}" required><button class="button btn-liquid-light" type="submit">Marcar entregada</button></form>`}
+      <form data-admin-form="sale-note" data-id="${sale.id}" novalidate><h3>Nota</h3><label for="sn-note" class="sr-only">Nota</label><textarea id="sn-note" name="note" maxlength="500" rows="3">${escaparHTML(sale.note || '')}</textarea><button class="button btn-liquid-light" type="submit">Guardar nota</button></form>`;
+    return `<h2 id="admin-dialog-title">Venta de ${escaparHTML(sale.device.identifier)}</h2><dl class="user-facts">${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>${forms}
+      <div class="app-dialog-actions">${open ? T.button('cancel-sale', 'Cancelar venta', 'light', `data-danger="true" data-id="${sale.id}"`) : ''}${T.button('close-dialog', 'Cerrar')}</div>`;
   }
-  function shell() {
-    const panels={equipos:equipmentPanel,ventas:salesPanel,vinculacion:bindingPanel,resumen:summaryPanel};
-    return `<div class="commerce-workspace">${AppViews.heading('Equipos y ventas','Inventario, venta presencial y preparación de entregas.')}
-      <div class="account-tabs commerce-tabs" role="tablist" aria-label="Equipos y ventas">${CommerceModel.tabs.map(([key,label],index)=>`<button id="commerce-tab-${key}" type="button" role="tab" class="button ${index?'btn-liquid-light':'btn-liquid-brand active'}" data-commerce-tab="${key}" aria-controls="commerce-panel-${key}" aria-selected="${!index}" tabindex="${index?-1:0}">${label}</button>`).join('')}</div>
-      <p class="sr-only" id="commerce-date-help">Escribe la fecha como año-mes-día. Flecha abajo abre el calendario; Escape lo cierra.</p>
-      ${CommerceModel.tabs.map(([key],index)=>`<div id="commerce-panel-${key}" role="tabpanel" aria-labelledby="commerce-tab-${key}" tabindex="0" ${index?'hidden':''}>${panels[key]()}</div>`).join('')}</div>`;
+
+  const confirmations = {cancel:sale => ({titulo:`¿Cancelar la venta de ${sale.device.identifier}?`, texto:'La venta quedará cancelada y el equipo volverá a poder venderse. No se puede deshacer.', accion:'Cancelar venta', peligro:true})};
+
+  return Object.freeze({screen, createForm, detail, confirmations, errorText,
+    resetFilters: root => root.querySelector('[data-admin-form="sales-filter"]').reset(),
+    periodDates(root, dates) { const form = root.querySelector('[data-admin-form="sales-period"]'); form.elements.since.value = dates.desde; form.elements.until.value = dates.hasta; }});
+})();
+
+// ── Administradores ──
+// Quién tiene qué capacidad (5.10). La capacidad de super administrador no se ofrece: solo se asigna desde la base.
+const AdminAccessViews = (() => {
+  const T = AdminTableViews;
+  const {tag} = GardenViews;
+  const GROUPS = [['Operación', [['ver_flota', 'Flota'], ['atender_soporte', 'Soporte'], ['gestionar_mantenimientos', 'Mantenimientos']]],
+    ['Gestión', [['atender_consultas', 'Consultas'], ['gestionar_dispositivos', 'Equipos'], ['gestionar_ventas', 'Ventas'], ['gestionar_guias', 'Guías']]],
+    ['Legal', [['gestionar_legales', 'Textos legales'], ['ver_consentimientos', 'Consentimientos']]]];
+  const LABELS = Object.fromEntries(GROUPS.flatMap(([, items]) => items).concat([['gestionar_administradores', 'Super administrador']]));
+  const ACTIONS = {cambiar_capacidades:'Cambió capacidades', publicar_legal:'Publicó un texto legal', crear_borrador_legal:'Creó un borrador legal', editar_borrador_legal:'Editó un borrador legal',
+    eliminar_borrador_legal:'Eliminó un borrador legal', exportar_consentimientos:'Exportó consentimientos', alta_equipo:'Dio de alta un equipo', rotar_credencial:'Rotó una credencial',
+    retirar_equipo:'Retiró un equipo', desvincular_dispositivo:'Desvinculó un equipo', registrar_venta:'Registró una venta', registrar_pago:'Registró un pago', entregar_venta:'Marcó una entrega',
+    editar_nota_venta:'Editó la nota de una venta', cancelar_venta:'Canceló una venta'};
+  const ERRORS = {'capacidad-reservada':'La capacidad de super administrador solo se asigna desde la base de datos.', 'capacidad-propia':'No puedes cambiar tus propias capacidades.',
+    'cuenta-no-encontrada':'No hay una cuenta con ese correo.', 'cuenta-no-elegible':'La cuenta debe estar activa y con el correo verificado.'};
+  const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
+  const label = code => LABELS[code] || code;
+  const action = name => ACTIONS[name] || name;
+  const chips = list => list.length ? list.map(code => tag(label(code), code === 'gestionar_administradores' ? 'ambar' : 'gris')).join(' ') : '—';
+
+  function adminsTab(state) {
+    const rows = state.admins.items.map(item => `<tr><td>${escaparHTML(item.email)}${item.superAdmin ? ' ★' : ''}</td><td>${item.name ? escaparHTML(item.name) : '—'}</td><td>${chips(item.capabilities)}</td>
+      <td>${item.secondFactor ? '✔' : '✖'}</td><td>${item.lastAccess ? T.merida(item.lastAccess) : '—'}</td><td>${item.email === state.ownEmail ? '<small>Tu cuenta</small>' : T.button('edit', 'Editar', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`);
+    return `<div class="app-actions">${T.button('grant', '+ Dar acceso a una cuenta', 'brand')}</div><section class="bento-panel">${rows.length ? T.table('Administradores', ['Correo', 'Nombre', 'Capacidades', 'Segundo factor', 'Último acceso', ''], rows) : '<p>No hay administradores.</p>'}${T.pager(state.admins)}</section>`;
   }
-  function activate(root,key) {
-    root.querySelectorAll('[data-commerce-tab]').forEach(button=>{
-      const active=button.dataset.commerceTab===key;
-      button.setAttribute('aria-selected',String(active)); button.tabIndex=active?0:-1;
-      button.classList.toggle('active',active); button.classList.toggle('btn-liquid-brand',active); button.classList.toggle('btn-liquid-light',!active);
-      root.querySelector('#'+button.getAttribute('aria-controls')).hidden=!active;
-    });
+
+  function historyTab(state) {
+    const rows = state.history.items.map(item => `<tr><td>${T.merida(item.at)}</td><td>${escaparHTML(item.account)}</td><td>${escaparHTML(label(item.capability))}</td><td>${tag(item.action === 'concedida' ? 'Concedida' : 'Retirada', item.action === 'concedida' ? 'verde' : 'rojo')}</td><td>${escaparHTML(item.by)}</td><td>${item.reason ? escaparHTML(item.reason) : '—'}</td></tr>`);
+    const capabilities = [['', 'Todas'], ...GROUPS.flatMap(([, items]) => items).concat([['gestionar_administradores', 'Super administrador']])];
+    return `<section class="bento-panel"><form class="care-filters" data-admin-form="history-filter" novalidate><div><label for="ah-account">Cuenta</label><input id="ah-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(state.filters.cuenta || '')}"></div>
+      <div><label for="ah-capability">Capacidad</label><select id="ah-capability" name="capacidad">${capabilities.map(([value, text]) => `<option value="${value}"${value === (state.filters.capacidad || '') ? ' selected' : ''}>${text}</option>`).join('')}</select></div>
+      ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button></div></form>
+      ${rows.length ? T.table('Historial de capacidades', ['Fecha y hora', 'Cuenta', 'Capacidad', 'Acción', 'Por', 'Motivo'], rows) : '<p>No hay cambios con estos filtros.</p>'}${T.pager(state.history)}</section>`;
   }
-  function formErrors(form,issues) {
-    for(const field of form.querySelectorAll('input,select')) {
-      const message=issues[field.name] || '';
-      field.setCustomValidity(message);
-      if(message) field.setAttribute('aria-invalid','true'); else field.removeAttribute('aria-invalid');
-      const error=form.querySelector(`[data-error="${field.name}"]`);
-      if(error) { error.textContent=message; error.hidden=!message; }
-    }
-    const summary=form.querySelector('[data-errors]');
-    if(summary) { summary.textContent=Object.keys(issues).length?'Revisa los campos señalados antes de continuar.':''; summary.hidden=!summary.textContent; }
+
+  function activityTab(state) {
+    const rows = state.activity.items.map(item => `<tr><td>${T.merida(item.at)}</td><td>${item.actor ? escaparHTML(item.actor) : '—'}</td><td>${escaparHTML(action(item.action))}</td><td>${item.entity ? escaparHTML(item.entity) : '—'}</td><td>${item.result === 'exito' ? 'Éxito' : 'Rechazado'}</td></tr>`);
+    return `<section class="bento-panel"><form class="care-filters" data-admin-form="activity-filter" novalidate><div><label for="aa-account">Administrador (correo)</label><input id="aa-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(state.filters.cuenta || '')}"></div>
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button></div></form>
+      ${rows.length ? T.table('Actividad de administradores', ['Fecha y hora', 'Administrador', 'Acción', 'Sobre qué', 'Resultado'], rows) : '<p>No hay actividad registrada.</p>'}${T.pager(state.activity)}</section>`;
   }
-  function facts(entries) {
-    return el('dl',{className:'commerce-facts'},...entries.map(([label,value])=>el('div',{},el('dt',{textContent:label}),el('dd',{textContent:value}))));
+
+  function screen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const tab = {administradores:adminsTab, historial:historyTab, actividad:activityTab}[state.tab](state);
+    return `${AppViews.heading('Administradores', 'Quién puede qué en el panel.')}${T.tabs([['administradores', 'Administradores'], ['historial', 'Historial'], ['actividad', 'Actividad']], state.tab)}${tab}${T.dialog}`;
   }
-  function renderReview(root,kind,data) {
-    const section=root.querySelector(`[data-review="${kind}"]`);
-    section.hidden=!data;
-    if(!data) { section.querySelector('[data-review-content]').replaceChildren(); return; }
-    const title=el('h2',{id:`commerce-${kind}-review-title`,tabIndex:-1,textContent:kind==='equipment'?'Detalle del equipo · borrador':'Revisión de venta · borrador'});
-    const entries=kind==='equipment'?[
-      ['Equipo',data.identifier],['Huerto',data.gardenName],['Disponibilidad propuesta',CommerceModel.availability[data.availability]],['Registro','Sin registrar'],['Vinculación','Sin consultar'],['Conexión','Sin datos de conexión']
-    ]:[
-      ['Equipo',data.equipment],['Correo destinatario',data.email],['Cuenta verificada','Sin consultar'],['Fecha de venta',data.saleDate],['Precio total declarado',CommerceModel.money(data.totalMinor)],['Importe recibido declarado',CommerceModel.money(data.receivedMinor)],['Saldo aritmético del borrador',CommerceModel.money(data.balanceMinor)],['Referencia',data.reference||'Sin referencia'],['Venta','Borrador sin registrar'],['Pago',data.balanceMinor===0?'El importe declarado cubre el total; sin confirmar':'El importe declarado es inferior al total; sin confirmar'],['Entrega',CommerceModel.deliveryModes[data.deliveryMode]+' · '+(data.deliveryDate||'Fecha por acordar')+' · Sin confirmar'],['Vinculación','Sin consultar; el borrador no autoriza emitir']
-    ];
-    const content=[title,facts(entries),el('p',{className:'commerce-hint',textContent:kind==='equipment'?'Revisión local. No comprueba unicidad ni crea un huerto, zonas o dispositivo. Se pierde al recargar.':'Revisión local, sin moneda acordada ni comprobación bancaria. No registra venta, cobro o entrega y no comprueba la elegibilidad para vincular.'})];
-    if(kind==='equipment') { const use=el('button',{className:'button btn-liquid-light',type:'button',textContent:'Usar identificador en borrador de venta'}); use.dataset.useEquipment=''; content.push(use); }
-    section.querySelector('[data-review-content]').replaceChildren(...content);
+
+  function accessForm({email = '', capabilities = [], editing = false}) {
+    const boxes = GROUPS.map(([group, items]) => `<fieldset class="legal-card"><legend>${group}</legend>${items.map(([code, text]) => `<label class="legal-check"><input type="checkbox" name="capability" value="${code}"${capabilities.includes(code) ? ' checked' : ''}><span>${text}</span></label>`).join('')}</fieldset>`).join('');
+    return `<h2 id="admin-dialog-title">${editing ? 'Editar acceso' : 'Dar acceso a una cuenta'}</h2><form data-admin-form="access" novalidate>
+      <label for="ac-email">Correo de la cuenta</label><input id="ac-email" name="email" type="email" maxlength="254" value="${escaparHTML(email)}"${editing ? ' readonly' : ''} required>
+      ${boxes}<p class="user-small-copy">La capacidad de super administrador solo se asigna desde la base de datos.</p>
+      <label for="ac-reason">Motivo</label><input id="ac-reason" name="reason" type="text" maxlength="300" required>
+      <div class="app-dialog-actions">${T.button('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit">Guardar cambios</button></div></form>`;
   }
-  function bindingContext(root,state) {
-    const host=root.querySelector('[data-binding-context]');
-    const sale=state.saleReview;
-    host.replaceChildren(el('h3',{textContent:'Relación preparada en esta visita'}));
-    if(!sale) { host.append(el('p',{textContent:'Revisa un borrador de venta para ver aquí el equipo, destinatario e importes propuestos. No se consultan ni confirman estados reales.'})); return; }
-    host.append(facts([['Equipo propuesto',sale.equipment],['Cuenta destinataria propuesta',sale.email],['Venta','Borrador sin registrar'],['Pago','Importe declarado: '+CommerceModel.money(sale.receivedMinor)+' de '+CommerceModel.money(sale.totalMinor)+'; sin confirmar'],['Entrega propuesta',CommerceModel.deliveryModes[sale.deliveryMode]+' · '+(sale.deliveryDate||'Por acordar')],['Vinculación','Sin consultar; sin autorización comercial']]));
+
+  function summaryText(granted, revoked) {
+    const names = list => list.length ? list.map(label).join(', ') : 'nada';
+    return `Darás: ${names(granted)}. Quitarás: ${names(revoked)}. ¿Continuar?`;
   }
-  function fill(form,values) { for(const [key,value] of Object.entries(values)) { const field=form.elements.namedItem(key); if(field) field.value=value; } }
-  function read(form) { return Object.fromEntries(new FormData(form)); }
-  function focusReview(root,kind) { root.querySelector(`#commerce-${kind}-review-title`)?.focus(); }
-  function unavailable(root) {
-    root.innerHTML=AppViews.heading('Equipos y ventas')+AppViews.state('Apartado no disponible','Tu sesión no tiene habilitado este destino administrativo.');
+  const confirmation = (granted, revoked) => ({titulo:'¿Cambiar las capacidades de esta cuenta?', texto:summaryText(granted, revoked), accion:'Continuar'});
+
+  return Object.freeze({screen, accessForm, confirmation, errorText});
+})();
+
+// ── Legales ──
+// Textos legales (5.8). El HTML de la vista previa y de las versiones lo devuelve el servidor ya saneado; aquí no se genera.
+const LegalAdminViews = (() => {
+  const T = AdminTableViews;
+  const {tag} = GardenViews;
+  const TYPES = {terminos:'Términos y condiciones', aviso_privacidad:'Aviso de privacidad', politica_cookies:'Política de cookies'};
+  const ERRORS = {'version-no-mayor':'La versión debe ser mayor que la vigente.', 'version-existente':'Ya existe esa versión de este documento.', 'documento-publicado':'Una versión publicada no se edita ni se borra: crea una nueva.',
+    'stale-record':'Alguien cambió este borrador. Vuelve a abrirlo para ver la versión nueva.'};
+  const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
+  const sha = value => escaparHTML(value.slice(0, 8));
+
+  function listScreen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const {current, drafts, history} = state.data;
+    const currentBlock = current ? `<p>Versión vigente: <strong>${escaparHTML(current.version)}</strong> · publicada el ${T.merida(current.publishedAt)}${current.publishedBy ? ` por ${escaparHTML(current.publishedBy)}` : ''} · huella ${sha(current.sha256)}… <a href="#admin/legales/${current.id}">Ver</a></p>` : '<p>Aún no hay una versión publicada.</p>';
+    const draftRows = drafts.map(item => `<li><div><strong>${escaparHTML(item.version)}</strong> · ${escaparHTML(item.title)} <small>editado ${T.merida(item.updatedAt)}</small></div>
+      <div class="app-actions"><a class="button btn-liquid-light compact" href="#admin/legales/${item.id}">Editar</a>${T.button('preview', 'Vista previa', 'light', `data-id="${item.id}"`)}${T.button('publish', 'Publicar', 'brand', `data-id="${item.id}" data-at="${escaparHTML(item.updatedAt)}" data-version="${escaparHTML(item.version)}"`)}${T.button('remove', 'Eliminar', 'light', `data-danger="true" data-id="${item.id}" data-at="${escaparHTML(item.updatedAt)}"`)}</div></li>`).join('');
+    const historyRows = history.map(item => `<li><span>${escaparHTML(item.version)} · ${T.merida(item.publishedAt)}${item.publishedBy ? ` · ${escaparHTML(item.publishedBy)}` : ''}</span> <a href="#admin/legales/${item.id}">Ver</a></li>`).join('');
+    return `${AppViews.heading('Textos legales', 'Redacta, previsualiza y publica nuevas versiones.')}${T.tabs(Object.entries(TYPES), state.type)}
+      <section class="bento-panel">${currentBlock}</section>
+      <section class="bento-panel"><div class="user-section-heading"><div><h2>Borradores</h2></div><a class="button btn-liquid-brand" href="#admin/legales/nuevo-${state.type}">+ Nueva versión</a></div>${draftRows ? `<ul class="legal-list">${draftRows}</ul>` : '<p>No hay borradores.</p>'}</section>
+      <section class="bento-panel"><h2>Historial de versiones publicadas</h2>${historyRows ? `<ul class="legal-list">${historyRows}</ul>` : '<p>Sin versiones publicadas.</p>'}</section>${T.dialog}`;
   }
-  function mount(root) {
-    root.innerHTML=shell();
-    return {workspace:root.querySelector('.commerce-workspace'), tablist:root.querySelector('[role=tablist]'),
-      forms:Object.fromEntries([...root.querySelectorAll('[data-commerce-form]')].map(form=>[form.dataset.commerceForm,form]))};
+
+  function editorScreen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const doc = state.document, published = doc && doc.state === 'publicada';
+    const title = published ? `${TYPES[doc.type]} · versión ${doc.version}` : doc ? `Editar borrador ${doc.version}` : `Nueva versión · ${TYPES[state.type]}`;
+    const back = `<a class="garden-back" href="#admin/legales">← Textos legales</a>`;
+    const facts = published ? `<p>${tag('Publicada', 'verde')} ${T.merida(doc.publishedAt)}${doc.publishedBy ? ` · ${escaparHTML(doc.publishedBy)}` : ''} · huella ${sha(doc.sha256)}…</p>` : '';
+    const toolbar = published ? '' : `<div class="legal-toolbar" role="group" aria-label="Formato">${[['h2', 'Título'], ['ul', 'Lista'], ['strong', 'Negrita'], ['a', 'Enlace']].map(([tagName, text]) => T.button('tag', text, 'light', `data-tag="${tagName}"`)).join('')}</div>`;
+    const form = `<form data-admin-form="legal" novalidate><label for="lg-version">Versión (formato 1.2)</label><input id="lg-version" name="version" type="text" maxlength="11" placeholder="1.2" value="${escaparHTML(doc?.version || '')}"${published ? ' readonly' : ''} required>
+      <label for="lg-title">Título</label><input id="lg-title" name="title" type="text" maxlength="120" value="${escaparHTML(doc?.title || TYPES[state.type] || '')}"${published ? ' readonly' : ''} required>
+      <label for="lg-content">Contenido</label>${toolbar}<textarea id="lg-content" name="content" rows="18" maxlength="28000"${published ? ' readonly' : ''} required>${escaparHTML(doc?.content || '')}</textarea>
+      ${published ? '' : `<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Guardar borrador</button>${T.button('preview-editor', 'Vista previa')}${doc ? T.button('publish-editor', 'Publicar', 'brand') : ''}</div>`}</form>`;
+    return `${back}${AppViews.heading(title)}${facts}<div class="legal-editor"><section class="bento-panel">${form}</section><section class="bento-panel"><h2>Vista previa</h2><div class="legal-preview" data-legal-preview>${doc ? doc.html : '<p>Pulsa «Vista previa» para ver el texto como lo verá el público.</p>'}</div></section></div>${T.dialog}`;
   }
-  function focusTab(root,key) { root.querySelector(`[data-commerce-tab="${key}"]`).focus(); }
-  const filterTexts={changed:'Filtro modificado. La consulta todavía no está disponible.',
-    ready:'Filtros preparados. La consulta todavía no está disponible; no se han consultado registros.'};
-  function filterStatus(root,kind,state) { root.querySelector(`[data-filter-status="${kind}"]`).textContent=filterTexts[state]; }
-  function customPeriod(form) { form.elements.preset.value='custom'; }
-  function focusInvalid(form) { form.querySelector('[aria-invalid=true]')?.focus(); }
-  function focusFirstInput(form) { form.querySelector('input')?.focus(); }
-  function setEquipment(form,identifier) { form.elements.equipment.value=identifier; }
-  function focusEquipment(form) { form.elements.equipment.focus(); }
-  return Object.freeze({shell,activate,formErrors,renderReview,bindingContext,fill,read,focusReview,
-    unavailable,mount,focusTab,filterStatus,customPeriod,focusInvalid,focusFirstInput,setEquipment,focusEquipment});
+
+  const confirmations = {
+    publish:(type, version) => ({titulo:`¿Publicar la versión ${version} de ${TYPES[type]}?`,
+      texto:`Todas las cuentas recibirán un aviso y deberán ${type === 'politica_cookies' ? 'volver a decidir sobre cookies' : 'aceptarla al entrar'}. Una versión publicada no se puede editar ni borrar.`, accion:'Publicar'}),
+    remove:{titulo:'¿Eliminar este borrador?', texto:'No se puede deshacer.', accion:'Eliminar', peligro:true}};
+
+  // El HTML ya viene saneado del servidor; el navegador solo lo coloca.
+  function showPreview(root, html) { root.querySelector('[data-legal-preview]').innerHTML = html; }
+  function previewDialog(html) { return `<h2 id="admin-dialog-title">Vista previa</h2><div class="legal-preview">${html}</div><div class="app-dialog-actions">${T.button('close-dialog', 'Cerrar')}</div>`; }
+  // Inserta una etiqueta en el texto seleccionado del contenido.
+  function insertTag(root, name) {
+    const area = root.querySelector('[name=content]'), start = area.selectionStart, end = area.selectionEnd, picked = area.value.slice(start, end);
+    const wrapped = {h2:`<h2>${picked || 'Título'}</h2>`, strong:`<strong>${picked || 'texto'}</strong>`, ul:`<ul>\n  <li>${picked || 'elemento'}</li>\n</ul>`, a:`<a href="https://">${picked || 'enlace'}</a>`}[name];
+    area.setRangeText(wrapped, start, end, 'end');
+    area.focus();
+  }
+
+  return Object.freeze({listScreen, editorScreen, confirmations, errorText, showPreview, previewDialog, insertTag});
+})();
+
+// ── Consentimientos ──
+// Bitácora de consentimientos (5.9): solo lectura. La IP ya viene recortada de la base.
+const ConsentViews = (() => {
+  const T = AdminTableViews;
+  const {tag} = GardenViews;
+  const options = (items, selected = '') => items.map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
+  const share = ({accepted, accounts, version}) => version ? `${accepted} de ${accounts} cuentas (versión ${escaparHTML(version)})` : 'Sin versión publicada';
+
+  function filters(values) {
+    return `<form class="care-filters" data-admin-form="consent-filter" novalidate>
+      <div><label for="cs-document">Documento</label><select id="cs-document" name="documento">${options([['', 'Todos'], ['terminos', 'Términos'], ['aviso', 'Aviso'], ['cookies', 'Cookies']], values.documento)}</select></div>
+      <div><label for="cs-decision">Decisión</label><select id="cs-decision" name="decision">${options([['', 'Todas'], ['acepto', 'Aceptó'], ['rechazo', 'Rechazó']], values.decision)}</select></div>
+      ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}
+      <div><label for="cs-account">Buscar correo</label><input id="cs-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(values.cuenta || '')}"></div>
+      <div><label for="cs-version">Versión</label><input id="cs-version" name="version" type="text" maxlength="11" placeholder="1.1" value="${escaparHTML(values.version || '')}"></div>
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${T.button('clear', 'Limpiar')}</div></form>`;
+  }
+
+  // La exportación es una descarga: si el filtro rebasa el tope del servidor, se avisa aquí en lugar de descargar un error.
+  function exportAction({exportUrl, list, exportLimit}) {
+    if(list.total > exportLimit) return `<div><button class="button btn-liquid-light" type="button" disabled>Exportar CSV</button><p class="user-small-copy">Acota el filtro: se exportan hasta ${exportLimit} filas.</p></div>`;
+    return `<a class="button btn-liquid-light" href="${escaparHTML(exportUrl)}" download="consentimientos.csv">Exportar CSV</a>`;
+  }
+
+  function row(item) {
+    return `<tr><td>${T.merida(item.at)}</td><td>${escaparHTML(item.account)}</td><td>${escaparHTML(item.what)}</td><td>${escaparHTML(item.version)}</td><td>${tag(item.decision, item.decision === 'Aceptó' ? 'verde' : 'rojo')}</td><td>${item.ip ? escaparHTML(item.ip) : '—'}</td><td>${item.browser ? escaparHTML(item.browser) : '—'}</td><td>${T.button('row', 'Ver', 'light', `data-id="${item.id}"`)}</td></tr>`;
+  }
+
+  function screen(state) {
+    if(state.status !== 'ready') return T.status(state.status);
+    const {summary, list} = state;
+    const stats = summary.statistics.percent === null ? 'Sin navegadores' : `${summary.statistics.percent}% (${summary.statistics.accepted} de ${summary.statistics.browsers})`;
+    const cards = [['Términos vigentes aceptados', share(summary.terms)], ['Aviso vigente aceptado', share(summary.privacy)], ['Navegadores con estadísticas', stats]]
+      .map(([label, value]) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong class="consent-figure">${value}</strong></article>`).join('');
+    const body = list.items.length ? T.table('Bitácora de consentimientos', ['Fecha y hora (Mérida)', 'Cuenta', 'Qué', 'Versión', 'Decisión', 'IP', 'Navegador', ''], list.items.map(row)) : '<div class="user-empty-inline"><p>No hay registros con estos filtros.</p></div>';
+    return `<div class="page-heading"><div><h1>Bitácora de consentimientos</h1><p>Quién aceptó qué, cuándo y desde dónde.</p></div>${exportAction(state)}</div>
+      <section class="user-summary-metrics" aria-label="Resumen de consentimientos">${cards}</section><section class="bento-panel">${filters(state.filters)}${body}${T.pager(list)}</section>${T.dialog}`;
+  }
+
+  function detail(item) {
+    const facts = [['Fecha y hora (Mérida)', T.merida(item.at)], ['Cuenta', escaparHTML(item.account)], ['Ámbito', escaparHTML(item.scope)], ['Qué', escaparHTML(item.what)], ['Versión', escaparHTML(item.version)],
+      ['Decisión', escaparHTML(item.decision)], ['Finalidad', item.purpose ? escaparHTML(item.purpose) : '—'], ['IP (recortada)', item.ip ? escaparHTML(item.ip) : '—'], ['Navegador', item.browser ? escaparHTML(item.browser) : '—']];
+    const history = item.scope === 'cuenta' && item.account.includes('@') ? T.button('account-history', 'Ver historial de esta cuenta', 'light', `data-account="${escaparHTML(item.account)}"`) : '';
+    return `<h2 id="admin-dialog-title">Registro de consentimiento</h2><dl class="user-facts">${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><div class="app-dialog-actions">${history}${T.button('close-dialog', 'Cerrar')}</div>`;
+  }
+
+  return Object.freeze({screen, detail,
+    resetFilters: root => root.querySelector('[data-admin-form="consent-filter"]').reset()});
 })();

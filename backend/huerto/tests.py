@@ -514,6 +514,7 @@ class Soporte(BaseHuerto):
         caso = respuesta.json()['case']
         self.assertRegex(caso['folio'], r'^CS-[0-9A-F]{8}$')
         self.assertEqual((caso['state'], caso['incident']), ('abierto', 'bomba'))
+        self.assertNotIn('attendedBy', caso, 'frente a la persona el administrador es solo «Soporte»: no se expone su alias')
         self.assertEqual(self.client.get(self.ruta).json()['active']['id'], caso['id'])
         auditoria = Auditoria.objects.get(accion='abrir_caso', actor=self.dueña)
         self.assertEqual(auditoria.detalle, {'incidente': 'bomba'})
