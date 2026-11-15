@@ -173,7 +173,7 @@ def recorrer():
 
     c, t = sesion_activa()
     alterar(c, **{sesion.INICIO: t - 28801})
-    ok('8 h absolutas: 401', c.get('/api/huertos/actual').status_code == 401)
+    ok('8 h absolutas: 401', c.get('/api/huertos').status_code == 401)
 
     c, t = sesion_activa()
     alterar(c, **{sesion.VISTO: t - 901})

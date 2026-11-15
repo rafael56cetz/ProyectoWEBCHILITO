@@ -2,6 +2,8 @@ from django.urls import path,re_path
 from allauth.headless.account import views as auth
 from allauth.headless.mfa import views as mfa
 from cuentas.api import bootstrap,profile,registration,browser_endpoint,totp_qr,verification_context
+from datos import api as datos
+from huerto import api as huerto
 from privacidad import api as privacidad
 from web import api
 from web.static_views import frontend,resource
@@ -32,12 +34,20 @@ urlpatterns=[path('',frontend),path('index.html',frontend),
  path('api/admin/guias/<uuid:guide_id>/editar',api.admin_guide_edit),
  path('api/admin/guias/<uuid:guide_id>/publicar',api.admin_guide_publish),
  path('api/admin/guias/<uuid:guide_id>/retirar',api.admin_guide_withdraw),
+ path('api/legales/aceptar',datos.accept_legal),path('api/dispositivos/vincular',datos.link_device),
+ path('api/comandos/<uuid:comando_id>',datos.command_state),
+ path('api/huertos',huerto.gardens),path('api/huertos/<int:huerto_id>',huerto.garden),
+ path('api/huertos/<int:huerto_id>/renombrar',huerto.garden_rename),path('api/huertos/<int:huerto_id>/archivar',huerto.garden_archive),
+ path('api/huertos/<int:huerto_id>/ia',huerto.garden_summaries),path('api/huertos/<int:huerto_id>/codigo',huerto.link_code),
+ path('api/huertos/<int:huerto_id>/vinculacion',huerto.link_state),path('api/huertos/<int:huerto_id>/desvincular',huerto.unlink),
+ path('api/huertos/<int:huerto_id>/plantas/<int:numero>',huerto.plant),
+ path('api/huertos/<int:huerto_id>/comandos',huerto.commands),path('api/huertos/<int:huerto_id>/cuidados',huerto.cares),
  # Rediseñadas en fases posteriores: responden 503 en-actualizacion.
- path('api/huertos/actual',api.en_actualizacion),path('api/huertos/actual/avisos',api.en_actualizacion),
+ path('api/huertos/actual/avisos',api.en_actualizacion),
  path('api/huertos/actual/avisos/<str:notice_id>',api.en_actualizacion),path('api/huertos/actual/avisos/<str:notice_id>/lectura',api.en_actualizacion),
- path('api/huertos/actual/mantenimiento',api.en_actualizacion),path('api/huertos/actual/solicitudes',api.en_actualizacion),
+ path('api/huertos/actual/mantenimiento',api.en_actualizacion),
  path('api/soporte',api.en_actualizacion),path('api/soporte/<uuid:case_id>/revocar',api.en_actualizacion),
- path('api/vinculacion',api.en_actualizacion),path('api/admin/vinculacion',api.en_actualizacion),
+ path('api/admin/vinculacion',api.en_actualizacion),
  path('api/admin/vinculacion/emitir',api.en_actualizacion),path('api/admin/vinculacion/<uuid:code_id>/revocar',api.en_actualizacion),
  path('api/admin/flota',api.en_actualizacion),
  path('api/admin/soporte',api.en_actualizacion),path('api/admin/soporte/<uuid:case_id>/solicitar-token',api.en_actualizacion),

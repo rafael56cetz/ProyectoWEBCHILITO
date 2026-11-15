@@ -111,8 +111,7 @@ const AppViews = (() => {
   const date = value => `<time${value && Number.isFinite(new Date(value).getTime()) ? ` datetime="${escaparHTML(new Date(value).toISOString())}"` : ''}>${escaparHTML(AppModel.date(value))}</time>`;
   const heading = (title,intro='') => `<div class="page-heading"><div><h1>${escaparHTML(title)}</h1>${intro?`<p>${escaparHTML(intro)}</p>`:''}</div></div>`;
   const state = (title,text,loading=false,retry=false) => `<div class="app-state bento-panel" role="${retry?'alert':'status'}"${loading?' aria-busy="true"':''}><span class="icon-medallion">${icon(loading?'clock':'info')}</span><h2>${escaparHTML(title)}</h2><p>${escaparHTML(text)}</p>${retry?'<button class="button btn-liquid-brand" type="button" data-app-action="reload">Reintentar</button>':''}</div>`;
-  // Sin huerto: formulario «Vincular mi huerto». La confirmación llega siempre del servidor.
-  const gardenLink = () => BindingViews.userPanel();
+  const accountTabs = active => `<nav class="account-tabs" aria-label="Apartados de mi cuenta">${[['perfil','','Perfil'],['huertos','/huertos','Mis huertos'],['seguridad','/seguridad','Seguridad'],['privacidad','/privacidad','Privacidad']].map(([key,path,label])=>`<a class="button ${key===active?'btn-liquid-brand active':'btn-liquid-light'}" href="#cuenta${path}"${key===active?' aria-current="page"':''}>${label}</a>`).join('')}</nav>`;
   const accountGreeting = greeting => greeting?(greeting==='Bienvenido'?greeting:'Hola, '+greeting):'Tu información de acceso.';
   // `nav` lo prepara AppController según la sesión y sus capacidades; la vista solo pinta los enlaces.
   function shell(route,{isAdmin,links,account}) {
@@ -162,7 +161,7 @@ const AppViews = (() => {
   // Salida al pie de Mi cuenta. Sigue disponible aunque el perfil no haya podido cargarse.
   const signOut = () => `<section class="bento-panel account-session" aria-labelledby="session-title"><div><h2 id="session-title">Tu sesión</h2><p>Saldrás de tu cuenta en este navegador.</p></div><button class="button btn-liquid-light account-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></section>`;
   function account(data) {
-    const privacyLink = '<nav class="account-tabs" aria-label="Apartados de mi cuenta"><a class="button btn-liquid-brand active" href="#cuenta" aria-current="page">Perfil</a><a class="button btn-liquid-light" href="#cuenta/seguridad">Seguridad</a><a class="button btn-liquid-light" href="#cuenta/privacidad">Privacidad</a></nav>';
+    const privacyLink = accountTabs('perfil');
     if(data.status==='loading')return heading('Mi cuenta')+privacyLink+state('Cargando cuenta','Consultando la información de tu cuenta.',true)+signOut();
     if(data.status==='error')return heading('Mi cuenta')+privacyLink+state('No se pudo consultar tu cuenta','Inténtalo de nuevo.',false,true)+signOut();
     return heading('Mi cuenta',accountGreeting(data.greeting))+privacyLink+`<section class="bento-panel account-profile" aria-labelledby="profile-title"><span class="icon-medallion">${icon('user')}</span><h2 id="profile-title">Datos de la cuenta</h2><dl class="profile-facts"><div><dt>Correo electrónico</dt><dd>${data.email?escaparHTML(data.email):'Esperando información de la cuenta'}</dd></div><div><dt>Verificación del correo</dt><dd>${data.verified===true?'Correo verificado':data.verified===false?'Correo sin verificar':'Sin información disponible'}</dd></div></dl><div class="app-actions"><a class="button btn-liquid-brand" href="#cuenta/contrasena">Cambiar contraseña</a></div></section><div data-profile-form></div>${signOut()}`;
@@ -213,7 +212,7 @@ const AppViews = (() => {
       }};
   }
   const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'}};
-  return {shell,frame,heading,state,date,notices,account,accountGreeting,gardenLink,confirmaciones,
+  return {shell,frame,heading,state,date,notices,account,accountGreeting,accountTabs,confirmaciones,
     assistant(){return heading('Asistente')+`<section class="bento-panel assistant-panel" aria-label="Disponibilidad del asistente"><span class="icon-medallion">${icon('sparkle')}</span><p>Aquí podrás consultar orientación para cuidar tu huerto y comprender sus avisos. La asistencia con inteligencia artificial se incorporará en una próxima etapa.</p></section>`;},
     reading(raw,unit){return `<strong class="${raw.value==null?'absent':''}">${raw.value==null?'—':escaparHTML(AppModel.number(raw.value))}${raw.value==null?'':`<small>${unit}</small>`}</strong>`;},
     readingNote(raw){return raw.quality==='invalid'?'Lectura inválida. Revisa este sensor.':raw.value==null?'Aún no hay lecturas disponibles.':`Última lectura: ${date(raw.at)}`;}

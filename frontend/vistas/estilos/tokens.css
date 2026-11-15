@@ -73,7 +73,7 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) {
   --claro-desenfoque:blur(22px) saturate(150%);
   --text:var(--claro-tinta);--muted:var(--claro-suave);--focus:var(--claro-verde);--sage:var(--claro-verde);
   --garden-ink:var(--claro-tinta);--garden-muted:var(--claro-suave);--garden-line:var(--claro-linea);
-  --garden-green:#fff;--garden-tint:rgba(255,255,255,.1);
+  --garden-green:var(--claro-verde);--garden-tint:rgba(255,255,255,.1);
 
   /* Botones de vidrio del panel */
   --boton-alto:44px;--boton-alto-compacto:38px;

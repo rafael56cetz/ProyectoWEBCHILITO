@@ -19,7 +19,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.utils import timezone
 
-from datos.services import auditar, identity
+from datos.services import aceptaciones_pendientes, auditar, identity
 from huerto.models import Huerto
 
 from . import politicas
@@ -206,6 +206,30 @@ def registrar_actos_de_registro(usuario, request):
             raise ValidationError('Textos legales no publicados')
         Decision.objects.create(sujeto=sujeto, acto=acto, decision=True, documento=documento, usuario=usuario,
                                 ip_recortada=ip_recortada(request), navegador=navegador_resumido(request))
+
+
+ACTO_POR_TIPO = {'terminos': 'aceptacion_terminos', 'aviso_privacidad': 'lectura_aviso'}
+
+
+@transaction.atomic
+def aceptar_textos(actor, documentos, request):
+    """Guarda la aceptación de textos vigentes. Solo valen los que la base marca como pendientes para esta cuenta."""
+    usuario = identity(actor)
+    if (not isinstance(documentos, list) or not 1 <= len(documentos) <= len(ACTO_POR_TIPO)
+            or not all(isinstance(identificador, str) for identificador in documentos)
+            or len(set(documentos)) != len(documentos)):
+        raise ValidationError('Documentos no válidos')
+    pendientes = {pendiente['documentId']: pendiente for pendiente in aceptaciones_pendientes(usuario)}
+    if not set(documentos) <= set(pendientes):
+        raise ValidationError('Documento no pendiente')
+    sujeto = Sujeto.objects.get(usuario=usuario, ambito='cuenta')
+    for identificador in documentos:
+        Decision.objects.create(sujeto=sujeto, acto=ACTO_POR_TIPO[pendientes[identificador]['type']], decision=True,
+                                documento=DocumentoLegal.objects.get(pk=identificador), usuario=usuario,
+                                ip_recortada=ip_recortada(request), navegador=navegador_resumido(request))
+    auditar(usuario, 'aceptar_legales', entidad='documento_legal',
+            detalle={'tipos': sorted(pendientes[identificador]['type'] for identificador in documentos)})
+    return {'status': 'accepted', 'pendingLegal': aceptaciones_pendientes(usuario)}
 
 
 def _limpiar(datos):

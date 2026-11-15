@@ -9,6 +9,8 @@ SECRET_KEY=os.environ.get('CHILITO_DJANGO_KEY','')
 if len(SECRET_KEY)<32:raise ImproperlyConfigured('Suministra CHILITO_DJANGO_KEY externo de al menos 32 caracteres')
 CHILITO_SUPPORT_KEY=os.environ.get('CHILITO_SUPPORT_KEY','')
 if len(CHILITO_SUPPORT_KEY.encode())<32:raise ImproperlyConfigured('Suministra CHILITO_SUPPORT_KEY independiente de al menos 32 bytes')
+CHILITO_VINCULACION_SECRETO=os.environ.get('CHILITO_VINCULACION_SECRETO','')
+if len(CHILITO_VINCULACION_SECRETO.encode())<32:raise ImproperlyConfigured('Suministra CHILITO_VINCULACION_SECRETO de al menos 32 bytes')
 DEBUG=False
 # localhost y no 127.0.0.1: WebAuthn no acepta una IP como identificador del sitio.
 ORIGIN=os.environ.get('CHILITO_ORIGIN','http://localhost:8780')
@@ -74,7 +76,7 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE=False
 ACCOUNT_RATE_LIMITS={'signup':'10/m/ip','login':'30/m/ip','login_failed':'10/m/ip,5/300s/key',
  'confirm_email':'1/60s/key','reset_password':'10/m/ip,1/60s/key','reset_password_from_key':'20/m/ip','change_password':'5/m/user',
  'request_login_code':'20/m/ip,3/m/key','reauthenticate':'10/m/user',
- 'privacidad_cookies':'20/m/ip','estadistica_seccion':'60/m/ip','contacto_producto':'5/h/ip'}
+ 'privacidad_cookies':'20/m/ip','estadistica_seccion':'60/m/ip','contacto_producto':'5/h/ip','vincular_dispositivo':'20/m/ip,5/m/key'}
 PASSWORD_RESET_TIMEOUT=600
 SESSION_ENGINE='django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE=28800

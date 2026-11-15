@@ -9,6 +9,14 @@ from django.http.request import RawPostDataException
 
 logger = logging.getLogger(__name__)
 REGLA_DE_DATOS = '23514'
+# Reglas de la base que la persona puede resolver; el resto sigue como `regla-de-datos`.
+REGLAS_CON_CODIGO = (('Máximo 3 huertos activos', 'huerto-limite', 'Ya tienes 3 huertos. Archiva uno para crear otro.'),
+                     ('Ya tienes un huerto sin equipo', 'huerto-sin-equipo',
+                      'Ya tienes un huerto sin equipo. Vincúlalo antes de crear otro.'),
+                     ('Desvincula el equipo antes de archivar', 'huerto-con-equipo',
+                      'Desvincula el equipo antes de archivar este huerto.'),
+                     ('Este huerto ya tiene equipo', 'huerto-con-equipo', 'Este huerto ya tiene un equipo vinculado.'),
+                     ('El equipo no está vinculado', 'equipo-no-vinculado', 'Este huerto no tiene un equipo vinculado.'))
 
 
 class EntradaInvalida(ValueError):
@@ -75,5 +83,7 @@ def respuesta_de_base(fallo):
         return None
     logger.warning('regla-de-datos tabla=%s regla=%s mensaje=%s', diagnostico.table_name,
                    diagnostico.constraint_name, diagnostico.message_primary)
-    return JsonResponse({'status': 409, 'code': 'regla-de-datos', 'message': 'La operación no cumple una regla de los datos.'},
-                        status=409)
+    code, message = next(((codigo, texto) for inicio, codigo, texto in REGLAS_CON_CODIGO
+                          if diagnostico.message_primary.startswith(inicio)),
+                         ('regla-de-datos', 'La operación no cumple una regla de los datos.'))
+    return JsonResponse({'status': 409, 'code': code, 'message': message}, status=409)

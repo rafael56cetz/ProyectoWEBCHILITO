@@ -148,15 +148,7 @@ body[data-private=true] [tabindex="-1"]:focus,
 .app-dialog-actions { display:flex; flex-wrap:wrap; gap:12px; }
 .app-dialog-actions .button { flex:1 1 150px; min-width:0; }
 
-.garden-link { display:flex; flex-wrap:wrap; align-items:center; gap:20px; margin-bottom:32px; }
-.garden-link > div { flex:1 1 240px; min-width:0; }
-.garden-link h2 { margin:0 0 8px; }
-.garden-link p { margin:0; }
-@media (max-width:480px) { .garden-link > .button { width:100%; } }
-
 /* Mi cuenta: perfil, seguridad y privacidad */
-.garden-link { margin-bottom:28px;align-items:flex-start; }
-.garden-link .icon-medallion { flex:0 0 auto; }
 .account-profile { margin-top:24px; }
 .account-profile [data-profile-state] { margin:16px 0 0; }
 [data-profile-form] .account-profile h2 { margin-top:0; }
@@ -479,9 +471,6 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
 .garden-welcome-lead { margin:12px 0 0;color:#264d32;font-size:clamp(19px,2vw,22px);font-weight:500;line-height:1.35; }
 .garden-welcome-phrase { margin:6px 0 0;color:#2f4436;font-size:17px;font-weight:400;line-height:1.5; }
 
-/* Sin huerto asignado: la pantalla completa se muestra vacía y sus controles quedan deshabilitados. */
-.user-locked { display:contents;min-width:0;margin:0;padding:0;border:0; }
-
 .user-diagnosis-meta { margin-top:12px!important;font-size:13px!important;color:var(--garden-muted); }
 .user-diagnosis-explanation { margin-top:16px;padding-top:14px;border-top:1px solid rgba(70,40,20,.14); }
 .user-diagnosis-explanation .user-diagnosis-meta { margin-top:8px!important; }
@@ -570,3 +559,37 @@ body[data-role=admin] .app-actions .button { white-space:normal; }
   .admin-connection:before { background:CanvasText; }
   body[data-role=admin] :is(input,select,textarea) { background:Field;color:FieldText; }
 }
+
+/* Mi huerto: selector, estados vacíos, asistente de vinculación, tarjeta de orden y Mis huertos */
+.garden-selector { position:relative;display:inline-block;margin-bottom:18px; }
+.garden-selector summary { display:inline-flex;align-items:center;gap:8px;min-height:var(--boton-alto-compacto);padding:0 16px;border-radius:999px;border:1px solid var(--boton-secundaria-borde);background:var(--boton-secundaria);box-shadow:var(--boton-secundaria-filo);font-weight:600;cursor:pointer;list-style:none; }
+.garden-selector summary::after { content:"▾"; }
+.garden-selector ul { position:absolute;z-index:var(--z-menu);min-width:260px;margin:8px 0 0;padding:8px;list-style:none;border-radius:var(--radio-menu);background:var(--claro-tarjeta-solida);box-shadow:var(--claro-filo); }
+.garden-selector li a,.garden-selector-off { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:var(--radio-campo);color:inherit;text-decoration:none; }
+.garden-selector li a:hover,.garden-selector li a[aria-current] { background:var(--garden-tint); }
+.garden-selector-off { color:var(--garden-muted);cursor:not-allowed; }
+.garden-empty,.garden-form,.garden-connect { display:grid;gap:14px;margin-bottom:24px; }
+.garden-empty { justify-items:center;text-align:center; }
+.garden-empty-art { display:flex;gap:12px;justify-content:center; }
+.garden-empty-art .plant-drawing { width:64px;height:78px; }
+.garden-empty-link { display:inline-flex;align-items:center;gap:6px;color:var(--claro-verde); }
+.garden-form { max-width:640px; }
+.garden-form form { display:grid;gap:10px; }
+.garden-steps { display:grid;gap:12px;margin:0;padding-left:1.2em; }
+.garden-steps li span { display:block;color:var(--garden-muted);font-size:14px; }
+.garden-back { display:inline-block;margin-bottom:12px;color:var(--claro-verde);font-weight:600; }
+.user-quick-actions { display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px; }
+.link-progress { display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 20px;padding:0;list-style:none;color:var(--garden-muted); }
+.link-progress [aria-current=step] { color:var(--claro-titulo);font-weight:700; }
+.link-code-box { display:grid;gap:8px;justify-items:start; }
+.link-code { margin:0;padding:14px 20px;border-radius:var(--radio-campo);border:1px solid var(--garden-line);background:var(--campo-fondo);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:.12em;user-select:all; }
+.link-help { margin-top:8px; }
+.order-card { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }
+.order-card h3,.order-card p { margin:0; }
+.order-card.is-sending .badge { animation:orden-pulso 1.4s ease-in-out infinite; }
+@keyframes orden-pulso { 50% { opacity:.55; } }
+@media (prefers-reduced-motion:reduce) { .order-card.is-sending .badge { animation:none; } }
+.my-garden { display:grid;gap:12px;margin-bottom:20px; }
+.my-garden h2 { margin:0; }
+.legal-card { display:grid;gap:10px;margin:0 0 14px;padding:14px 16px;border:1px solid color-mix(in srgb,currentColor 35%,transparent);border-radius:var(--radio-campo); }
+.legal-check { display:flex;gap:10px;align-items:flex-start; }

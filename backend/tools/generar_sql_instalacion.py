@@ -15,6 +15,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.testing')
 os.environ.setdefault('CHILITO_ENV', 'testing')
 os.environ.setdefault('CHILITO_DJANGO_KEY', 'solo-generacion-sin-valor-real-0000000')
 os.environ.setdefault('CHILITO_SUPPORT_KEY', 'solo-generacion-sin-valor-real-0000001')
+os.environ.setdefault('CHILITO_VINCULACION_SECRETO', 'solo-generacion-sin-valor-real-0000002')
 
 import django
 from django.db import connections

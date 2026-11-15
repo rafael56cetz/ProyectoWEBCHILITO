@@ -1,5 +1,5 @@
 // VISTA · Cuenta: pantallas de acceso, segundo factor, perfil y privacidad personal.
-// Define: AuthViews, MfaViews, ProfileViews, PrivacyViews.
+// Define: AuthViews, MfaViews, ProfileViews, PrivacyViews, LegalAcceptViews.
 
 // ── Acceso ──
 const AuthViews = (() => {
@@ -230,7 +230,7 @@ const MfaViews = Object.freeze({
       <button class="button btn-liquid-light" type="button" data-step-key hidden>Usar llave de acceso</button></div></form>`;
   },
   account() {
-    const tabs = '<nav class="account-tabs" aria-label="Apartados de mi cuenta"><a class="button btn-liquid-light" href="#cuenta">Perfil</a><a class="button btn-liquid-brand active" href="#cuenta/seguridad" aria-current="page">Seguridad</a><a class="button btn-liquid-light" href="#cuenta/privacidad">Privacidad</a></nav>';
+    const tabs = AppViews.accountTabs('seguridad');
     return `${AppViews.heading('Seguridad','Elige cómo confirmas tu identidad al entrar.')}${tabs}
       <div id="mfa-feedback" class="user-feedback" role="status" tabindex="-1" hidden></div>
       <section class="bento-panel" data-mfa-required hidden role="alert"><h2>Activa un método para usar el panel</h2><p>Los administradores necesitan una app autenticadora o una llave de acceso.</p></section>
@@ -442,7 +442,7 @@ const ProfileViews = (() => {
 
 const PrivacyViews = Object.freeze({
   account() {
-    const tabs = '<nav class="account-tabs" aria-label="Apartados de mi cuenta"><a class="button btn-liquid-light" href="#cuenta">Perfil</a><a class="button btn-liquid-light" href="#cuenta/seguridad">Seguridad</a><a class="button btn-liquid-brand active" href="#cuenta/privacidad" aria-current="page">Privacidad</a></nav>';
+    const tabs = AppViews.accountTabs('privacidad');
     const documents = '<nav class="doc-links" aria-label="Documentos legales"><span>Documentos legales</span><a href="#privacidad">Aviso de privacidad</a><a href="#cookies">Política de cookies</a><a href="#terminos">Términos y condiciones</a></nav>';
     return `<div class="privacy-flow">${AppViews.heading('Privacidad','Consulta tus datos y decide sobre las estadísticas de este navegador.')}${tabs}<div data-my-privacy></div>${documents}</div>`;
   },
@@ -452,3 +452,33 @@ const PrivacyViews = Object.freeze({
     return root.querySelector('[data-my-privacy]');
   }
 });
+
+// ── Legales ──
+// Aceptación de textos legales nuevos (4.0), con el marco del acceso. Los datos del servidor entran escapados.
+const LegalAcceptViews = (() => {
+  const documents = {
+    terminos:{link:'#terminos', accept:version => `Acepto los Términos y condiciones (versión ${version})`},
+    aviso_privacidad:{link:'#privacidad', accept:version => `He leído el Aviso de privacidad (versión ${version})`}};
+  const card = item => {
+    const document = documents[item.type];
+    return `<fieldset class="legal-card"><legend>${escaparHTML(item.title)} · versión ${escaparHTML(item.version)}</legend>
+      ${document ? `<a class="auth-text-link" href="${document.link}" target="_blank" rel="noopener noreferrer">Leer documento${icon('external')}<span class="sr-only"> (se abre en otra pestaña)</span></a>` : ''}
+      <label class="legal-check"><input type="checkbox" name="document" value="${escaparHTML(item.documentId)}" required><span>${escaparHTML(document ? document.accept(item.version) : `Acepto ${item.title} (versión ${item.version})`)}</span></label></fieldset>`;
+  };
+  function screen(root, assets, pending) {
+    const form = `<form data-legal-form novalidate>${pending.map(card).join('')}
+      <div data-legal-feedback class="auth-feedback is-error" role="alert" hidden>No pudimos guardar tu aceptación. Inténtalo de nuevo.</div>
+      <div class="step-actions"><button class="button btn-liquid-brand" type="submit" disabled>Aceptar y continuar</button>
+      <button class="button btn-liquid-light" type="button" data-legal-logout>Cerrar sesión</button></div></form>`;
+    root.innerHTML = AuthViews.layout('Actualizamos nuestros documentos', 'Para seguir usando El Chilito, revisa y acepta la versión nueva.', form, assets);
+    const host = root.querySelector('[data-legal-form]'), submit = host.querySelector('[type=submit]'), feedback = host.querySelector('[data-legal-feedback]');
+    const boxes = () => [...host.querySelectorAll('input[name=document]')];
+    return {form:host, logout:host.querySelector('[data-legal-logout]'),
+      ids: () => boxes().filter(box => box.checked).map(box => box.value),
+      allChecked: () => boxes().every(box => box.checked),
+      changed() { submit.disabled = !boxes().every(box => box.checked); feedback.hidden = true; },
+      busy(on) { submit.disabled = on || !boxes().every(box => box.checked); submit.textContent = on ? 'Guardando…' : 'Aceptar y continuar'; },
+      fail() { feedback.hidden = false; }};
+  }
+  return Object.freeze({screen});
+})();

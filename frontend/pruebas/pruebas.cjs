@@ -20,113 +20,6 @@ const cargar = (contexto, ...archivos) => archivos.forEach(a => vm.runInContext(
 const suites = [];
 const suite = (titulo, ejecutar) => suites.push([titulo, ejecutar]);
 
-// ── Ayuda para vincular: borrador de correo sin secretos ──────────────────────────────────────
-suite('ayuda de vinculación', () => {
-  function load(supportContact) {
-    const context = vm.createContext({ChilitoHTTP:{configuration:{supportContact}}});
-    cargar(context, 'modelos/equipos.js');
-    return vm.runInContext('BindingHelp', context);
-  }
-  const SUPPORT = 'soporte@example.test';
-  const SUBJECT = '[El Chilito] Ayuda con la vinculación';
-  const OPENING = 'Hola, necesito ayuda para vincular mi huerto. ';
-  const parts = href => {
-    const [target, query] = href.slice('mailto:'.length).split('?');
-    assert.deepEqual([...new URLSearchParams(query).keys()], ['subject', 'body']);
-    const field = name => decodeURIComponent(query.split('&').find(p => p.startsWith(name + '=')).slice(name.length + 1));
-    return {target, subject:field('subject'), body:field('body')};
-  };
-  const help = load(SUPPORT);
-
-  // Cuatro motivos, destinatario y asunto.
-  for(const [reason, detail, expected] of [
-    ['expired', '', 'venció antes de completar la vinculación'],
-    ['lost', '', 'Perdí o no encuentro el código'],
-    ['rejected', '', 'no funciona al intentar vincular'],
-    ['other', 'La pantalla se queda en blanco.', 'por este motivo: La pantalla se queda en blanco.']]) {
-    const draft = help.draft(reason, detail);
-    assert.equal(draft.status, 'ready', reason);
-    const mail = parts(draft.href);
-    assert.equal(mail.target, SUPPORT);
-    assert.equal(mail.subject, SUBJECT);
-    assert.ok(mail.body.startsWith(OPENING), reason);
-    assert.ok(mail.body.includes(expected), reason);
-    assert.ok(mail.body.includes('\r\n\r\nInformación adicional'), reason);
-  }
-  assert.ok(help.draft('expired').body.includes('El código que recibí venció antes de completar la vinculación. Quisiera solicitar orientación para obtener uno nuevo.'));
-
-  // Texto para copiar: sale del mismo borrador, con las tres partes separadas y sin la URL.
-  for(const [reason, detail] of [['expired'], ['lost'], ['rejected'], ['other', 'Se queda en blanco.']]) {
-    const draft = help.draft(reason, detail);
-    assert.equal(draft.text, `Para: ${SUPPORT}\nAsunto: ${SUBJECT}\n\nMensaje:\n${draft.body.trimEnd()}\n`, reason);
-    assert.ok(!draft.text.includes('mailto'), reason);
-    assert.ok(!draft.text.includes('%'), reason);
-  }
-  assert.notEqual(help.draft('expired').text, help.draft('lost').text);
-  for(const refused of [help.draft('', ''), help.draft('other', ''), help.draft('other', 'el 2FA era 123456'), load('').draft('expired')])
-    assert.equal(refused.text, undefined);
-  assert.ok(help.draft('other', 'ñ & ?x=1 #a %20 🌶️').text.includes('ñ & ?x=1 #a %20 🌶️'));
-
-  // «Otro motivo» exige explicación; un motivo cerrado ignora el texto oculto.
-  assert.equal(help.draft('other', '').status, 'need-detail');
-  assert.equal(help.draft('other', ' \n\t ').status, 'need-detail');
-  assert.equal(help.draft('', '').status, 'need-reason');
-  assert.equal(help.draft('__proto__', 'x').status, 'need-reason');
-  const atLimit = 'ab '.repeat((help.MAX_DETAIL - 3) / 3) + 'abc';
-  assert.equal(atLimit.length, help.MAX_DETAIL);
-  assert.equal(help.draft('other', atLimit).status, 'ready');
-  assert.equal(help.draft('other', atLimit + 'd').status, 'too-long');
-  assert.ok(!help.draft('expired', 'texto oculto').body.includes('texto oculto'));
-
-  // Caracteres especiales: no rompen la URL, no añaden cabeceras y vuelven idénticos.
-  const special = 'ñáü & ?x=1 #a %20 + "c" <b> 🌶️\r\ncc: otro@example.test&bcc=x@example.test';
-  const specialMail = help.draft('other', special);
-  assert.equal(specialMail.status, 'ready');
-  assert.ok(!/[\s#<>"]/.test(specialMail.href));
-  assert.equal(specialMail.href.match(/&/g).length, 1);
-  assert.equal(specialMail.href.match(/\?/g).length, 1);
-  assert.ok(parts(specialMail.href).body.includes('ñáü & ?x=1 #a %20 + "c" <b> 🌶️\r\ncc: otro@example.test&bcc=x@example.test'));
-  assert.equal(help.draft('other', 'mal \uD83D formado').status, 'ready');
-  assert.ok(!parts(help.draft('other', 'a\u0000b\u0007c').href).body.includes('\u0000'));
-
-  // Nada de secretos en el borrador.
-  const code = '0123456789ABCDEFGHJKMNPQRS';
-  for(const value of [`mi código es ${code}`, code.toLowerCase(), code.replace(/(.{6})/g, '$1-'), code.replace(/(.{6})/g, '$1 '), 'el 2FA era 123456'])
-    assert.equal(help.draft('other', value).status, 'secret', value);
-  assert.equal(help.draft('other', 'Mi teléfono no recibe el correo desde 2024.').status, 'ready');
-  for(const reason of ['expired', 'lost', 'rejected']) {
-    const body = help.draft(reason).body;
-    assert.ok(!/(?:[0-9A-Z]-?){26}|\d{6}/.test(body), reason);
-  }
-
-  // Destinatario: solo el contacto configurado; si falta o no es válido, no se inventa otro.
-  assert.equal(help.contact(), SUPPORT);
-  assert.equal(help.draft('expired').address, SUPPORT);
-  for(const value of ['', '   ', null, undefined, 'no-es-correo', 'a b@example.test', 7]) {
-    const missing = load(value);
-    assert.equal(missing.contact(), null);
-    assert.equal(missing.draft('expired').status, 'unavailable');
-  }
-  const crafted = load('a?bcc=x@example.test');
-  assert.equal(parts(crafted.draft('expired').href).target, 'a%3Fbcc%3Dx@example.test');
-
-  // Separación de contextos y de capas (vinculación vive sola en su archivo de equipos).
-  const view = read('vistas/equipos.js'), model = read('modelos/equipos.js'), controller = read('controladores/equipos.js');
-  assert.ok(!view.includes('#consiguelo'));
-  assert.ok(!view.includes('Consíguelo'));
-  assert.ok(!view.includes('Copiar correo'));
-  assert.ok(bloque('vistas/publico.js', 'Pagina publica').includes('id="consiguelo"'));
-  for(const label of ['Solicitar ayuda para vincular mi huerto', 'El código venció.', 'Perdí o no encuentro el código.', 'El código no funciona.', 'Otro motivo', 'Preparar correo', 'Copiar mensaje preparado', 'Copiar dirección de soporte']) assert.ok(view.includes(label), label);
-  assert.ok(!/fetch\(|ChilitoHTTP/.test(view));
-  assert.ok(!/document\.|querySelector/.test(model));
-  for(const source of [view, model, controller]) assert.ok(!/correo enviado|mensaje enviado/i.test(source));
-  const helpSource = controller.slice(controller.indexOf('const BindingHelpController'));
-  assert.ok(!/service\.consume|ChilitoHTTP|fetch\(/.test(helpSource));
-  assert.equal(helpSource.match(/service\.draft\(/g).length, 1);
-  assert.equal(helpSource.match(/openMail\(/g).length, 1);
-  console.log('PASS ayuda de vinculación');
-});
-
 // ── Comercial: validaciones y borradores, sin red, DOM ni almacenamiento ──────────────────────
 suite('comercial', () => {
   const forbidden = () => { throw new Error('El modelo comercial no debe consultar red, DOM ni almacenamiento'); };
@@ -309,89 +202,100 @@ suite('contrato de adaptadores', async () => {
 });
 
 // ── Tarjeta del huerto (diagnóstico) y retirada de despliegues ───────────────────────────────
-suite('tarjeta del huerto', async () => {
-  const context = vm.createContext({});
-  vm.runInContext(bloque('modelos/huerto.js', 'Diagnostico'), context);
-  const D = vm.runInContext('GardenDiagnosis', context);
-  const NOW = Date.parse('2026-11-08T12:00:00Z'), at = '2026-11-08T11:58:00+00:00';
-  const rule = c => ({source:'rules', title:'Revisa', message:'Nivel bajo.', next:'Rellena', generatedAt:at, ...c});
-  const exp = c => ({status:'available', source:'ai', text:'Porque…', generatedAt:at, expiresAt:'2026-11-08T13:00:00+00:00', ...c});
-  const base = c => ({rule:rule(), readings:{state:'current', at}, explanation:null, ...c});
-  const view = raw => D.present(D.adapt(raw), NOW);
-  // Fechas: solo el formato canónico, con T y zona.
-  for(const bad of ['2026-11-08T11:58:00', '2026-11-08 11:58:00+00:00', '2026-11-08', '20261108T115800Z', '2026-11-08T11:58Z', 'ayer']) assert.equal(D.adapt(base({rule:rule({generatedAt:bad})})), null, bad);
-  for(const good of ['2026-11-08T11:58:00.000+00:00', '2026-11-08T11:58:00Z', '2026-11-08T05:58:00-06:00']) assert.notEqual(D.adapt(base({rule:rule({generatedAt:good})})), null, good);
-  // Vacío e inválido: null, sin lanzar.
-  for(const bad of [null, undefined, '', 'x', 7, [], {}, {rule:{}}, base({rule:rule({source:'ai'})}), base({rule:rule({title:' '})}), base({rule:rule({title:'x'.repeat(121)})}), base({rule:rule({message:7})}), base({rule:rule({message:'a\u0000b'})}), base({rule:rule({generatedAt:'ayer'})}), base({rule:rule({next:5})}), base({readings:null}), base({readings:{state:'fresh', at}}), base({readings:{state:'stale', at:null}}), base({readings:{state:'missing', at}})])
-    assert.equal(D.adapt(bad), null, JSON.stringify(bad));
-  assert.equal(D.present(null), null);
-  // Solo reglas: sin nada que mencione IA.
-  const solo = view(base());
-  assert.equal(solo.title, 'Revisa'); assert.match(solo.origin, /^Resumen por reglas/); assert.equal(solo.explanation, null);
-  assert.ok(!/\bIA\b/.test(JSON.stringify(solo)));
-  assert.equal(view(base({rule:rule({next:null})})).next, null);
-  // Lecturas: cada estado con su texto.
-  assert.match(view(base({readings:{state:'missing', at:null}})).readings, /Sin lecturas disponibles/);
-  assert.match(view(base({readings:{state:'stale', at}})).readings, /Lecturas antiguas/);
-  assert.match(view(base()).readings, /^Lecturas del /);
-  // Explicación: disponible, y etiquetada como IA solo entonces.
-  const full = view(base({explanation:exp()}));
-  assert.equal(full.explanation.state, 'available'); assert.equal(full.explanation.text, 'Porque…'); assert.match(full.explanation.note, /generada con IA/);
-  assert.equal(full.title, 'Revisa', 'la explicación no sustituye al mensaje');
-  // Sin validez: la regla se mantiene y no hay texto.
-  for(const bad of [exp({text:''}), exp({text:'x'.repeat(1201)}), exp({status:'blocked'}), exp({status:'truncated'}), exp({status:'failed'}), exp({status:'empty'}), exp({source:'rules'}), exp({expiresAt:null}), exp({generatedAt:'x'}), 'x', 7, []]) {
-    const v = view(base({explanation:bad}));
-    assert.equal(v.title, 'Revisa'); assert.equal(v.explanation.state, 'unavailable', JSON.stringify(bad)); assert.equal(v.explanation.text, undefined);
-  }
-  // Caducidad: del servidor y al pasar el tiempo. No altera las lecturas.
-  const fromServer = view(base({explanation:{status:'expired'}}));
-  assert.equal(fromServer.explanation.state, 'expired'); assert.match(fromServer.readings, /^Lecturas del /);
-  const live = D.adapt(base({explanation:exp()}));
-  assert.equal(D.present(live, Date.parse('2026-11-08T13:00:00Z')).explanation.state, 'expired');
-  assert.equal(D.present(live, Date.parse('2026-11-08T12:59:59Z')).explanation.state, 'available');
-  assert.match(D.present(live, Date.parse('2026-11-08T14:00:00Z')).readings, /^Lecturas del /);
-  assert.equal(D.msUntilExpiry(live, NOW), 3600000);
-  assert.equal(D.msUntilExpiry(live, Date.parse('2026-11-09T00:00:00Z')), null);
-  assert.equal(D.msUntilExpiry(D.adapt(base()), NOW), null);
-  // El texto malicioso sigue siendo dato y la vista no usa HTML.
-  assert.equal(view(base({rule:rule({title:'<img src=x onerror=alert(1)>'})})).title, '<img src=x onerror=alert(1)>');
-  const v = bloque('vistas/huerto.js', 'Diagnostico'), card = bloque('vistas/huerto.js', 'Huerto usuario'), model = bloque('modelos/huerto.js', 'Huerto usuario');
-  const admin = bloque('vistas/administracion.js', 'Administracion'), adminModel = bloque('modelos/administracion.js', 'Administracion'), adminControl = bloque('controladores/administracion.js', 'Administracion');
-  assert.ok(!/innerHTML|fetch\(|ChilitoHTTP/.test(v));
-  assert.ok(!/document\.|querySelector/.test(bloque('modelos/huerto.js', 'Diagnostico')));
-  assert.ok(model.includes('diagnosis:GardenDiagnosis.adapt(raw.body.diagnosis)'));
-  assert.ok(!/data\.diagnosis|diagnosis\.title/.test(card), 'la plantilla no inserta datos del resumen');
-  assert.ok(card.includes('>Resumen de tu huerto</h2>') && !card.includes('Diagnóstico inteligente'));
+suite('Mi huerto y retirada de despliegues', async () => {
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value), gardenGreeting:() => ({phrase:'Frase.'})}});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
+  const M = vm.runInContext('GardenModel', context), S = vm.runInContext('GardenService', context);
+  const NOW = Date.parse('2026-11-08T12:00:00Z');
+  // Línea de estado 3.2: sale de la conexión del equipo y de su última lectura.
+  const device = c => ({connection:'en_linea', lastReadingAt:'2026-11-08T11:58:00Z', lastConnectionAt:'2026-11-08T11:58:00Z', firmware:'1.0.3', ...c});
+  assert.equal(M.connection(null, NOW), null);
+  assert.deepEqual({...M.connection(device({connection:'nunca', lastReadingAt:null}), NOW)}, {tone:'gris', text:'Equipo vinculado · Esperando su primera conexión'});
+  assert.equal(M.connection(device({connection:'desconectado'}), NOW).tone, 'rojo');
+  const online = M.connection(device(), NOW);
+  assert.equal(online.tone, 'verde'); assert.match(online.text, /hace 2 min.*Firmware 1\.0\.3/);
+  assert.equal(M.connection(device({lastReadingAt:'2026-11-08T11:30:00Z'}), NOW).tone, 'ambar');
+  assert.equal(M.connection(device({lastReadingAt:null}), NOW).tone, 'ambar');
+  // Sin lectura no hay número: ni cero ni promedio inventado.
+  assert.equal(M.averageMoisture([]), null);
+  assert.equal(M.averageMoisture([{moisture:null}, {moisture:null}]), null);
+  assert.equal(M.averageMoisture([{moisture:40}, {moisture:null}, {moisture:60}]), 50);
+  M.reset();
+  const gardens = [{id:'1'}, {id:'2'}];
+  assert.equal(M.pick(gardens, '2').id, '2'); assert.equal(M.pick(gardens, 'x').id, '1'); assert.equal(M.pick([], null), null);
+  M.remember('2'); assert.equal(M.pick(gardens, null).id, '2'); M.reset();
+  assert.equal(M.groupCode('ABCD1234'), 'ABCD-1234');
+  assert.equal(M.clock(125), '2:05');
+  // El identificador entra en la ruta: solo dígitos; nada llega a la red con otra cosa.
+  assert.deepEqual({...await S.detail('1/../../admin')}, {status:'error', code:'invalid-input'});
+  assert.deepEqual({...await S.plant('abc', 1)}, {status:'error', code:'invalid-input'});
+  assert.deepEqual({...await S.orderState('../x')}, {status:'error', code:'invalid-input'});
+  // Vistas: tres versiones, selector solo con 2 o más huertos, y texto del servidor siempre escapado.
+  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-08', today:() => 0}, UserGardenViews:{chart:() => ''},
+    AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title}});
+  vm.runInContext('const GardenModelAlias = GardenModel;', views);
+  vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
+  const V = vm.runInContext('GardenViews', views);
+  const plants = [1, 2, 3].map(number => ({number, name:`Planta ${number}`, stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null}));
+  const detail = (gardenDevice, extra = {}) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:null, lamp:null, summary:null, ...extra});
+  const A = V.summary({status:'ready', gardens:[], detail:null}, 'Ana');
+  assert.ok(A.includes('Aún no tienes un huerto') && A.includes('Crear mi huerto') && !A.includes('disabled') && !A.includes('fieldset'));
+  const B = V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null)}, 'Ana');
+  assert.ok(B.includes('Conecta tu equipo') && B.includes('Vincular equipo') && B.includes('Ver planta') && !B.includes('Depósito de agua'));
+  const equipo = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:null, linkedAt:null, firmware:null, lastReadingAt:null};
+  const C = V.summary({status:'ready', gardens:[detail(equipo).garden], detail:detail(equipo)}, 'Ana');
+  assert.ok(C.includes('Depósito de agua') && C.includes('Esperando la primera lectura de tu equipo') && C.includes('Revisar mi equipo') && C.includes('Generado con IA') === false);
+  assert.ok((C.match(/Sin lectura/g) || []).length >= 6, 'sin lectura se dice «Sin lectura»');
+  assert.ok(!/(?<![\d.])0\s*(%|°C)/.test(C), 'ningún cero inventado');
+  assert.ok(!C.includes('garden-selector'));
+  const one = detail(equipo).garden, two = {...one, id: '2', device: equipo};
+  assert.ok(V.summary({status:'ready', gardens:[one, two], detail:detail(equipo)}, '').includes('garden-selector'));
+  assert.ok(V.summary({status:'ready', gardens:[one, two, {...one, id:'3'}], detail:detail(equipo)}, '').includes('Máximo 3 huertos'));
+  assert.ok(V.summary({status:'ready', gardens:[one, {...two, device:null}], detail:detail(equipo)}, '').includes('Primero vincula tu huerto sin equipo'));
+  const hostile = V.summary({status:'ready', gardens:[], detail:detail(equipo, {garden:{id:'1', name:'<img src=x onerror=alert(1)>', device:equipo}})}, '<b>x</b>');
+  assert.ok(!hostile.includes('<img src=x') && !hostile.includes('<b>x</b>'));
+  // Asistente de vinculación, ficha de planta, Mis huertos y alta: todos pintan sin romperse y escapan lo que viene del servidor.
+  const garden = detail(null).garden;
+  const wizard = o => V.linkWizard({garden, step:1, code:null, seconds:0, expired:false, device:null, ...o});
+  assert.ok(wizard({}).includes('Generar código'));
+  const waiting = wizard({step:2, code:'ABCD1234', seconds:540});
+  assert.ok(waiting.includes('ABCD-1234') && waiting.includes('9:00') && waiting.includes('192.168.4.1') && waiting.includes('Solo se muestra ahora'));
+  assert.ok(wizard({step:2, code:null, expired:true}).includes('El código venció. Genera otro.'));
+  assert.ok(wizard({step:3, device:{identifier:'<b>CHI</b>'}}).includes('¡Tu equipo quedó vinculado!') && !wizard({step:3, device:{identifier:'<b>CHI</b>'}}).includes('<b>CHI</b>'));
+  const page = V.plantPage({garden, plant:{...plants[0], name:'<i>x</i>'}, stages:[{stage:'germinacion', since:'2026-11-01'}], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
+  assert.ok(page.includes('Regar esta planta') && page.includes('Línea de vida') && !page.includes('<i>x</i>'));
+  assert.ok(V.plantDialogs(plants[0], true).water.includes('Si el depósito no tiene agua, tu equipo no regará.'));
+  assert.ok(V.myGardens({status:'ready', gardens:[detail(equipo).garden]}).includes('Desvincular equipo'));
+  assert.ok(V.myGardens({status:'ready', gardens:[detail(null).garden]}).includes('Archivar huerto'));
+  assert.ok(V.newGarden().includes('Nombre del huerto (opcional)'));
+  assert.ok(V.confirmations.desvincular('CHI-1').peligro && V.confirmations.archivar('Patio').accion === 'Archivar huerto');
+  assert.ok(V.orderCard({type:'regar', plant:2, duration:8, state:'confirmado'}).includes('Confirmada'));
+  assert.ok(V.orderCard({type:'autodiagnostico', state:'expirado'}).includes('Sin respuesta'));
+  assert.ok(V.errorText('huerto-limite').includes('3 huertos'));
+  // Tarjeta de orden: consulta en segundo plano hasta la respuesta del equipo y luego se detiene.
+  const calls = {intervals:[], cleared:0, notices:[]};
+  const tracker = vm.createContext({GardenModel:M, GardenViews:{fillSlot() {}, orderCard:() => ''}, setInterval:f => { calls.intervals.push(f); return 1; }, clearInterval:() => { calls.cleared += 1; },
+    mostrarAviso:(type, text) => calls.notices.push([type, text]), Date});
+  vm.runInContext(bloque('controladores/huerto.js', 'Huerto').split('const GardenSummaryController')[0], tracker);
+  const track = vm.runInContext('GardenOrderCard', tracker).track;
+  const service = {orderState:async () => ({status:'ready', command:{id:'x', state:'confirmado'}})};
+  track({root:{}, order:{id:'x', state:'pendiente'}, service, signal:{aborted:false}});
+  await calls.intervals[0]();
+  assert.equal(calls.cleared, 1); assert.equal(calls.notices[0][0], 'exito');
+  // La vinculación de 26 caracteres y la ayuda por correo ya no existen en la parte de usuario.
+  const equipos = ['modelos', 'vistas', 'controladores'].map(dir => read(`${dir}/equipos.js`)).join('\n');
+  for(const gone of ['BindingHelp', 'BindingUserController', 'userPanel', 'mailto:', '26 caracteres', '/api/vinculacion\'']) assert.ok(!equipos.includes(gone), gone);
+  assert.ok(!bloque('vistas/huerto.js', 'Huerto usuario').includes('user-locked'));
   // Gobernanza y despliegues se retiraron del panel de administración.
+  const admin = bloque('vistas/administracion.js', 'Administracion'), adminModel = bloque('modelos/administracion.js', 'Administracion'), adminControl = bloque('controladores/administracion.js', 'Administracion');
   for(const gone of ['Gobernanza de datos', 'Despliegues y parámetros', 'Comprobar formato', 'Registrar solicitud de despliegue', 'No está conectado a ningún asistente']) assert.ok(!admin.includes(gone), gone);
   assert.ok(!adminControl.includes('No se ha desplegado nada'));
   assert.ok(!/releaseTypes|validateRelease|requestRelease|saveKnowledge|restartPlatform/.test(adminModel));
   const panelModel = bloque('modelos/comun.js', 'Panel');
   for(const gone of ['admin/gobernanza', 'admin/despliegues', 'ver_gobernanza', 'gestionar_cambios']) assert.ok(!panelModel.includes(gone), gone);
-  // Caducidad: solo se repinta la tarjeta; la pantalla, con sus diálogos y su foco, no se reconstruye.
-  const timers = [], paints = []; let rebuilt = 0, now = NOW;
-  const root = {set innerHTML(_) { rebuilt += 1; }, querySelector: s => s === '[data-garden-diagnosis]' ? {} : null, addEventListener() {}};
-  const sandbox = vm.createContext({AbortController, setTimeout: (f, ms) => timers.push({f, ms}), clearTimeout: id => { if(id) timers[id - 1].cleared = true; }, setInterval: () => 1, clearInterval() {},
-    document:{addEventListener() {}}, UserGardenViews:{paint:root => { root.innerHTML = ''; }, dialog:() => null, closeDialog() {}}, GardenDiagnosisViews:{paint:(_, view) => paints.push(view)}, AppModel:{garden:g => g, alias:() => ''}, AuthService:{session:{}},
-    CareGuideUserController:{attach:() => ({paint() {}})}, BindingUserController:{attach() {}}});
-  vm.runInContext(bloque('modelos/huerto.js', 'Diagnostico'), sandbox);
-  sandbox.nowValue = () => now;
-  vm.runInContext('Date.now = () => nowValue();', sandbox);
-  vm.runInContext(bloque('controladores/huerto.js', 'Huerto usuario'), sandbox);
-  const adapted = vm.runInContext('GardenDiagnosis', sandbox).adapt(base({explanation:exp()}));
-  const controller = vm.runInContext('UserGardenController', sandbox).mount('huerto', {root, service:{load:async () => ({garden:{status:'waiting'}, diagnosis:adapted})}});
-  await new Promise(resolve => setImmediate(resolve));
-  const timer = timers.filter(t => !t.cleared).at(-1);
-  assert.equal(timer.ms, 3600000);
-  assert.equal(paints.at(-1).explanation.state, 'available');
-  const before = rebuilt;
-  now += 3600000;
-  timer.f();
-  assert.equal(rebuilt, before, 'la caducidad no debe reconstruir la pantalla');
-  assert.equal(paints.at(-1).explanation.state, 'expired');
-  assert.equal(paints.at(-1).title, 'Revisa', 'la regla permanece');
-  controller.dispose();
-  console.log('PASS tarjeta del huerto y retirada de despliegues');
+  console.log('PASS Mi huerto (A, B y C), selector, tarjeta de orden y retirada de la vinculación de 26 caracteres');
 });
 
 // ── Guías de cuidado: modelo y separación de capas ────────────────────────────────────────────

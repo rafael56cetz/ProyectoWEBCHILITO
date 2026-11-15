@@ -5,7 +5,7 @@ from functools import wraps
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, RequestDataTooBig, ValidationError
 from django.db import DatabaseError, IntegrityError
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from allauth.core import ratelimit
@@ -72,6 +72,8 @@ def endpoint(methods=('GET',), fields=(), cap=None):
                 return failure(409, 'stale-record')
             except s.FactorRequerido:
                 return failure(403, 'mfa-required')
+            except Http404:
+                return failure(404, 'not-found')
             except (PermissionDenied, ObjectDoesNotExist):
                 return failure(403, 'access-denied')
             except IntegrityError as fallo:

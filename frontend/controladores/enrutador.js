@@ -6,18 +6,27 @@ const SiteController = (() => {
   function start({authService = AuthService, appService = AppService, config = AuthConfig, assets = '', review = false, canEnter = options => authService.restore(options)} = {}) {
     const sections = ['inicio','el-proyecto','prototipo','consiguelo','como-funciona'];
     const app = document.getElementById('app');
-    let current = {}, controller = null, authContext = {}, renderId = 0, navigationRequest = null, heroShown = false, currentMenuKey = null;
+    let current = {}, controller = null, authContext = {}, renderId = 0, navigationRequest = null, heroShown = false, currentMenuKey = null, legalTarget = '#huerto';
     const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const replaceHash = hash => history.replaceState(null,'',location.pathname + location.search + hash);
+    // Rutas del huerto: la ficha de planta pide su número (1 a 3); el huerto elegido viaja en ?h=.
+    function gardenRoute(detail, extra, query) {
+      const gardenId = new URLSearchParams(query).get('h');
+      if(detail === 'plantas' && !['1','2','3'].includes(extra)) { replaceHash('#huerto'); return {screen:'huerto',detail:'',gardenId}; }
+      return {screen:'huerto',detail,extra:detail === 'plantas' ? extra : '',gardenId};
+    }
     function routeFromHash() {
       const [path, query = ''] = location.hash.slice(1).split('?');
-      const [part, encodedDetail] = path.split('/');
-      let detail;
-      try { detail = decodeURIComponent(encodedDetail || ''); } catch { detail = ''; }
+      const [part, encodedDetail, encodedExtra] = path.split('/');
+      let detail, extra;
+      try { detail = decodeURIComponent(encodedDetail || ''); extra = decodeURIComponent(encodedExtra || ''); } catch { detail = extra = ''; }
       if(part==='admin') return {screen:'admin',detail:['flota','soporte','mantenimientos','solicitudes','guias'].includes(detail)?detail:'flota'};
       // La pantalla de solicitudes se retiró: el Aviso explica estos derechos y sus medios.
       if(path === 'derechos-arco') { replaceHash('#privacidad'); return {screen:'privacidad'}; }
       if(part === 'cuenta' && detail === 'seguridad') return {screen:'cuenta',detail:'seguridad',invalidSecurity:path.split('/').length !== 2};
+      if(part === 'aceptar-legales') return {screen:'aceptar-legales'};
+      if(part === 'huerto' && ['nuevo','vincular','plantas'].includes(detail)) return gardenRoute(detail,extra,query);
+      if(part === 'cuenta' && detail === 'huertos') return {screen:'cuenta',detail:'huertos'};
       if(part === 'cuenta' && detail === 'privacidad') {
         if(path.split('/').length !== 2) replaceHash('#cuenta/privacidad');
         return {screen:'cuenta',detail:'privacidad'};
@@ -37,6 +46,7 @@ const SiteController = (() => {
       }
       if(AuthModel.screens.includes(part)) return {screen:part};
       if(Object.hasOwn(PrivacyModel.documents, part) && !encodedDetail) return {screen:part};
+      if(part === 'huerto') return {screen:'huerto',detail:'',gardenId:new URLSearchParams(query).get('h')};
       if(AppModel.destinations.some(item => item.id === part)) return {screen:part,detail};
       return {screen:'inicio',anchor:sections.includes(part) ? part : null};
     }
@@ -63,7 +73,7 @@ const SiteController = (() => {
       navigationRequest = null;
       SiteViews.busy(app,false);
       let route = routeFromHash();
-      const requestedPrivate = AppModel.isPrivate(route.screen);
+      const requestedPrivate = AppModel.isPrivate(route.screen) || route.screen === 'aceptar-legales';
       if(requestedPrivate) {
         // Mantiene la última vista autorizada y su navegación mientras se comprueba la siguiente ruta.
         if(!controller?.update || !AppModel.isPrivate(current.screen)) {
@@ -81,12 +91,22 @@ const SiteController = (() => {
           if(id === renderId) { navigationRequest = null; SiteViews.busy(app,false); }
         }
         if(id !== renderId) return;
+        const pendingLegal = session?.profile?.pendingLegal?.length > 0;
+        if(session?.status === 'authenticated' && route.screen === 'aceptar-legales' && !pendingLegal) {
+          replaceHash(AppModel.panelHome(session));
+          return render();
+        }
         if(session?.status !== 'authenticated') {
           const verifying = session?.status === 'verification-required';
           const destination = session?.status === 'second-step' ? 'segundo-paso' : verifying ? 'verificar' : 'acceso';
           authContext = verifying ? {email:session.email,expiresAt:AuthModel.expiry(session.expiresAt)} : {feedback:session?.status === 'unavailable' ? 'No podemos comprobar tu sesión. Inténtalo de nuevo.' : 'Inicia sesión para continuar.'};
           history.replaceState(null,'',location.pathname + location.search + '#' + destination);
           route = {screen:destination};
+        } else if(pendingLegal) {
+          // Con textos nuevos sin aceptar, solo se puede aceptarlos o cerrar sesión.
+          if(route.screen !== 'aceptar-legales') legalTarget = location.hash || '#huerto';
+          route = {screen:'aceptar-legales'};
+          replaceHash('#aceptar-legales');
         } else if((session.role==='admin') !== (route.screen==='admin') && !(session.role==='admin' && route.screen==='cuenta')) {
           route=session.role==='admin'?{screen:'admin',detail:AppModel.adminHome(session).split('/')[1]}:{screen:'huerto'};
           history.replaceState(null,'',location.pathname+location.search+'#'+(route.screen==='admin'?'admin/'+route.detail:'huerto'));
@@ -113,7 +133,7 @@ const SiteController = (() => {
         }
       }
       const isPrivate = AppModel.isPrivate(route.screen);
-      const changed = route.screen !== current.screen || route.detail !== current.detail || route.invalidSecurity !== current.invalidSecurity;
+      const changed = route.screen !== current.screen || route.detail !== current.detail || route.extra !== current.extra || route.invalidSecurity !== current.invalidSecurity;
       const sectionChanged = PrivacyModel.sectionOf(route) !== PrivacyModel.sectionOf(current);
       const stayOnLanding = route.screen === 'inicio' && current.screen === 'inicio' && Boolean(app.querySelector('.home'));
       // Una nueva respuesta de sesión puede cambiar los destinos: reconstruir también el menú.
@@ -139,6 +159,12 @@ const SiteController = (() => {
         // Entre pantallas de acceso el panel de la foto no cambia: solo se anima al llegar.
         if(!fromAccessScreen && !reducedMotion()) SiteViews.revealHeading(app,'.auth-quote h2');
         if(['acceso','registro'].includes(route.screen)) leaveAccessScreen(id);
+      } else if(route.screen === 'aceptar-legales') {
+        authContext = {};
+        SiteViews.title('Actualizamos nuestros documentos');
+        controller = LegalAcceptController.mount({root:app,assets,pending:authService.session.profile.pendingLegal,
+          async onDone() { await authService.restore(); CookieController.refresh(); location.hash = legalTarget; },
+          async onLogout() { await authService.logout(); CookieController.refresh(); location.hash = '#acceso'; }});
       } else if(route.screen === 'sin-acceso') {
         authContext = {};
         SiteViews.title('Sin acceso a tu segundo paso');
@@ -154,6 +180,8 @@ const SiteController = (() => {
       } else if(isPrivate) {
         authContext = {};
         let title = route.screen==='admin' ? AppModel.adminDestinations.find(item=>item.id==='admin/'+route.detail).label : route.screen === 'cuenta' && route.detail === 'contrasena' ? 'Cambiar contraseña' : route.screen === 'avisos' && route.detail ? 'Detalle del aviso' : AppModel.destinations.find(item=>item.id===route.screen).label;
+        if(route.screen === 'huerto') title = {nuevo:'Crear huerto',vincular:'Vincular equipo',plantas:'Ficha de planta'}[route.detail] || title;
+        if(route.detail === 'huertos') title = 'Mis huertos';
         if(route.detail === 'privacidad') title = 'Privacidad';
         if(route.detail === 'seguridad') title = route.invalidSecurity?'Página no disponible':'Seguridad';
         SiteViews.title(title);

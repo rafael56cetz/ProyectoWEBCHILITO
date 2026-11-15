@@ -264,6 +264,7 @@ const AuthService = (() => {
       forgetSession();
       ChilitoHTTP.clearPending();
       UserGardenService.reset();
+      GardenModel.reset();
       AdminService.reset();
       return {status:'accepted'};
     }

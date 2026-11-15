@@ -14,7 +14,7 @@ LEER = ("import json,config.settings as s;print(json.dumps({'debug':s.DEBUG,'ses
 
 
 def entorno(**cambios):
-    valores = {'CHILITO_ENV': 'deployment', 'CHILITO_DJANGO_KEY': 'k' * 50, 'CHILITO_SUPPORT_KEY': 's' * 40, 'CHILITO_MFA_KEY': Fernet.generate_key().decode(),
+    valores = {'CHILITO_ENV': 'deployment', 'CHILITO_DJANGO_KEY': 'k' * 50, 'CHILITO_SUPPORT_KEY': 's' * 40, 'CHILITO_VINCULACION_SECRETO': 'v' * 40, 'CHILITO_MFA_KEY': Fernet.generate_key().decode(),
                'CHILITO_ALLOWED_HOSTS': 'chilito.example.test', 'CHILITO_ORIGIN': 'https://chilito.example.test', 'CHILITO_DB_USER': 'chilito_pkg_runtime',
                'CHILITO_SMTP_ENABLED': '1', 'PYTHONDONTWRITEBYTECODE': '1'}
     valores.update(cambios)

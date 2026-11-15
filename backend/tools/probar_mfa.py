@@ -101,7 +101,7 @@ def recorrer():
     ok('contraseña sola no entra', r.status_code == 401 and flujos(r) == ['login_by_code'], (r.status_code, flujos(r)))
     ok('envía un correo', len(mail.outbox) == 1, len(mail.outbox))
     ok('perfil rechazado sin segundo paso', c.get('/api/cuenta').status_code == 401)
-    ok('huerto rechazado sin segundo paso', c.get('/api/huertos/actual').status_code == 401)
+    ok('huerto rechazado sin segundo paso', c.get('/api/huertos').status_code == 401)
     ok('métodos rechazados sin segundo paso', c.get(A).status_code == 401)
     r = post(c, 'auth/code/confirm', code=codigo())
     ok('código correcto entra', r.status_code == 200 and r.json()['meta']['is_authenticated'], r.status_code)

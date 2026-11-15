@@ -1,5 +1,5 @@
 // CONTROLADOR · Cuenta: acceso, segundo factor, perfil y privacidad personal.
-// Define: AuthController, SecondStepController, MfaController, ProfileController, WelcomeController, MyPrivacyController, PrivacyController, WebAuthnBrowser.
+// Define: AuthController, SecondStepController, MfaController, ProfileController, WelcomeController, MyPrivacyController, PrivacyController, WebAuthnBrowser, LegalAcceptController.
 
 // ── Mfa ──
 // allauth decide; aquí solo se pide lo que falta y se muestra el resultado.
@@ -559,4 +559,28 @@ const AuthController = (() => {
     };
   }
   return { mount };
+})();
+
+// ── Legales ──
+// El servidor decide qué textos están pendientes; aquí solo se envían las casillas marcadas.
+const LegalAcceptController = (() => {
+  function mount({root, assets = '', pending, onDone, onLogout, service = PrivacyData}) {
+    const view = LegalAcceptViews.screen(root, assets, pending);
+    let alive = true, working = false;
+    view.form.addEventListener('change', () => view.changed());
+    view.form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if(working || !view.allChecked()) return;
+      working = true;
+      view.busy(true);
+      const result = await service.acceptLegal(view.ids());
+      working = false;
+      if(!alive) return;
+      view.busy(false);
+      if(result.status === 'accepted') onDone(); else view.fail();
+    });
+    view.logout.addEventListener('click', onLogout);
+    return {dispose() { alive = false; }};
+  }
+  return {mount};
 })();

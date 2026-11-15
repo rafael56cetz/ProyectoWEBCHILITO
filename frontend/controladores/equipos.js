@@ -1,38 +1,8 @@
-// CONTROLADOR · Equipos: vinculación de huertos y su ayuda.
-// Define: BindingUserController, BindingAdminController, BindingHelpController.
+// CONTROLADOR · Equipos: emisión de códigos de vinculación por el operador.
+// Define: BindingAdminController.
 
 // ── Vinculacion ──
 // Vinculación de huertos: eventos y coordinación. El servidor confirma; aquí nunca se supone un éxito.
-const BindingUserController = (() => {
-  const texts = {
-    format:'Revisa el código: son 26 letras y números. Puedes pegarlo con o sin guiones.',
-    rejected:'El código no es válido o ya venció. Pide uno nuevo al equipo.',
-    limited:'Demasiados intentos. Pide un código nuevo al equipo; si lo intentaste muchas veces, espera una hora.',
-    busy:'Demasiadas solicitudes seguidas. Espera un momento y vuelve a intentarlo.',
-    network:'No pudimos comunicarnos con el servidor. Vuelve a intentarlo: si ya se vinculó, lo reconoceremos.'};
-  // Escucha en la raíz de la pantalla: el formulario se vuelve a dibujar con cada carga.
-  function attach({root, signal, service = BindingService, onLinked}) {
-    let busy = false;
-    root.addEventListener('submit', async event => {
-      const form = event.target.closest('[data-binding-form]');
-      if(!form) return;
-      event.preventDefault();
-      if(busy) return;
-      const raw = form.elements.code.value;
-      if(!service.normalize(raw)) { BindingViews.userStatus(form, texts.format, {error:true}); return; }
-      busy = true;
-      BindingViews.userStatus(form, 'Validando el código…', {busy:true});
-      const result = await service.consume(raw);
-      busy = false;
-      if(signal.aborted) return;
-      if(result.status === 'linked' || result.status === 'already-linked') { onLinked(result); return; }
-      BindingViews.userStatus(form, texts[result.status] || 'No se pudo completar la vinculación. Inténtalo de nuevo.', {error:true});
-    }, {signal});
-    BindingHelpController.attach({root, signal});
-  }
-  return Object.freeze({attach});
-})();
-
 const BindingAdminController = (() => {
   const messages = {forbidden:'Tu cuenta no tiene la capacidad para vincular huertos.', stale:'Ese código ya estaba cerrado. Se actualizó la lista.',
     busy:'Demasiadas operaciones seguidas. Espera un momento.', invalid:'Revisa los datos del formulario.',
@@ -123,79 +93,4 @@ const BindingAdminController = (() => {
     return {dispose() { life.abort(); view.closeReauth(); }};
   }
   return Object.freeze({mount});
-})();
-
-// Ayuda para vincular: prepara un correo que la persona revisa y envía. Abrir el enlace no significa que se envió.
-const BindingHelpController = (() => {
-  const texts = {
-    'need-reason':'Elige un motivo para preparar el correo.',
-    'need-detail':'Explica el motivo para preparar el correo.',
-    'too-long':'Acorta tu explicación: puedes añadir más detalles en el correo.',
-    secret:'Quita cualquier código de tu explicación. No hace falta para ayudarte.',
-    unavailable:'El contacto de soporte no está disponible por ahora. Inténtalo más tarde.',
-    copied:'Mensaje copiado',
-    blocked:'Tu navegador no permitió copiar. Selecciona el texto preparado y cópialo a mano.',
-    prepared:'Pedimos a tu navegador que abra tu aplicación de correo con el mensaje listo. Revísalo y envíalo desde ahí: todavía no se ha enviado nada.'};
-  const writeClipboard = async text => {
-    try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
-  };
-  async function copyAddress(panel, service) {
-    if(await writeClipboard(service.contact() || '')) BindingViews.helpStatus(panel, 'Dirección de soporte copiada.');
-    else BindingViews.helpStatus(panel, 'No se pudo copiar. Selecciona la dirección y cópiala a mano.', {error:true});
-  }
-  // Único punto de lectura y validación: ambos botones parten del formulario tal como está ahora.
-  function currentDraft(form, panel, service) {
-    BindingViews.helpManual(panel, '');
-    const result = service.draft(form.elements.reason.value, form.elements.detail.value);
-    BindingViews.helpInvalid(form, result.status === 'need-detail' || result.status === 'too-long' || result.status === 'secret');
-    if(result.status === 'ready') return result;
-    BindingViews.helpStatus(panel, texts[result.status], {error:true});
-    return null;
-  }
-  function attach({root, signal, service = BindingHelp}) {
-    let revision = 0;
-    async function copyMessage(form, panel) {
-      const draft = currentDraft(form, panel, service);
-      if(!draft) return;
-      const started = revision;
-      const copied = await writeClipboard(draft.text);
-      // Si el formulario cambió mientras tanto, este resultado ya no describe lo que se ve.
-      if(signal.aborted || started !== revision) return;
-      if(copied) { BindingViews.helpStatus(panel, texts.copied); return; }
-      BindingViews.helpStatus(panel, texts.blocked, {error:true, focus:false});
-      BindingViews.helpManual(panel, draft.text);
-    }
-    // «toggle» no burbujea: se captura en la raíz porque el panel se vuelve a dibujar con cada carga.
-    root.addEventListener('toggle', event => {
-      if(event.target.matches?.('[data-binding-help]') && event.target.open) BindingViews.helpSetup(event.target, service.contact(), texts.unavailable);
-    }, {signal, capture:true});
-    root.addEventListener('change', event => {
-      if(event.target.matches('[data-binding-help-form] [name=reason]')) BindingViews.helpDetail(event.target.form, event.target.value === 'other');
-    }, {signal});
-    // Cambiar el motivo o la explicación invalida cualquier resultado y texto manual anteriores.
-    root.addEventListener('input', event => {
-      if(!event.target.matches('[data-binding-help-form] :is([name=reason],[name=detail])')) return;
-      revision += 1;
-      const panel = event.target.closest('[data-binding-help]');
-      BindingViews.helpManual(panel, '');
-      BindingViews.helpStatus(panel, '');
-    }, {signal});
-    root.addEventListener('submit', event => {
-      const form = event.target.closest('[data-binding-help-form]');
-      if(!form) return;
-      event.preventDefault();
-      const panel = form.closest('[data-binding-help]');
-      const draft = currentDraft(form, panel, service);
-      if(!draft) return;
-      BindingViews.openMail(draft.href);
-      BindingViews.helpStatus(panel, texts.prepared);
-    }, {signal});
-    root.addEventListener('click', event => {
-      const panel = event.target.closest('[data-binding-help]');
-      if(!panel) return;
-      if(event.target.closest('[data-binding-help-copy]')) copyAddress(panel, service);
-      if(event.target.closest('[data-binding-help-copy-message]')) copyMessage(panel.querySelector('[data-binding-help-form]'), panel);
-    }, {signal});
-  }
-  return Object.freeze({attach});
 })();

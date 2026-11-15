@@ -1,5 +1,315 @@
-// CONTROLADOR · Huerto: pantalla de la persona usuaria, guías de cuidado y mantenimientos.
-// Define: UserGardenController, CareGuideUserController, CareGuideAdminController, MaintenanceController.
+// CONTROLADOR · Huerto: Mi huerto y sus pantallas, panel técnico y soporte, guías de cuidado y mantenimientos.
+// Define: GardenOrderCard, GardenSummaryController, GardenCreateController, GardenLinkController, PlantController, GardenController, MyGardensController, UserGardenController, CareGuideUserController, CareGuideAdminController, MaintenanceController.
+
+// ── Huerto ──
+// Mi huerto y sus pantallas. El servidor confirma cada operación; aquí nunca se supone un éxito.
+const GardenOrderCard = (() => {
+  const POLL_MS = 5000;
+  const POLL_LIMIT_MS = 10 * 60 * 1000;
+  // Pinta la tarjeta de la orden y la consulta cada 5 s, en segundo plano, hasta que el equipo responda o pasen 10 minutos.
+  function track({root, order, service, signal, onResolved = () => {}}) {
+    const started = Date.now();
+    GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(order));
+    if(GardenModel.FINAL_ORDER_STATES.includes(order.state)) return {stop() {}};
+    const timer = setInterval(async () => {
+      if(Date.now() - started > POLL_LIMIT_MS) { clearInterval(timer); return; }
+      const result = await service.orderState(order.id, signal);
+      if(signal.aborted || result.status !== 'ready') return;
+      GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(result.command));
+      if(!GardenModel.FINAL_ORDER_STATES.includes(result.command.state)) return;
+      clearInterval(timer);
+      mostrarAviso(result.command.state === 'confirmado' ? 'exito' : 'error', result.command.state === 'confirmado' ? 'Tu equipo confirmó la orden.' : 'Tu equipo no completó la orden.');
+      onResolved(result.command);
+    }, POLL_MS);
+    return {stop() { clearInterval(timer); }};
+  }
+  return {track};
+})();
+
+const GardenSummaryController = (() => {
+  const LOAD_TIMEOUT_MS = 20000;
+  function mount({root, route, service}) {
+    const life = new AbortController();
+    let state = {status:'loading', gardens:[], detail:null}, tracker = null, working = false, serial = 0;
+    const name = () => AppModel.alias(AuthService.session);
+    const paint = () => GardenViews.paint(root, GardenViews.summary(state, name()));
+    async function fetchState() {
+      const request = new AbortController();
+      const abort = () => request.abort();
+      life.signal.addEventListener('abort', abort, {once:true});
+      const timeout = setTimeout(abort, LOAD_TIMEOUT_MS);
+      try {
+        const list = await service.list(request.signal);
+        if(list.status !== 'ready') return {status:'error', gardens:[], detail:null};
+        const current = GardenModel.pick(list.items, route.gardenId);
+        if(!current) return {status:'ready', gardens:[], detail:null};
+        const detail = await service.detail(current.id, request.signal);
+        if(detail.status !== 'ready') return {status:'error', gardens:[], detail:null};
+        GardenModel.remember(current.id);
+        return {status:'ready', gardens:list.items, detail};
+      } finally { clearTimeout(timeout); life.signal.removeEventListener('abort', abort); }
+    }
+    async function load() {
+      const id = ++serial;
+      tracker?.stop();
+      state = {status:'loading', gardens:[], detail:null};
+      paint();
+      const next = await fetchState().catch(() => ({status:'error', gardens:[], detail:null}));
+      if(life.signal.aborted || id !== serial) return;
+      state = next;
+      paint();
+    }
+    async function runOrder(values) {
+      working = true;
+      try {
+        const result = await service.order(state.detail.garden.id, values);
+        if(life.signal.aborted) return;
+        if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code)); return; }
+        tracker?.stop();
+        tracker = GardenOrderCard.track({root, order:result.command, service, signal:life.signal, onResolved:refreshQuietly});
+      } finally { working = false; }
+    }
+    // Tras una orden resuelta se vuelve a leer el huerto (p. ej. el estado de la lámpara) sin borrar la tarjeta.
+    async function refreshQuietly(order) {
+      const detail = await service.detail(state.detail.garden.id, life.signal);
+      if(life.signal.aborted || detail.status !== 'ready') return;
+      state = {...state, detail};
+      paint();
+      GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(order));
+    }
+    async function confirmOrder(type) {
+      if(await confirmar(GardenViews.confirmations[type])) await runOrder({type});
+    }
+    async function recordRefill() {
+      const result = await service.care(state.detail.garden.id, {type:'rellenar_deposito'});
+      mostrarAviso(result.status === 'accepted' ? 'exito' : 'error', result.status === 'accepted' ? 'Recarga registrada.' : GardenViews.errorText(result.code));
+    }
+    async function showSummaries() {
+      const result = await service.summaries(state.detail.garden.id, 1);
+      if(life.signal.aborted) return;
+      if(result.status === 'ready') GardenViews.fillSlot(root, '[data-summaries]', GardenViews.summaryList(result.items));
+      else mostrarAviso('error', GardenViews.errorText(result.code));
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-garden-action]');
+      if(!trigger) return;
+      const {gardenAction: action, type} = trigger.dataset;
+      if(action === 'reload') await load();
+      else if(action === 'summaries') await showSummaries();
+      else if(action === 'refill') await recordRefill();
+      else if(action === 'order' && !working) await runOrder({type});
+      else if(action === 'order-confirm' && !working) await confirmOrder(type);
+    }, {signal:life.signal});
+    load();
+    return {redraw() { if(state.status === 'ready') paint(); }, dispose() { serial++; tracker?.stop(); life.abort(); }};
+  }
+  return {mount};
+})();
+
+const GardenCreateController = (() => {
+  function mount({root, service}) {
+    const life = new AbortController();
+    GardenViews.paint(root, GardenViews.newGarden());
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.target.closest('[data-garden-form="create"]');
+      if(!form || form.dataset.busy) return;
+      form.dataset.busy = 'true';
+      const result = await service.create(form.elements.name.value.trim());
+      delete form.dataset.busy;
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code, 'No se pudo crear el huerto. Revisa el nombre e inténtalo de nuevo.')); return; }
+      GardenModel.remember(result.garden.id);
+      location.hash = `#huerto/vincular?h=${result.garden.id}`;
+    }, {signal:life.signal});
+    return {redraw() {}, dispose() { life.abort(); }};
+  }
+  return {mount};
+})();
+
+const GardenLinkController = (() => {
+  const POLL_MS = 5000;
+  function mount({root, route, service}) {
+    const life = new AbortController();
+    let wizard = null, polling = null, ticking = null;
+    const stop = () => { clearInterval(polling); clearInterval(ticking); polling = ticking = null; };
+    const paint = () => GardenViews.paint(root, GardenViews.linkWizard(wizard));
+    const secondsLeft = () => wizard.expiresAt ? GardenModel.remainingSeconds(wizard.expiresAt) : 0;
+    function expire() {
+      stop();
+      wizard = {...wizard, code:null, expired:true, seconds:0};
+      paint();
+    }
+    function linked(device) {
+      stop();
+      wizard = {...wizard, step:3, code:null, device};
+      paint();
+      mostrarAviso('exito', 'Tu equipo quedó vinculado.');
+    }
+    async function check() {
+      const state = await service.linkState(wizard.garden.id, life.signal);
+      if(life.signal.aborted || state.status !== 'ready') return;
+      if(state.linked) linked(state.device);
+      else if(['expirado', 'cancelado'].includes(state.codeState)) expire();
+    }
+    function startWaiting() {
+      stop();
+      ticking = setInterval(() => {
+        const seconds = secondsLeft();
+        if(seconds <= 0) { expire(); return; }
+        GardenViews.countdown(root, seconds);
+      }, 1000);
+      polling = setInterval(check, POLL_MS);
+    }
+    async function generate() {
+      const result = await service.generateCode(wizard.garden.id);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted' || !result.code) { mostrarAviso('error', GardenViews.errorText(result.code)); return; }
+      wizard = {...wizard, step:2, code:result.code, expiresAt:result.expiresAt, expired:false, seconds:GardenModel.remainingSeconds(result.expiresAt)};
+      paint();
+      startWaiting();
+    }
+    async function copyCode() {
+      try { await navigator.clipboard.writeText(wizard.code); mostrarAviso('exito', 'Código copiado.'); }
+      catch { mostrarAviso('error', 'No se pudo copiar. Escríbelo a mano.'); }
+    }
+    async function start() {
+      const list = await service.list(life.signal);
+      if(life.signal.aborted) return;
+      const garden = list.status === 'ready' ? GardenModel.pick(list.items, route.gardenId) : null;
+      if(!garden) { location.hash = '#huerto'; return; }
+      GardenModel.remember(garden.id);
+      wizard = {garden, step:garden.device ? 3 : 1, code:null, expiresAt:null, seconds:0, expired:false, device:garden.device};
+      paint();
+    }
+    root.addEventListener('click', event => {
+      const action = event.target.closest('[data-garden-action]')?.dataset.gardenAction;
+      if(action === 'generate') generate();
+      else if(action === 'copy-code') copyCode();
+    }, {signal:life.signal});
+    start();
+    return {redraw() {}, dispose() { stop(); life.abort(); }};
+  }
+  return {mount};
+})();
+
+const PlantController = (() => {
+  function mount({root, route, service}) {
+    const life = new AbortController();
+    let gardenId = null, data = null, range = '24h', tracker = null;
+    const paint = () => GardenViews.paint(root, GardenViews.plantPage({...data, garden:{id:gardenId}, range}));
+    async function load() {
+      if(!gardenId) {
+        const list = await service.list(life.signal);
+        const garden = list.status === 'ready' ? GardenModel.pick(list.items, route.gardenId) : null;
+        if(life.signal.aborted) return;
+        if(!garden) { location.hash = '#huerto'; return; }
+        gardenId = garden.id;
+        GardenModel.remember(gardenId);
+      }
+      const result = await service.plant(gardenId, route.extra, range);
+      if(life.signal.aborted) return;
+      if(result.status !== 'ready') { GardenViews.paint(root, GardenViews.failed); return; }
+      data = result;
+      paint();
+    }
+    async function save(form) {
+      const values = {name:form.elements.name.value.trim(), sowingDate:form.elements.sowingDate.value || null, stage:form.elements.stage.value};
+      const result = await service.editPlant(gardenId, route.extra, values);
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code, 'Revisa el nombre, la fecha y la etapa e inténtalo de nuevo.')); return; }
+      GardenViews.closeDialog(root);
+      mostrarAviso('exito', 'Planta actualizada.');
+      await load();
+    }
+    async function water(form) {
+      const result = await service.order(gardenId, {type:'regar', plant:Number(route.extra), duration:Number(form.elements.duration.value)});
+      if(life.signal.aborted) return;
+      GardenViews.closeDialog(root);
+      if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code)); return; }
+      tracker?.stop();
+      tracker = GardenOrderCard.track({root, order:result.command, service, signal:life.signal});
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-garden-action]');
+      if(!trigger || !data) return;
+      const dialogs = GardenViews.plantDialogs(data.plant, data.hasDevice);
+      const action = trigger.dataset.gardenAction;
+      if(action === 'range') { range = trigger.dataset.range; await load(); }
+      else if(action === 'edit') GardenViews.openDialog(root, dialogs.edit);
+      else if(action === 'water') GardenViews.openDialog(root, dialogs.water);
+      else if(action === 'close-dialog') GardenViews.closeDialog(root);
+    }, {signal:life.signal});
+    root.addEventListener('submit', event => {
+      event.preventDefault();
+      const kind = event.target.closest('[data-garden-form]')?.dataset.gardenForm;
+      if(kind === 'plant') save(event.target);
+      else if(kind === 'water') water(event.target);
+    }, {signal:life.signal});
+    load();
+    return {redraw() {}, dispose() { tracker?.stop(); life.abort(); }};
+  }
+  return {mount};
+})();
+
+const GardenController = (() => {
+  function mount({root, route, service = GardenService}) {
+    if(route.detail === 'nuevo') return GardenCreateController.mount({root, service});
+    if(route.detail === 'vincular') return GardenLinkController.mount({root, route, service});
+    if(route.detail === 'plantas') return PlantController.mount({root, route, service});
+    return GardenSummaryController.mount({root, route, service});
+  }
+  return {mount};
+})();
+
+const MyGardensController = (() => {
+  function mount({root, service = GardenService}) {
+    const life = new AbortController();
+    let state = {status:'loading', gardens:[]};
+    const paint = () => GardenViews.paint(root, GardenViews.myGardens(state));
+    async function load() {
+      state = {status:'loading', gardens:[]};
+      paint();
+      const list = await service.list(life.signal);
+      if(life.signal.aborted) return;
+      state = list.status === 'ready' ? {status:'ready', gardens:list.items} : {status:'error', gardens:[]};
+      paint();
+    }
+    async function finish(result, success) {
+      if(life.signal.aborted) return;
+      if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code)); return; }
+      GardenViews.closeDialog(root);
+      mostrarAviso('exito', success);
+      await load();
+    }
+    async function unlink(garden) {
+      const confirmation = GardenViews.confirmations.desvincular(garden.device.identifier);
+      if(await confirmar(confirmation)) await finish(await service.unlink(garden.id), 'Equipo desvinculado.');
+    }
+    async function archive(garden) {
+      if(await confirmar(GardenViews.confirmations.archivar(garden.name))) await finish(await service.archive(garden.id), 'Huerto archivado.');
+    }
+    root.addEventListener('click', async event => {
+      const trigger = event.target.closest('[data-garden-action]');
+      if(!trigger) return;
+      const garden = state.gardens.find(item => item.id === trigger.closest('[data-garden-id]')?.dataset.gardenId);
+      const action = trigger.dataset.gardenAction;
+      if(action === 'reload') await load();
+      else if(action === 'close-dialog') GardenViews.closeDialog(root);
+      else if(action === 'rename' && garden) GardenViews.openDialog(root, GardenViews.renameDialog(garden));
+      else if(action === 'unlink' && garden) await unlink(garden);
+      else if(action === 'archive' && garden) await archive(garden);
+    }, {signal:life.signal});
+    root.addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.target.closest('[data-garden-form="rename"]');
+      if(form) await finish(await service.rename(form.dataset.gardenId, form.elements.name.value.trim()), 'Nombre actualizado.');
+    }, {signal:life.signal});
+    load();
+    return {redraw() {}, dispose() { life.abort(); }};
+  }
+  return {mount};
+})();
 
 // ── Huerto usuario ──
 const UserGardenController = (() => {
@@ -13,23 +323,11 @@ const UserGardenController = (() => {
       UserGardenViews.closeDialog(current(),origin);
       pending=null;origin=null;
     }
-    let diagnosisExpiry=null;
-    // La tarjeta se pinta como texto. Al caducar la explicación solo se repinta ella:
-    // reconstruir la pantalla cerraría un diálogo abierto y perdería el foco.
-    function paintDiagnosis() {
-      clearTimeout(diagnosisExpiry);
-      const card=root.querySelector('[data-garden-diagnosis]');
-      if(!card)return;
-      GardenDiagnosisViews.paint(card,GardenDiagnosis.present(data.diagnosis));
-      const left=GardenDiagnosis.msUntilExpiry(data.diagnosis);
-      if(left!==null)diagnosisExpiry=setTimeout(paintDiagnosis,Math.min(left,2147483647));
-    }
     function render() {
       UserGardenViews.paint(root,screen,data,AppModel.alias(AuthService.session));
       const dialog=current();
       dialog?.addEventListener('cancel',e=>{e.preventDefault();if(!working)closeDialog();},{signal:life.signal});
       guides.paint(data.garden.status!=='loading');
-      paintDiagnosis();
     }
     async function load({message='',error=false,focusRange=false}={}) {
       const id=++serial;
@@ -115,11 +413,9 @@ const UserGardenController = (() => {
     };
     const timer=setInterval(checkPermission,1000);
     document.addEventListener('visibilitychange',checkPermission,{signal:life.signal});
-    // Sin huerto: el formulario de vinculación. Tras confirmarlo el servidor, se vuelve a consultar el huerto.
-    BindingUserController.attach({root,signal:life.signal,onLinked:()=>load({message:'Huerto vinculado. Todavía no se reciben lecturas del equipo.'})});
     const guides=CareGuideUserController.attach({root,signal:life.signal,screen,detail});
     render();load();
-    return {redraw:render,dispose(){disposed=true;serial++;clearInterval(timer);clearTimeout(diagnosisExpiry);closeDialog();life.abort();}};
+    return {redraw:render,dispose(){disposed=true;serial++;clearInterval(timer);closeDialog();life.abort();}};
   }
   return {mount};
 })();

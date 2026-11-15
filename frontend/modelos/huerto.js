@@ -1,71 +1,83 @@
-// MODELO · Huerto: resumen del huerto, operaciones de la persona usuaria, guías de cuidado y mantenimientos.
-// Define: GardenDiagnosis, UserGardenService, CareGuideService, MaintenanceService, MaintenanceDates.
+// MODELO · Huerto: huertos y plantas de la persona usuaria, panel técnico y soporte, guías de cuidado y mantenimientos.
+// Define: GardenService, GardenModel, UserGardenService, CareGuideService, MaintenanceService, MaintenanceDates.
 
-// ── Diagnostico ──
-// Resumen de la tarjeta del huerto: valida lo que envía Django y lo prepara para mostrarlo.
-// Aquí no se calculan estados de lectura ni umbrales: esos los decide el servidor.
-const GardenDiagnosis = (() => {
-  const LIMITS = Object.freeze({title:120, message:600, next:200, explanation:1200});
-  const READINGS = new Set(['missing','stale','current']);
-  const CONTROL = /[\u0000-\u0009\u000B-\u001F\u007F]/;
-  const text = (value, max) => {
-    if(typeof value !== 'string') return null;
-    const clean = value.trim();
-    return clean && clean.length <= max && !CONTROL.test(clean) ? clean : null;
-  };
-  // Formato canónico del contrato: con T y zona horaria. Sin zona, la hora sería ambigua.
-  const CANONICAL_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
-  const date = value => typeof value === 'string' && CANONICAL_DATE.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
-  const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-  const NONE = Object.freeze({status:'unavailable'});
-  function adaptExplanation(raw) {
-    if(raw === null || raw === undefined) return null;
-    if(!isObject(raw)) return NONE;
-    if(raw.status === 'expired') return {status:'expired'};
-    if(raw.status !== 'available' || raw.source !== 'ai') return NONE;
-    const body = text(raw.text, LIMITS.explanation), generatedAt = date(raw.generatedAt), expiresAt = date(raw.expiresAt);
-    return body && generatedAt && expiresAt ? {status:'available', text:body, generatedAt, expiresAt} : NONE;
+// ── Huerto ──
+// Huertos, plantas, órdenes y vinculación del equipo. El servidor decide; cada llamada devuelve su cuerpo o {status:'error', code}.
+const GardenService = (() => {
+  const base = '/api/huertos';
+  const background = {'X-Chilito-Sondeo':'1'};
+  const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
+  async function call(path, {method = 'GET', body, signal, headers} = {}) {
+    try {
+      const response = await ChilitoHTTP.request(path, {method, body, signal, headers});
+      if(response.http === 401) { ChilitoHTTP.sessionExpired(); return {status:'error', code:'unauthenticated'}; }
+      return response.http === 200 ? response.body : {status:'error', code:response.body?.code || 'unavailable'};
+    } catch { return {status:'error', code:'network'}; }
   }
-  function adaptReadings(raw) {
-    if(!isObject(raw) || !READINGS.has(raw.state)) return null;
-    if(raw.state === 'missing') return raw.at === null || raw.at === undefined ? {state:'missing', at:null} : null;
-    const at = date(raw.at);
-    return at ? {state:raw.state, at} : null;
+  // El identificador entra en la ruta: solo dígitos.
+  const garden = (id, rest = '') => validId(id) ? `${base}/${id}${rest}` : null;
+  const get = (path, options) => path ? call(path, options) : Promise.resolve({status:'error', code:'invalid-input'});
+  const post = (path, body = {}, options) => path ? call(path, {method:'POST', body, ...options}) : Promise.resolve({status:'error', code:'invalid-input'});
+  return Object.freeze({
+    validId,
+    list: signal => call(base, {signal}),
+    detail: (id, signal) => get(garden(id), {signal}),
+    create: name => post(base, name ? {name} : {}),
+    rename: (id, name) => post(garden(id, '/renombrar'), {name}),
+    archive: id => post(garden(id, '/archivar')),
+    summaries: (id, page) => get(garden(id, `/ia?page=${Number(page) || 1}`)),
+    generateCode: id => post(garden(id, '/codigo')),
+    linkState: (id, signal) => get(garden(id, '/vinculacion'), {signal, headers:background}),
+    unlink: id => post(garden(id, '/desvincular')),
+    plant: (id, number, range = '24h') => get(garden(id, `/plantas/${Number(number)}?rango=${encodeURIComponent(range)}`)),
+    editPlant: (id, number, values) => post(garden(id, `/plantas/${Number(number)}`), values),
+    order: (id, values) => post(garden(id, '/comandos'), values),
+    orderState: (orderId, signal) => get(typeof orderId === 'string' && /^[0-9a-f-]{36}$/.test(orderId) ? `/api/comandos/${orderId}` : null, {signal, headers:background}),
+    care: (id, values) => post(garden(id, '/cuidados'), values)
+  });
+})();
+
+// Cálculos de presentación sobre lo que envía el servidor. Sin lectura, el valor es null: nunca un cero ni una fecha inventada.
+const GardenModel = (() => {
+  const RECENT_READING_MS = 15 * 60 * 1000;
+  const FINAL_ORDER_STATES = ['confirmado', 'fallido', 'expirado'];
+  const WATERING_SECONDS = [5, 8, 10, 15, 20];
+  const STAGES = ['sin_sembrar', 'germinacion', 'plantula', 'crecimiento', 'floracion', 'fructificacion'];
+  const RANGES = ['1h', '24h', '7d', '30d'];
+  let chosen = null;
+  function ago(value, now = Date.now()) {
+    const minutes = Math.floor((now - Date.parse(value)) / 60000);
+    if(!Number.isFinite(minutes)) return null;
+    if(minutes < 1) return 'hace menos de 1 min';
+    if(minutes < 60) return `hace ${minutes} min`;
+    if(minutes < 1440) return `hace ${Math.floor(minutes / 60)} h`;
+    return `hace ${Math.floor(minutes / 1440)} días`;
   }
-  // Sin regla ni lecturas válidas no hay resumen. La explicación nunca lo sustituye.
-  function adapt(raw) {
-    if(!isObject(raw) || !isObject(raw.rule) || raw.rule.source !== 'rules') return null;
-    const title = text(raw.rule.title, LIMITS.title), message = text(raw.rule.message, LIMITS.message), generatedAt = date(raw.rule.generatedAt);
-    const hasNext = raw.rule.next !== null && raw.rule.next !== undefined, next = hasNext ? text(raw.rule.next, LIMITS.next) : null;
-    const readings = adaptReadings(raw.readings);
-    if(!title || !message || !generatedAt || !readings || (hasNext && !next)) return null;
-    return {rule:{title, message, next, generatedAt}, readings, explanation:adaptExplanation(raw.explanation)};
+  // Línea de estado 3.2: tono y texto salen de la conexión del equipo y de su última lectura.
+  function connection(device, now = Date.now()) {
+    if(!device) return null;
+    const firmware = device.firmware ? ` · Firmware ${device.firmware}` : '';
+    if(device.connection === 'nunca') return {tone:'gris', text:'Equipo vinculado · Esperando su primera conexión'};
+    if(device.connection === 'desconectado') return {tone:'rojo', text:`Desconectado desde ${AppModel.date(device.lastConnectionAt)}`};
+    const recent = device.lastReadingAt && now - Date.parse(device.lastReadingAt) < RECENT_READING_MS;
+    return recent ? {tone:'verde', text:`En línea · Última lectura ${ago(device.lastReadingAt, now)}${firmware}`}
+      : {tone:'ambar', text:'Conectado, sin lecturas recientes'};
   }
-  const dateText = value => new Date(value).toLocaleString('es-MX', {dateStyle:'medium', timeStyle:'short'});
-  function readingsText({state, at}) {
-    if(state === 'missing') return 'Sin lecturas disponibles: no se puede valorar el estado de las plantas.';
-    if(state === 'stale') return `Lecturas antiguas, la última es del ${dateText(at)}: pueden no describir el estado actual.`;
-    return `Lecturas del ${dateText(at)}`;
+  // Promedio de las plantas que tienen lectura; sin ninguna, null.
+  function averageMoisture(plants) {
+    const values = plants.map(plant => plant.moisture).filter(Number.isFinite);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
   }
-  // La vigencia se vuelve a comprobar al mostrar: la página puede llevar tiempo abierta.
-  function explanationView(explanation, now) {
-    if(!explanation) return null;
-    if(explanation.status === 'unavailable') return {state:'unavailable', note:'Explicación adicional no disponible.'};
-    if(explanation.status === 'expired' || Date.parse(explanation.expiresAt) <= now) return {state:'expired', note:'La explicación adicional caducó y ya no se muestra.'};
-    return {state:'available', text:explanation.text, note:`Explicación generada con IA · ${dateText(explanation.generatedAt)} · Complementa el resumen, no lo sustituye.`};
+  function pick(gardens, requested) {
+    return gardens.find(item => item.id === requested) || gardens.find(item => item.id === chosen) || gardens[0] || null;
   }
-  function present(diagnosis, now = Date.now()) {
-    if(!diagnosis) return null;
-    return {title:diagnosis.rule.title, message:diagnosis.rule.message, next:diagnosis.rule.next,
-      origin:`Resumen por reglas · ${dateText(diagnosis.rule.generatedAt)}`, readings:readingsText(diagnosis.readings),
-      explanation:explanationView(diagnosis.explanation, now)};
-  }
-  function msUntilExpiry(diagnosis, now = Date.now()) {
-    if(diagnosis?.explanation?.status !== 'available') return null;
-    const left = Date.parse(diagnosis.explanation.expiresAt) - now;
-    return left > 0 ? left : null;
-  }
-  return Object.freeze({adapt, present, msUntilExpiry});
+  const remember = id => { chosen = id; };
+  const reset = () => { chosen = null; };
+  // El código se escribe en el equipo como XXXX-XXXX; aquí solo se agrupa para mostrarlo.
+  const groupCode = code => typeof code === 'string' ? code.replace(/^(.{4})(.{4})$/, '$1-$2') : '';
+  const remainingSeconds = (expiresAt, now = Date.now()) => Math.max(0, Math.floor((Date.parse(expiresAt) - now) / 1000));
+  const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, ago, connection, averageMoisture, pick, remember, reset, groupCode, remainingSeconds, clock});
 })();
 
 // ── Huerto usuario ──
@@ -103,7 +115,7 @@ const UserGardenService = (() => {
       return [200,201].includes(response.http)&&response.body.status==='accepted'?response.body:{status:failure(response)};
     }catch{return {status:'error'};}
   }
-  const empty=range=>({range,soil:{adc:null,moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null},diagnosis:null,history:{soil:[],temperature:[],humidity:[]},maintenance:[],commands:[],permission:null,permissionState:'closed',supportAvailable:false,reports:[],lampRequest:null});
+  const empty=range=>({range,soil:{adc:null,moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null},history:{soil:[],temperature:[],humidity:[]},maintenance:[],commands:[],permission:null,permissionState:'closed',supportAvailable:false,reports:[],lampRequest:null});
   function permission() {
     return active&&active.expiresAt>Date.now()?{...active}:null;
   }
@@ -128,7 +140,7 @@ const UserGardenService = (() => {
       const records=(maintenance.items||[]).map(r=>({id:r.id,task:r.type,label:tasks[r.type]||r.type,at:r.at}));
       const orders=(commands.items||[]).map(r=>({id:r.id,at:r.at,actuator:r.type==='water'?'Bomba de riego':'Lámpara',action:{water:'Solicitud de riego puntual','lamp-off':'Solicitud de apagado de lámpara','lamp-auto':'Restaurar control de lámpara'}[r.type],origin:'Usuario',status:'Sin confirmación'}));
       const lamp=(commands.items||[]).find(r=>r.type==='lamp-off'||r.type==='lamp-auto');
-      return {garden:AppModel.garden(g),range,soil:{adc:null,moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null},diagnosis:GardenDiagnosis.adapt(raw.body.diagnosis),history:{soil:[],temperature:[],humidity:[]},maintenance:records,commands:orders,permission:permission(),permissionState:latest?'active':reports[0]?.permissionState||'closed',supportAvailable:true,reports:structuredClone(reports),lampRequest:lamp?.type||null};
+      return {garden:AppModel.garden(g),range,soil:{adc:null,moisture:{value:null,quality:'missing',at:null}},connection:{wifi:null,mqtt:null},history:{soil:[],temperature:[],humidity:[]},maintenance:records,commands:orders,permission:permission(),permissionState:latest?'active':reports[0]?.permissionState||'closed',supportAvailable:true,reports:structuredClone(reports),lampRequest:lamp?.type||null};
     },
     async recordTask(task,{signal}={}) {
       if(!Object.hasOwn(tasks,task))return {status:'invalid'};

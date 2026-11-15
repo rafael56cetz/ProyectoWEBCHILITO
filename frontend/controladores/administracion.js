@@ -221,7 +221,7 @@ const AppController = (() => {
     const lifetime = new AbortController();
     let pageLifetime = new AbortController(), loadingTimer = null;
     const {page} = view;
-    let adminPanel = null, userGarden = null, auth = null, privacy = null, security = null, filter = 'all', data = null, sequence = 0, busy = false;
+    let adminPanel = null, userGarden = null, auth = null, privacy = null, security = null, gardens = null, filter = 'all', data = null, sequence = 0, busy = false;
     async function request(action, payload = {}) {
       const controller = new AbortController();
       const abort = () => controller.abort();
@@ -266,8 +266,16 @@ const AppController = (() => {
         adminPanel=route.detail==='comercial'?CommerceController.mount({root:page,session:authService.session}):route.detail==='mantenimientos'?MaintenanceController.mount({root:page}):route.detail==='solicitudes'?InquiryController.mount({root:page}):route.detail==='vinculacion'?BindingAdminController.mount({root:page}):route.detail==='guias'?CareGuideAdminController.mount({root:page}):AdminController.mount(route.detail,{root:page});
         return;
       }
-      if(['huerto','telemetria','mantenimiento','soporte'].includes(route.screen)) {
+      if(route.screen==='huerto') {
+        userGarden = GardenController.mount({root:page,route});
+        return;
+      }
+      if(['telemetria','mantenimiento','soporte'].includes(route.screen)) {
         userGarden = UserGardenController.mount(route.screen,{root:page,detail:route.detail,onData:next=>{data=next.garden;}});
+        return;
+      }
+      if(route.screen === 'cuenta' && route.detail === 'huertos') {
+        gardens = MyGardensController.mount({root:page});
         return;
       }
       if(route.screen === 'cuenta' && route.detail === 'seguridad') {
@@ -317,6 +325,7 @@ const AppController = (() => {
       auth?.dispose(); auth = null;
       privacy?.dispose(); privacy = null;
       security?.dispose(); security = null;
+      gardens?.dispose(); gardens = null;
       busy = false;
     }
     function update(nextRoute) {

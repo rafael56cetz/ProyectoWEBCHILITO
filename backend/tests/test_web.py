@@ -15,9 +15,8 @@ from datos.models import Auditoria, ConsultaProducto, GuiaCuidado
 from tests import aceptar_vigentes, cuenta, publicar_textos
 from web.middleware import ActorDeBase
 
-ENDPOINTS_ACTUALIZACION = ['/api/huertos/actual', '/api/huertos/actual/avisos', '/api/huertos/actual/mantenimiento',
-                           '/api/huertos/actual/solicitudes', '/api/soporte', '/api/vinculacion', '/api/admin/vinculacion',
-                           '/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
+ENDPOINTS_ACTUALIZACION = ['/api/huertos/actual/avisos', '/api/huertos/actual/mantenimiento', '/api/soporte',
+                           '/api/admin/vinculacion', '/api/admin/flota', '/api/admin/soporte', '/api/admin/mantenimientos']
 
 
 class BaseWeb(TestCase):
@@ -154,7 +153,7 @@ class Escrituras(BaseWeb):
         self.assertNotIn('.count(', fuente)
 
     def test_respuestas_no_cacheables_y_con_proteccion_del_navegador(self):
-        for ruta in ['/api/cuenta', '/api/huertos/actual', '/api/admin/flota']:
+        for ruta in ['/api/cuenta', '/api/huertos', '/api/admin/flota']:
             respuesta = self.client.get(ruta)
             self.assertIn('no-store', respuesta.get('Cache-Control', ''))
             self.assertEqual(respuesta.get('X-Frame-Options'), 'DENY')

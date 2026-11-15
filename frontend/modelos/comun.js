@@ -39,7 +39,8 @@ const PrivacyData = (() => {
     document: kind => send('/api/privacidad/documentos/'+encodeURIComponent(kind), {headers:background}),
     myData: () => post('/api/privacidad/mis-datos', {}),
     saveProfile: values => post('/api/cuenta/perfil', values),
-    welcome: values => post('/api/cuenta/bienvenida', values)
+    welcome: values => post('/api/cuenta/bienvenida', values),
+    acceptLegal: documents => post('/api/legales/aceptar', {documents})
   });
 })();
 

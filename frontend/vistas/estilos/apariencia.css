@@ -286,13 +286,13 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :i
   border:1px solid var(--insignia-borde);background:var(--insignia-fondo);color:var(--insignia-texto)!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.7);font-size:12px!important;font-weight:700;line-height:1.4;white-space:nowrap;
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-atendida,.care-admin-state.is-publicada):not(#_) {
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-atendida,.care-admin-state.is-publicada,.badge.tone-verde):not(#_) {
   --insignia-fondo:var(--insignia-verde-fondo);--insignia-texto:var(--insignia-verde-texto);--insignia-borde:var(--insignia-verde-borde);
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-nueva,.care-admin-state.is-borrador,.notice-condition.active):not(#_) {
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-nueva,.care-admin-state.is-borrador,.notice-condition.active,.badge.tone-ambar):not(#_) {
   --insignia-fondo:var(--insignia-ambar-fondo);--insignia-texto:var(--insignia-ambar-texto);--insignia-borde:var(--insignia-ambar-borde);
 }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.care-admin-state.is-retirada,.badge.error):not(#_) {
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.care-admin-state.is-retirada,.badge.error,.badge.tone-rojo):not(#_) {
   --insignia-fondo:var(--insignia-rojo-fondo);--insignia-texto:var(--insignia-rojo-texto);--insignia-borde:var(--insignia-rojo-borde);
 }
 
@@ -595,33 +595,10 @@ html body[data-private=true][data-role=admin] .maint-calendar :is(button,input,s
   .maint-calendar .maint-calendar-grid [aria-current=date] { outline:1px solid CanvasText;outline-offset:-4px; }
 }
 
-/* Vinculación de huertos (persona usuaria y operador) */
-.binding-form { display:grid;gap:8px;margin-top:16px; }
-.binding-form label { font-weight:600;font-size:14px; }
-.binding-row { display:flex;flex-wrap:wrap;gap:12px;align-items:stretch; }
-.binding-row input { flex:1 1 280px;min-width:0;min-height:48px;padding-inline:14px!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase; }
+/* Vinculación de huertos (operador) */
 .binding-help { margin:0!important;font-size:13px; }
-.binding-support { margin-top:16px;padding:0 16px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:18px;background:rgba(255,255,255,.34); }
-.binding-support summary { min-height:44px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;cursor:pointer; }
-.binding-support summary::before { content:"›";font-size:18px;line-height:1;transition:transform .16s ease; }
-.binding-support[open] summary::before { transform:rotate(90deg); }
-.binding-support > .binding-status { margin:0 0 14px!important; }
-.binding-support-body,.binding-support-form { display:grid;gap:10px; }
-.binding-support-body { padding-bottom:16px; }
-.binding-support-body[hidden],.binding-support-detail[hidden] { display:none; }
-.binding-support-actions { display:flex;flex-wrap:wrap;gap:10px; }
-@media (max-width:520px) { .binding-support-actions .button { flex:1 1 100%; } }
-.binding-support-detail { display:grid;gap:6px; }
-.binding-support-detail label { font-weight:600;font-size:14px; }
-.binding-support-detail textarea { width:100%;box-sizing:border-box;resize:vertical; }
-.binding-support-contact { display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--claro-linea,rgba(70,40,20,.14)); }
-.binding-support-address { display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
-.binding-support-address strong { overflow-wrap:anywhere;user-select:all; }
-@media (prefers-reduced-motion:reduce) { .binding-support summary::before { transition:none; } }
-@media (prefers-reduced-transparency:reduce) { .binding-support { background:var(--claro-tarjeta-solida,#fff); } }
 .binding-status { margin:4px 0 0!important;font-size:14px;font-weight:600; }
 .binding-status[hidden] { display:none; }
-.binding-form[aria-busy=true] .binding-status { font-weight:500; }
 .binding-issue-form { display:grid;gap:10px;max-width:560px;margin-top:14px; }
 .binding-issue-form label { font-weight:600;font-size:14px; }
 .binding-issue-form > button { justify-self:start;margin-top:6px; }
