@@ -26,7 +26,9 @@ from django.test import Client, override_settings
 
 from cuentas.models import Usuario
 from privacidad import services
-from privacidad.models import ConteoNavegacion, DecisionPrivacidad, EventoPrivacidad, SujetoPrivacidad
+from datos.models import Auditoria
+from privacidad.models import ConteoNavegacion, Decision, Sujeto
+from web.models import Idempotencia
 
 resultados = []
 
@@ -58,7 +60,7 @@ def recorrer():
     v = Client(SERVER_NAME='localhost')
     for tipo in ('privacidad', 'terminos', 'cookies'):
         r = v.get(f'/api/privacidad/documentos/{tipo}')
-        ok(f'documento {tipo}', r.status_code == 200 and 'text' in r.json() and r.json().get('draft') is True, r.status_code)
+        ok(f'documento {tipo}', r.status_code == 200 and 'text' in r.json() and r.json().get('registered') is True and r.json().get('draft') is False, r.status_code)
     ok('documento desconocido', v.get('/api/privacidad/documentos/otro').status_code == 404)
 
     # Banner sin sesión
@@ -71,9 +73,9 @@ def recorrer():
     ok('sin cookie estadística', services.COOKIE_ESTADISTICA not in v.cookies)
 
     # Rechazo
-    decisiones_previas = DecisionPrivacidad.objects.count()
+    decisiones_previas = Decision.objects.count()
     r = post(v, '/api/privacidad/cookies', {'statistics': False})
-    ok('rechazar guarda decisión', r.status_code == 200 and DecisionPrivacidad.objects.count() == decisiones_previas + 1, r.status_code)
+    ok('rechazar guarda decisión', r.status_code == 200 and Decision.objects.count() == decisiones_previas + 1, r.status_code)
     cookie = v.cookies[services.COOKIE_PREFERENCIA]
     ok('cookie HttpOnly y Lax', cookie['httponly'] and cookie['samesite'] == 'Lax')
     ok('dura 180 días', cookie['max-age'] == 180 * 24 * 3600, cookie['max-age'])
@@ -91,7 +93,7 @@ def recorrer():
     ok('sección fuera de lista', post(v, '/api/estadisticas/seccion', {'section': 'admin'}).status_code == 400)
     ok('sección no textual', post(v, '/api/estadisticas/seccion', {'section': ['inicio']}).status_code == 400)
     falsa = Client(SERVER_NAME='localhost')
-    falsa.cookies[services.COOKIE_PREFERENCIA] = str(SujetoPrivacidad.objects.filter(ambito='navegador').first().pk)
+    falsa.cookies[services.COOKIE_PREFERENCIA] = str(Sujeto.objects.filter(ambito='navegador').first().pk)
     ok('cookie sin firma ignorada', post(falsa, '/api/estadisticas/seccion', {'section': 'avisos'}).json()['counted'] is False)
 
     # Revocar
@@ -112,35 +114,37 @@ def recorrer():
     ok('bienvenida atendida', c.get('/api/cuenta').json()['profile']['welcomePending'] is False)
 
     # Rectificación
-    # El rol de la aplicación puede contar eventos, pero no leer su contenido.
-    n = EventoPrivacidad.objects.count()
+    # La auditoría guarda qué campo cambió, nunca su valor.
+    n = Auditoria.objects.filter(accion='rectificar_perfil').count()
     r = post(c, '/api/cuenta/perfil', {'firstName': ' Ana ', 'alias': 'Chile'})
     ok('rectificar perfil', r.status_code == 200, r.status_code)
     u.refresh_from_db()
     ok('recorta y guarda', (u.first_name, u.alias) == ('Ana', 'Chile'), u.first_name)
     ok('saludo por alias', c.get('/api/cuenta').json()['profile']['greeting'] == 'Chile')
-    ok('un evento por campo cambiado', EventoPrivacidad.objects.count() == n + 2, EventoPrivacidad.objects.count() - n)
-    n = EventoPrivacidad.objects.count()
+    ok('un registro por campo cambiado', Auditoria.objects.filter(accion='rectificar_perfil').count() == n + 2)
+    ok('la auditoría no guarda valores', 'Ana' not in str(list(Auditoria.objects.filter(accion='rectificar_perfil').values_list('detalle', flat=True))))
+    n = Auditoria.objects.filter(accion='rectificar_perfil').count()
     post(c, '/api/cuenta/perfil', {'firstName': 'Ana', 'alias': 'Chile'})
-    ok('sin cambios no hay evento', EventoPrivacidad.objects.count() == n)
+    ok('sin cambios no hay registro', Auditoria.objects.filter(accion='rectificar_perfil').count() == n)
     ok('campo no permitido', post(c, '/api/cuenta/perfil', {'is_staff': True}).status_code == 400)
     ok('alias muy largo', post(c, '/api/cuenta/perfil', {'alias': 'x' * 65}).status_code == 400)
     ok('texto con control', post(c, '/api/cuenta/perfil', {'alias': 'a\nb'}).status_code == 400)
     ok('alias de solo espacios queda vacío', post(c, '/api/cuenta/perfil', {'alias': '   '}).status_code == 200)
 
     # Acceso
-    n = EventoPrivacidad.objects.count()
+    n = Auditoria.objects.filter(accion='consultar_mis_datos').count()
     r = post(c, '/api/privacidad/mis-datos')
     ok('consulta propia', r.json()['data']['email'] == 'titular@example.test', r.status_code)
-    ok('deja evento de acceso', EventoPrivacidad.objects.count() == n + 1)
-    ok('no guarda datos en idempotencia', 'titular' not in str(list(u.idempotencia_set.values_list('respuesta', flat=True))))
+    ok('deja registro de acceso', Auditoria.objects.filter(accion='consultar_mis_datos').count() == n + 1)
+    ok('no guarda datos en idempotencia', 'titular' not in str(list(Idempotencia.objects.filter(actor=u).values_list('respuesta', flat=True))))
 
     # Oposición con sesión
     post(c, '/api/privacidad/cookies', {'statistics': True})
-    n = EventoPrivacidad.objects.count()
+    n = Decision.objects.count()
     r = post(c, '/api/privacidad/cookies', {'statistics': False})
-    ok('oposición registrada', r.status_code == 200 and EventoPrivacidad.objects.count() == n + 1, r.status_code)
-    sujeto = SujetoPrivacidad.objects.filter(usuario=u, ambito='navegador').first()
+    ok('oposición registrada', r.status_code == 200 and Decision.objects.count() == n + 1, r.status_code)
+    ok('guarda IP recortada y navegador resumido', Decision.objects.filter(usuario=u, acto='cookies').exclude(ip_recortada='').exists())
+    sujeto = Sujeto.objects.filter(usuario=u, ambito='navegador').first()
     ok('navegador vinculado a la cuenta', sujeto is not None)
     # Otra cuenta en el mismo navegador pide su propia decisión
     d.cookies[services.COOKIE_PREFERENCIA] = c.cookies[services.COOKIE_PREFERENCIA].value
@@ -164,9 +168,9 @@ def recorrer():
     ok('sin sesión cuenta con la decisión del navegador', post(ajena, '/api/estadisticas/seccion', {'section': 'huerto'}).json()['counted'] is True)
     ok('el servicio aplica la misma regla', services.estado_cookies(firmado, AnonymousUser())['decided'] is True)
 
-    # Mantenimientos: sin capacidad
-    ok('sin capacidad no entra', c.get('/api/admin/mantenimientos').status_code == 403)
-    ok('sin capacidad no anula', post(c, f'/api/admin/mantenimientos/{uuid.uuid4()}/anular', {'reason': 'x', 'revision': 0}).status_code == 403)
+    # Administración: sin capacidad
+    ok('sin capacidad no entra', c.get('/api/admin/guias').status_code == 403)
+    ok('sin capacidad no publica', post(c, f'/api/admin/guias/{uuid.uuid4()}/publicar', {'version': 1}).status_code == 403)
 
 
 def main():
@@ -178,7 +182,7 @@ def main():
         finally:
             transaction.set_rollback(True)
     with connection.cursor() as k:
-        k.execute('SELECT (SELECT count(*) FROM cuentas_usuario),(SELECT count(*) FROM privacidad_sujetoprivacidad),(SELECT count(*) FROM privacidad_conteonavegacion)')
+        k.execute('SELECT (SELECT count(*) FROM cuentas_usuario),(SELECT count(*) FROM privacidad_sujeto),(SELECT count(*) FROM conteo_navegacion)')
         print('usuarios, sujetos y conteos tras revertir:', k.fetchone())
     print(f'{sum(resultados)} de {len(resultados)} correctas')
     sys.exit(0 if all(resultados) else 1)

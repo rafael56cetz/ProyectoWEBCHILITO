@@ -14,7 +14,7 @@ const SiteController = (() => {
       const [part, encodedDetail] = path.split('/');
       let detail;
       try { detail = decodeURIComponent(encodedDetail || ''); } catch { detail = ''; }
-      if(part==='admin') return {screen:'admin',detail:['flota','soporte','mantenimientos','solicitudes','vinculacion','guias','comercial'].includes(detail)?detail:'flota'};
+      if(part==='admin') return {screen:'admin',detail:['flota','soporte','mantenimientos','solicitudes','guias'].includes(detail)?detail:'flota'};
       // La pantalla de solicitudes se retiró: el Aviso explica estos derechos y sus medios.
       if(path === 'derechos-arco') { replaceHash('#privacidad'); return {screen:'privacidad'}; }
       if(part === 'cuenta' && detail === 'seguridad') return {screen:'cuenta',detail:'seguridad',invalidSecurity:path.split('/').length !== 2};

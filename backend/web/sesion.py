@@ -56,7 +56,6 @@ class SesionAcotada:
         sesion, usuario, ahora = request.session, request.user, int(time.time())
         visto = sesion.get(VISTO)
         if vencida(ahora, sesion.get(INICIO), visto, lambda: services.is_admin(usuario)):
-            services.close_actor_sessions(usuario, 'expiry')
             logout(request)
         elif not es_sondeo(request) and ahora - visto >= RESOLUCION_ACTIVIDAD:
             sesion[VISTO] = ahora

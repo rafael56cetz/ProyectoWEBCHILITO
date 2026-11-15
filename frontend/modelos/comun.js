@@ -59,12 +59,9 @@ const AppModel = (() => {
     {id:'admin/soporte',label:'Consola remota',icon:'support'},
     {id:'admin/mantenimientos',label:'Mantenimientos',icon:'tool'},
     {id:'admin/solicitudes',label:'Solicitudes del producto',icon:'inbox'},
-    {id:'admin/comercial',label:'Equipos y ventas',icon:'grid'},
-    {id:'admin/vinculacion',label:'Vinculación de huertos',icon:'leaf'},
     {id:'admin/guias',label:'Guías de cuidado',icon:'list'}
   ];
-  // Comercial: visibilidad provisional con vincular_huertos; no concede permisos comerciales.
-  const adminCapabilities={'admin/flota':'ver_flota','admin/soporte':'atender_soporte','admin/mantenimientos':'gestionar_mantenimientos','admin/solicitudes':'atender_consultas','admin/comercial':'vincular_huertos','admin/vinculacion':'vincular_huertos','admin/guias':'gestionar_guias'};
+  const adminCapabilities={'admin/flota':'ver_flota','admin/soporte':'atender_soporte','admin/mantenimientos':'gestionar_mantenimientos','admin/solicitudes':'atender_consultas','admin/guias':'gestionar_guias'};
   const allowedAdmin=(session=AuthService.session)=>adminDestinations.filter(item=>(session.capabilities||[]).includes(adminCapabilities[item.id]));
   // Gmail en otra pestaña con la cuenta de soporte seleccionada. Sin API ni credenciales: Gmail autentica por su cuenta.
   const supportMailUrl=()=>{const contact=ChilitoHTTP.configuration?.supportContact;

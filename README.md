@@ -93,11 +93,10 @@ Las pruebas del servidor requieren PostgreSQL y, en el `.env`, `CHILITO_TEST_DB_
 
 ```sh
 python3 backend/tools/pruebas_local.py suite
-python3 backend/tools/pruebas_local.py crud
 python3 backend/tools/pruebas_local.py flujos
 ```
 
-`suite` usa el corredor de pruebas de Django. `crud` y `flujos` comprueban operaciones con el rol limitado. Crean y eliminan la base temporal fija `test_chilito_integracion_sinteticos`; no debe contener datos que quieras conservar. Los flujos también usan el rol de la aplicación (`CHILITO_DB_USER`) del mismo `.env`. El correo de pruebas se simula o queda en el entorno de pruebas; `probar_correo.py` es una herramienta distinta que sí envía un mensaje real.
+`suite` usa el corredor de pruebas de Django. `flujos` comprueba operaciones con el rol limitado. Crean y eliminan la base temporal fija `test_chilito_integracion_sinteticos`; no debe contener datos que quieras conservar. Los flujos también usan el rol de la aplicación (`CHILITO_DB_USER`) del mismo `.env`. El correo de pruebas se simula o queda en el entorno de pruebas; `probar_correo.py` es una herramienta distinta que sí envía un mensaje real.
 
 ## Base de datos y entrega
 

@@ -2,10 +2,10 @@
 
 - `servir_local.py`: arranca la aplicación en http://localhost:8780.
 - `comprobar_frontend_local.py`: compara por contenido la raíz, los scripts y los estilos de localhost:8780 con esta carpeta. Solo lectura; no consulta cuentas ni la base. Ejecutarlo en la terminal del equipo donde se abre la aplicación si el entorno del agente no puede acceder a localhost.
-- `pruebas_local.py suite|crud|flujos`: pruebas; ver `README.md` de la raíz.
+- `pruebas_local.py suite|flujos`: pruebas; ver `README.md` de la raíz.
 - `entorno_local.py`: carga los `.env` sin mostrar sus valores.
 - `destino_temporal.py`: comprueba que los flujos apunten a la base temporal antes de escribir.
-- `probar_seguridad.py`, `probar_mfa.py`, `probar_privacidad.py`, `probar_crud_runtime.py`: flujos con el rol limitado.
+- `probar_seguridad.py`, `probar_mfa.py`, `probar_privacidad.py`: flujos con el rol limitado.
 - `configurar_correo.py`, `correo_config.py`, `probar_correo.py`: configuración y prueba de SMTP.
 - `probar_cuota_contacto.py`: comprueba el límite de «Consíguelo» en un entorno de pruebas desplegado.
 - `soporte_local.py`: recuperación de acceso sin métodos.

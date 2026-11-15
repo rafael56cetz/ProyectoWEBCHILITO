@@ -18,7 +18,7 @@ INSTALLED_APPS=['django.contrib.auth','django.contrib.contenttypes','django.cont
 MIDDLEWARE=['django.middleware.security.SecurityMiddleware','django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware','django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware','django.contrib.messages.middleware.MessageMiddleware',
-    'allauth.account.middleware.AccountMiddleware','web.middleware.SecurityHeaders','web.sesion.SesionAcotada']
+    'allauth.account.middleware.AccountMiddleware','web.middleware.SecurityHeaders','web.sesion.SesionAcotada','web.middleware.ActorDeBase']
 ROOT_URLCONF='config.urls'
 TEMPLATES=[{'BACKEND':'django.template.backends.django.DjangoTemplates','DIRS':[],'APP_DIRS':True,
  'OPTIONS':{'context_processors':['django.template.context_processors.request','django.contrib.auth.context_processors.auth','django.contrib.messages.context_processors.messages']}}]
@@ -32,6 +32,7 @@ DATABASES={'default':{'ENGINE':'django.db.backends.postgresql','NAME':os.environ
  'USER':os.environ.get('CHILITO_DB_USER','chilito_pkg_runtime'),'PASSWORD':os.environ.get('CHILITO_DB_PASSWORD',''),
  'HOST':os.environ.get('CHILITO_DB_HOST','127.0.0.1'),'PORT':os.environ.get('CHILITO_DB_PORT','5432'),
  'OPTIONS':{'sslmode':os.environ.get('CHILITO_DB_SSLMODE','verify-full')},
+ 'ATOMIC_REQUESTS':True,
  'TEST':{'NAME':'test_chilito_integracion_sinteticos'}}}
 AUTH_PASSWORD_VALIDATORS=[{'NAME':'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
  {'NAME':'django.contrib.auth.password_validation.MinimumLengthValidator','OPTIONS':{'min_length':15}},

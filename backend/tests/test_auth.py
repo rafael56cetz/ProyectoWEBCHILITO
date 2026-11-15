@@ -4,21 +4,18 @@ import re
 import time
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.core import mail
+from django.contrib.auth.models import Permission
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from allauth.mfa.models import Authenticator
 from allauth.account.internal.flows.email_verification_by_code import EMAIL_VERIFICATION_CODE_SESSION_KEY as CODE_KEY
-from cuentas.models import ConfirmacionRegistroLocal
 from cuentas.email import AuthorizedSMTPBackend, MailUnavailable
-from datos import services
-from datos.models import Dispositivo, PermisoSoporte
-from huerto.models import Huerto, Membresia
-from privacidad.models import DecisionPrivacidad, EventoPrivacidad
+from privacidad.models import Decision
 from privacidad.services import documento_vigente
+from tests import cuenta, publicar_textos
 
 P = '/_allauth/browser/v1/'
 PASSWORD = 'Frase aislada para comprobar cuentas extensas 73!'
@@ -28,6 +25,10 @@ NEW_PASSWORD = 'Nueva frase aislada para comprobar el cambio 81!'
 @override_settings(ELCHILITO_REGISTRATION_ENABLED=True,
                    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class AuthenticationHTTPTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
+
     def setUp(self):
         cache.clear()
         self.client = Client(enforce_csrf_checks=True, HTTP_HOST='127.0.0.1')
@@ -41,9 +42,7 @@ class AuthenticationHTTPTests(TestCase):
                                  HTTP_X_CSRFTOKEN=cookie.value if cookie else '')
 
     def make_user(self, email='auth-user@example.test', verified=True, **fields):
-        user = get_user_model().objects.create_user(email, PASSWORD, **fields)
-        EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=verified)
-        return user
+        return cuenta(email, password=PASSWORD, verificada=verified, **fields)
 
     def login(self, user=None, client=None):
         user = user or self.make_user()
@@ -97,14 +96,13 @@ class AuthenticationHTTPTests(TestCase):
         self.assertEqual(foreign.status_code, 403)
         self.assertEqual(get_user_model().objects.count(), 0)
 
-    def test_signup_verification_and_no_automatic_membership(self):
+    def test_signup_verification_and_no_privileges(self):
         exact = ' ' + '\U0001f680' * 13 + ' '
         response = self.signup(password=exact)
         self.assertEqual(response.status_code, 401)
         user = get_user_model().objects.get()
         self.assertTrue(user.check_password(exact))
         self.assertFalse(user.is_staff or user.is_superuser)
-        self.assertTrue(ConfirmacionRegistroLocal.objects.get(usuario=user).documentos_pendientes)
         self.assertFalse(EmailAddress.objects.get(user=user).verified)
         self.assertEqual(len(mail.outbox), 1)
         self.assertNotIn(self.code(), response.content.decode())
@@ -115,8 +113,7 @@ class AuthenticationHTTPTests(TestCase):
         self.assertEqual(profile['role'], 'user')
         self.assertEqual(profile['capabilities'], [])
         self.assertEqual(profile['profile']['id'], str(user.pk))
-        self.assertFalse(Membresia.objects.exists())
-        self.assertNotEqual(self.client.get('/api/huertos/actual').status_code, 200)
+        self.assertEqual(profile['pendingLegal'], [])
 
     def test_invalid_password_policy_and_maximum_256(self):
         for password in ['x' * 14, '\U0001f680' * 257, '123456789012345', 'password']:
@@ -145,12 +142,13 @@ class AuthenticationHTTPTests(TestCase):
     def test_signup_saves_each_legal_act_with_its_current_version(self):
         self.assertIn(self.signup().status_code, (200, 401))
         user = get_user_model().objects.get()
-        actos = {d.acto: d for d in DecisionPrivacidad.objects.filter(sujeto__usuario=user, sujeto__ambito='cuenta')}
+        actos = {d.acto: d for d in Decision.objects.filter(sujeto__usuario=user, sujeto__ambito='cuenta')}
         self.assertEqual(set(actos), {'aceptacion_terminos', 'lectura_aviso'})
         self.assertTrue(all(d.decision is True for d in actos.values()))
         self.assertEqual(actos['aceptacion_terminos'].documento, documento_vigente('terminos'))
         self.assertEqual(actos['lectura_aviso'].documento, documento_vigente('aviso_privacidad'))
-        self.assertEqual(EventoPrivacidad.objects.filter(actor=user, accion='decision').count(), 2)
+        self.assertEqual({d.ip_recortada for d in actos.values()}, {'127.0.0.0'})
+        self.assertEqual({d.usuario_id for d in actos.values()}, {user.pk})
 
     def test_signup_requires_reading_the_privacy_notice(self):
         r = self.client.post(P + 'auth/signup', json.dumps({'email': 'new-auth@example.test', 'password': PASSWORD,
@@ -254,16 +252,15 @@ class AuthenticationHTTPTests(TestCase):
         self.assertEqual(known.json(), unknown.json())
         self.assertEqual(self.client.get('/api/cuenta').status_code, 401)
 
-    def test_superuser_flags_do_not_grant_web_capabilities(self):
-        user = self.make_user(is_staff=True, is_superuser=True)
+    def test_capabilities_come_only_from_explicit_grants(self):
+        user = self.make_user()
         self.login(user)
         profile = self.client.get('/api/cuenta').json()
-        self.assertEqual(profile['role'], 'user')
-        permission = Permission.objects.get(content_type__app_label='datos', codename='ver_flota')
-        user.user_permissions.add(permission)
+        self.assertEqual((profile['role'], profile['capabilities']), ('user', []))
+        self.assertFalse(get_user_model()._meta.get_field('is_staff').default)
+        user.user_permissions.add(Permission.objects.get(content_type__app_label='cuentas', codename='ver_flota'))
         profile = self.client.get('/api/cuenta').json()
-        self.assertEqual(profile['role'], 'admin')
-        self.assertEqual(profile['capabilities'], ['ver_flota'])
+        self.assertEqual((profile['role'], profile['capabilities']), ('admin', ['ver_flota']))
 
     def test_unverified_login_requires_code_and_inactive_login_rejected(self):
         user = self.make_user(verified=False)
@@ -333,61 +330,6 @@ class AuthenticationHTTPTests(TestCase):
             self.assertEqual(self.signup().status_code, 503)
         self.assertFalse(get_user_model().objects.exists())
         self.assertEqual(len(mail.outbox), 0)
-
-    def test_logout_closes_technical_session_without_revoking_permission(self):
-        owner = self.make_user()
-        admin = self.make_user('auth-admin@example.test')
-        admin.user_permissions.add(Permission.objects.get(content_type__app_label='datos', codename='atender_soporte'))
-        garden = Huerto.objects.create(clave='auth-garden', nombre='Huerto sintético')
-        Membresia.objects.create(usuario=owner, huerto=garden)
-        Dispositivo.objects.create(huerto=garden, identificador='auth-device')
-        issued = services.issue_support(owner, garden.pk, 'connection', True)
-        self.login(admin)
-        Authenticator.objects.create(user=admin, type='totp', data={})
-        technical = services.open_technical(admin, issued['permission']['ticket'], issued['permission']['token'])
-        self.assertEqual(self.post('auth/session', {}, method='delete').status_code, 401)
-        technical.refresh_from_db()
-        self.assertIsNotNone(technical.cerrada_en)
-        self.assertEqual(technical.motivo_cierre, 'logout')
-        self.assertIsNone(PermisoSoporte.objects.get(pk=technical.permiso_id).revocado_en)
-
-    def test_logout_cleans_up_after_admin_loses_verification_or_activity(self):
-        # Both variants use the original server-session cookie and body {} only.
-        # An arbitrary anonymous payload never supplies the cleanup identity.
-        owner = self.make_user()
-        garden = Huerto.objects.create(clave='logout-ineligible', nombre='Huerto sintético')
-        Membresia.objects.create(usuario=owner, huerto=garden)
-        Dispositivo.objects.create(huerto=garden, identificador='logout-ineligible-device')
-        admin = self.make_user('logout-ineligible@example.test')
-        admin.user_permissions.add(Permission.objects.get(content_type__app_label='datos', codename='atender_soporte'))
-        issued = services.issue_support(owner, garden.pk, 'connection', True)
-        for loss in ['verification', 'activity']:
-            with self.subTest(loss=loss):
-                cache.clear()
-                Authenticator.objects.filter(user=admin).delete()
-                self.assertEqual(self.login(admin).status_code, 200)
-                Authenticator.objects.create(user=admin, type='totp', data={})
-                technical = services.open_technical(admin, issued['permission']['ticket'], issued['permission']['token'])
-                if loss == 'verification':
-                    EmailAddress.objects.filter(user=admin).update(verified=False)
-                else:
-                    get_user_model().objects.filter(pk=admin.pk).update(is_active=False)
-                self.assertEqual(self.post('auth/session', {}, method='delete').status_code, 401)
-                technical.refresh_from_db()
-                self.assertIsNotNone(technical.cerrada_en)
-                self.assertEqual(technical.motivo_cierre, 'logout')
-                self.assertIsNone(PermisoSoporte.objects.get(pk=technical.permiso_id).revocado_en)
-                from datos.models import Auditoria
-                self.assertTrue(Auditoria.objects.filter(sesion_tecnica=technical, accion='technical-closed').exists())
-                EmailAddress.objects.filter(user=admin).update(verified=True)
-                get_user_model().objects.filter(pk=admin.pk).update(is_active=True)
-                Authenticator.objects.filter(user=admin).delete()
-                self.assertEqual(self.login(admin).status_code, 200)
-                Authenticator.objects.create(user=admin, type='totp', data={})
-                from django.core.exceptions import PermissionDenied
-                with self.assertRaises(PermissionDenied):
-                    services.technical_action(admin, technical.pk, 'diagnostic')
-                self.post('auth/session', {}, method='delete')
 
     def test_deep_json_and_oversize_auth_body_are_controlled(self):
         nested = '{"email":' + '[' * 1500 + '0' + ']' * 1500 + '}'

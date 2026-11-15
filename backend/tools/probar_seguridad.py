@@ -162,7 +162,7 @@ def recorrer():
     ok('consulta de sesión no renueva', c.session[sesion.VISTO] == t - 120)
     c.get('/api/cuenta', headers={'X-Chilito-Sondeo': '1'})
     ok('sondeo no renueva', c.session[sesion.VISTO] == t - 120)
-    c.get('/api/huertos/actual')
+    c.get('/api/guias')
     ok('actividad real renueva', c.session[sesion.VISTO] >= t)
 
     alterar(c, **{sesion.VISTO: t - 1801})

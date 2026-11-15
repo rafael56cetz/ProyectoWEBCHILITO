@@ -52,7 +52,7 @@ class VencimientoTests(SimpleTestCase):
 
 
 class MiddlewareTests(SimpleTestCase):
-    def peticion(self, ruta='/api/huertos/actual', edad_visto=120, **extra):
+    def peticion(self, ruta='/api/cuenta', edad_visto=120, **extra):
         request = RequestFactory().get(ruta, **extra)
         request.session = {sesion.INICIO: 10_000_000 - 600, sesion.VISTO: 10_000_000 - edad_visto}
         request.user = MagicMock(is_authenticated=True)
@@ -78,12 +78,11 @@ class MiddlewareTests(SimpleTestCase):
     def test_estaticos_no_cuentan(self):
         self.assertEqual(self.atender(self.peticion('/vistas/estilos/site.css')), 10_000_000 - 120)
 
-    def test_al_vencer_cierra_sesion_tecnica_y_web(self):
+    def test_al_vencer_cierra_la_sesion_web(self):
         request = self.peticion(edad_visto=2000)
         with patch('web.sesion.services') as servicios, patch('web.sesion.logout') as salir:
             servicios.is_admin.return_value = False
             self.atender(request)
-        servicios.close_actor_sessions.assert_called_once_with(request.user, 'expiry')
         salir.assert_called_once_with(request)
 
 

@@ -1,9 +1,6 @@
 """Pruebas del perfil preparatorio; no acreditan persistencia ni un flujo HTTP."""
-from importlib import import_module
-
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.migrations.loader import MigrationLoader
 from django.test import SimpleTestCase
 from django.utils import timezone
 
@@ -67,19 +64,3 @@ class PerfilBienvenidaTests(SimpleTestCase):
         usuario.clean()
         self.assertEqual(usuario.bienvenida_atendida_en, atendida)
         self.assertEqual((usuario.first_name, usuario.last_name, usuario.alias), ("", "", ""))
-
-    def test_migracion_agrega_perfil_sin_reemplazar_identidad(self):
-        loader = MigrationLoader(None)
-        anterior = loader.project_state(("cuentas", "0004_identidad_correo_gmail"))
-        nuevo = anterior.clone()
-        migration = import_module("cuentas.migrations.0005_perfil_bienvenida").Migration
-        for operacion in migration.operations:
-            operacion.state_forwards("cuentas", nuevo)
-        usuario_anterior = anterior.models[("cuentas", "usuario")]
-        usuario_nuevo = nuevo.models[("cuentas", "usuario")]
-        for nombre in ("email", "password", "first_name", "last_name", "is_staff", "is_superuser"):
-            with self.subTest(campo=nombre):
-                self.assertEqual(usuario_nuevo.fields[nombre].deconstruct(), usuario_anterior.fields[nombre].deconstruct())
-        self.assertEqual(usuario_nuevo.fields["alias"].default, "")
-        self.assertTrue(usuario_nuevo.fields["bienvenida_atendida_en"].null)
-        self.assertEqual(len(usuario_nuevo.options["constraints"]), len(usuario_anterior.options["constraints"]) + 1)

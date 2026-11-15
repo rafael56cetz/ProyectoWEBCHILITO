@@ -1,9 +1,14 @@
 """Contrato HTTP común: errores genéricos y JSON estricto. Una sola versión por proyecto."""
 import json
+import logging
 import math
 
 from django.http import JsonResponse
 from django.http.request import RawPostDataException
+
+
+logger = logging.getLogger(__name__)
+REGLA_DE_DATOS = '23514'
 
 
 class EntradaInvalida(ValueError):
@@ -59,3 +64,16 @@ def leer_json(request, permitidos, *, vacio=False):
     if not isinstance(datos, dict) or set(datos) - set(permitidos):
         raise EntradaInvalida
     return datos
+
+
+def respuesta_de_base(fallo):
+    """409 genérico si la base rechazó una regla de datos (23514); en otro caso, None.
+
+    El detalle va solo al registro del servidor: tabla, regla y el mensaje fijo de la base, sin valores."""
+    diagnostico = getattr(getattr(fallo, '__cause__', None), 'diag', None)
+    if getattr(getattr(fallo, '__cause__', None), 'sqlstate', None) != REGLA_DE_DATOS:
+        return None
+    logger.warning('regla-de-datos tabla=%s regla=%s mensaje=%s', diagnostico.table_name,
+                   diagnostico.constraint_name, diagnostico.message_primary)
+    return JsonResponse({'status': 409, 'code': 'regla-de-datos', 'message': 'La operación no cumple una regla de los datos.'},
+                        status=409)

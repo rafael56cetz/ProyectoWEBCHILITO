@@ -20,9 +20,8 @@ from allauth.mfa.totp.internal.auth import SECRET_SESSION_KEY
 from cuentas.email import MailUnavailable, delivery_available, delivery_problem
 from cuentas.inputs import PASSWORD_INPUTS
 from cuentas.registration import local_registration_allowed
-from cuentas.services import actor_de_sesion
 from datos import services
-from web.respuestas import error, leer_json
+from web.respuestas import error, leer_json, respuesta_de_base
 
 
 logger = logging.getLogger(__name__)
@@ -57,14 +56,15 @@ def profile(request):
     try:
         contract = services.session_contract(request.user)
         assigned = services.has_garden(request.user)
+        pendientes = services.aceptaciones_pendientes(request.user)
     except (PermissionDenied, ObjectDoesNotExist):
         return error(403, 'verification-required')
-    except DatabaseError:
+    except DatabaseError as fallo:
         logger.exception('perfil-no-disponible')
-        return error(503, 'service-unavailable')
+        return respuesta_de_base(fallo) or error(503, 'service-unavailable')
     return JsonResponse({**contract, 'status': 'ready', 'session': contract,
                          'email': contract['profile']['email'], 'verified': True,
-                         'gardenAssigned': assigned})
+                         'gardenAssigned': assigned, 'pendingLegal': pendientes})
 
 
 _FIELDS = {
@@ -105,12 +105,6 @@ def _payload(request, allowed):
     return data
 
 
-def _close_sessions_for_logout(request):
-    actor = request.user if request.user.is_authenticated else actor_de_sesion(request.session)
-    if actor is not None:
-        services.close_actor_sessions(actor, 'logout')
-
-
 def browser_endpoint(view_class, methods, *, reset_mail=False, verified_only=False):
     options = {'client': Client.BROWSER}
     input_class = getattr(view_class, 'input_class', None)
@@ -143,8 +137,6 @@ def browser_endpoint(view_class, methods, *, reset_mail=False, verified_only=Fal
         if reset_mail and not delivery_available(data.get('email')):
             return error(503, 'mail-unavailable')
         try:
-            if view_class is auth.SessionView and request.method == 'DELETE':
-                _close_sessions_for_logout(request)
             return library_view(request, *args, **kwargs)
         except MailUnavailable:
             return error(503, 'mail-unavailable')
@@ -153,9 +145,9 @@ def browser_endpoint(view_class, methods, *, reset_mail=False, verified_only=Fal
             if 'credential' not in _FIELDS[view_class]:
                 raise fallo
             return error(400, 'invalid-input')
-        except DatabaseError:
+        except DatabaseError as fallo:
             logger.exception('acceso-no-disponible')
-            return error(503, 'service-unavailable')
+            return respuesta_de_base(fallo) or error(503, 'service-unavailable')
     return view
 
 
@@ -192,8 +184,8 @@ def verification_context(request):
         expires = process.state['at'] + settings.ACCOUNT_EMAIL_VERIFICATION_BY_CODE_TIMEOUT
         return JsonResponse({'status': 'verification-required', 'email': process.email,
                              'expiresAt': datetime.fromtimestamp(expires, timezone.utc).isoformat()})
-    except DatabaseError:
-        return error(503, 'service-unavailable')
+    except DatabaseError as fallo:
+        return respuesta_de_base(fallo) or error(503, 'service-unavailable')
 
 
 @never_cache

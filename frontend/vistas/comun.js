@@ -45,12 +45,10 @@ const AppViews = (() => {
     const mailLink=()=>{const url=AppModel.supportMailUrl();return url?`<a class="private-mail-link" href="${escaparHTML(url)}" target="_blank" rel="noopener noreferrer">${icon('mail')}<span>Abrir correo de soporte</span>${icon('external')}<span class="sr-only">(se abre en otra pestaña)</span></a>`:'';};
     // Grupo «Gestión»: correo de soporte y buzón de consultas (este solo con atender_consultas).
     const inbox=links.find(item=>item.id==='admin/solicitudes');
-    const commerce=links.find(item=>item.id==='admin/comercial');
-    const binding=links.find(item=>item.id==='admin/vinculacion');
     const guides=links.find(item=>item.id==='admin/guias');
-    const adminGroup=isAdmin?`<p class="private-role-label private-group-label">Gestión</p><div class="private-pending">${mailLink()}${inbox?link(inbox):''}${commerce?link(commerce):''}${binding?link(binding):''}${guides?link(guides):''}</div>`:'';
+    const adminGroup=isAdmin?`<p class="private-role-label private-group-label">Gestión</p><div class="private-pending">${mailLink()}${inbox?link(inbox):''}${guides?link(guides):''}</div>`:'';
     // En administración, el grupo «Gestión» va antes de Mi cuenta, que queda al pie del panel.
-    const navigation=isAdmin?links.filter(item=>item!==account&&item!==inbox&&item!==commerce&&item!==binding&&item!==guides).map(link).join('')+adminGroup+link(account):links.map(link).join('');
+    const navigation=isAdmin?links.filter(item=>item!==account&&item!==inbox&&item!==guides).map(link).join('')+adminGroup+link(account):links.map(link).join('');
     // La página principal ya tiene acceso fijo bajo el logotipo, también en móvil.
     const menuFooter=`<div class="private-menu-footer"><button class="button private-menu-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></div>`;
     return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>${logoutConfirmation()}`;
@@ -64,7 +62,7 @@ const AppViews = (() => {
     if(detail) {
       const item=data.items.find(item=>item.id===detail);
       if(data.status==='loading')return heading('Avisos')+state('Cargando aviso','Consultando su información.',true);
-      if(data.status==='error')return heading('Avisos')+state('No se pudo consultar el aviso','Inténtalo de nuevo.',false,true);
+      if(data.status==='error')return heading('Avisos')+state('Esta sección se está actualizando.','Vuelve a intentarlo más tarde.',false,true);
       if(!item)return heading('Aviso no disponible')+`<div class="bento-panel"><p>Este aviso no está disponible.</p><a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div>`;
       return heading('Detalle del aviso')+`<article class="bento-panel notice-detail"><div class="notice-meta"><span class="notice-condition ${item.condition}">${item.condition==='active'?'Activo':'Resuelto'}</span><span class="read-state">${item.read?'Leído':'No leído'}</span></div><h2>${escaparHTML(item.title)}</h2><p>${escaparHTML(item.description)}</p><dl class="notice-facts"><div><dt>Zona</dt><dd>${escaparHTML(item.zone)}</dd></div><div><dt>Importancia</dt><dd>${{high:'Alta',medium:'Media',info:'Informativa'}[item.importance]}</dd></div><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div>${item.resolvedAt?`<div><dt>Resolución</dt><dd>${date(item.resolvedAt)}</dd></div>`:''}</dl><div class="notice-recommendation"><h3>Recomendación</h3><p>${escaparHTML(item.recommendation)}</p></div><div class="app-actions">${!item.read?`<button class="button btn-liquid-brand" data-app-action="mark-read" data-id="${escaparHTML(item.id)}" type="button">Marcar como leído</button>`:''}<a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div></article>`;
     }
@@ -72,7 +70,7 @@ const AppViews = (() => {
     const items=AppModel.filterNotices(data.items,filter);
     let body;
     if(data.status==='loading')body=state('Cargando avisos','Consultando los avisos del huerto.',true);
-    else if(data.status==='error')body=state('No se pudieron consultar los avisos','Inténtalo de nuevo para revisar los avisos.',false,true);
+    else if(data.status==='error')body=state('Esta sección se está actualizando.','Vuelve a intentarlo más tarde.',false,true);
     else if(!items.length)body=state(filter==='all'?'No hay avisos para mostrar':'No hay avisos en este filtro','Los avisos de cultivo y comunicación aparecerán aquí cuando estén disponibles.');
     else body=`<div class="notices-grid">${items.map(noticeCard).join('')}</div>`;
     return heading('Avisos',AppModel.addressed(name,'Revisa lo que necesita atención en tu huerto.'))+filters+`<p class="sr-only" role="status">${data.status==='ready'?`${items.length} avisos en este filtro.`:''}</p>`+body;

@@ -2,7 +2,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.db import models
-from django.db.models.functions import Lower
+from web.models import AHORA
 
 class UsuarioManager(BaseUserManager):
     use_in_migrations = True
@@ -32,8 +32,10 @@ class UsuarioManager(BaseUserManager):
 class Usuario(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
-    alias = models.CharField(max_length=64, blank=True, default="")
+    alias = models.CharField(max_length=64, blank=True, default="", db_default="")
     bienvenida_atendida_en = models.DateTimeField(null=True, blank=True)
+    anonimizacion_solicitada_en = models.DateTimeField(null=True, blank=True)
+    anonimizada_en = models.DateTimeField(null=True, blank=True)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = UsuarioManager()
@@ -50,39 +52,29 @@ class Usuario(AbstractUser):
         return self.alias.strip() or self.first_name.strip() or "Bienvenido"
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(Lower("email"), name="usuario_email_ci_unico"),
-            models.UniqueConstraint(
-                models.Func("email", function="public.chilito_identidad_correo",
-                            output_field=models.CharField()),
-                name="usuario_identidad_correo_unica",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(alias="") | models.Q(alias__regex=r"\S"),
-                name="usuario_alias_vacio_o_con_texto",
-            ),
+        permissions = [
+            ("ver_flota", "Ver telemetría de flota"),
+            ("atender_soporte", "Atender soporte remoto (consola remota)"),
+            ("gestionar_mantenimientos", "Corregir y anular cuidados registrados"),
+            ("atender_consultas", "Atender consultas del producto (Consíguelo)"),
+            ("gestionar_dispositivos", "Gestionar inventario y desvinculación de equipos"),
+            ("gestionar_ventas", "Registrar y gestionar ventas"),
+            ("gestionar_guias", "Crear, editar, publicar y retirar guías de cuidado"),
+            ("gestionar_legales", "Subir y publicar versiones de textos legales"),
+            ("ver_consentimientos", "Ver la bitácora de consentimientos"),
+            ("gestionar_administradores", "Super administrador: dar y quitar capacidades"),
         ]
 
 
-class CuotaAcceso(models.Model):
-    """Esquema de almacenamiento del DatabaseCache de Django y los límites de allauth; no es un segundo sistema de autenticación."""
-    cache_key = models.CharField(max_length=255, primary_key=True)
-    value = models.TextField()
-    expires = models.DateTimeField(db_index=True)
+class CapacidadHistorial(models.Model):
+    """Lo llena un trigger de la base; la aplicación solo lo lee."""
+    usuario = models.ForeignKey(Usuario, on_delete=models.DO_NOTHING, related_name="+", db_index=False)
+    capacidad = models.CharField(max_length=64)
+    accion = models.CharField(max_length=10)
+    realizada_por = models.ForeignKey(Usuario, null=True, on_delete=models.DO_NOTHING, related_name="+", db_index=False)
+    motivo = models.CharField(max_length=300, db_default="")
+    realizada_en = models.DateTimeField(db_default=AHORA)
 
     class Meta:
-        db_table = "cuentas_cuotas_acceso"
-
-
-class ConfirmacionRegistroLocal(models.Model):
-    """Confirmación técnica con casilla; nunca es un consentimiento legal aprobado."""
-    usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE, related_name="confirmacion_registro_local")
-    confirmado_en = models.DateTimeField(auto_now_add=True)
-    casilla_marcada = models.BooleanField(default=True, editable=False)
-    documentos_pendientes = models.BooleanField(default=True, editable=False)
-
-    class Meta:
-        constraints = [
-            models.CheckConstraint(condition=models.Q(casilla_marcada=True, documentos_pendientes=True),
-                                   name="registro_local_solo_confirmacion_tecnica"),
-        ]
+        db_table = "capacidad_historial"
+        default_permissions = ()

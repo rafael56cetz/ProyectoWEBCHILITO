@@ -1,247 +1,156 @@
-"""Validación offline del contrato de modelos, no prueba de PostgreSQL ni ARCO.
-
-No crea personas, filas ni conexiones. Los disparadores y GRANT requieren ensayos
-posteriores en PostgreSQL; estas pruebas no los ejecutan ni acreditan su eficacia.
-"""
-import unittest
-import uuid
+"""Privacidad sobre PostgreSQL: textos legales, perfil, auditoría sin valores y estadísticas con consentimiento."""
+import json
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
-from django.db.models import NOT_PROVIDED
-from django.db.models.functions import Now
-from django.test import SimpleTestCase
+from django.db import IntegrityError, connection, transaction
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 
-from .models import (ConteoNavegacion, DecisionPrivacidad, DocumentoVersion, EventoPrivacidad,
-                     FinalidadOpcional, PreferenciaFinalidad, SujetoPrivacidad)
+from datos.models import Auditoria
+from huerto.models import Huerto
+from tests import cuenta, publicar_textos
+
+from . import services
+from .models import ConteoNavegacion, Decision, DocumentoLegal
 
 
-class ContratoPrivacidadOffline(SimpleTestCase):
-    databases = set()
+class TextoLegalVigente(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
 
-    def test_lectura_no_se_confunde_con_finalidad_opcional(self):
-        fila = DecisionPrivacidad(acto="lectura_aviso", decision=True)
-        fila.clean()
-        fila.finalidad_id = uuid.uuid4()
+    def test_sirve_la_version_vigente_ya_saneada(self):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT chilito_publicar_documento_legal('terminos','1.1','Términos',"
+                           "'<h2>Uso</h2><p onclick=\"x()\">Texto</p><script>alert(1)</script>')")
+        documento = services.texto_vigente('terminos')
+        self.assertEqual(documento['version'], '1.1')
+        self.assertEqual(documento['html'], '<h3>Uso</h3><p>Texto</p>')
+        self.assertTrue(documento['registered'] and not documento['draft'])
+
+    def test_el_endpoint_conserva_los_campos_del_contrato(self):
+        cuerpo = Client().get('/api/privacidad/documentos/privacidad').json()
+        self.assertEqual(set(cuerpo), {'status', 'version', 'registered', 'text', 'html', 'draft'})
+        self.assertEqual(cuerpo['version'], '1.0')
+
+    def test_tipo_desconocido_o_sin_publicar_responde_404(self):
+        for tipo in ('../settings', 'terminos.html', 'aviso_privacidad'):
+            self.assertEqual(Client().get(f'/api/privacidad/documentos/{tipo}').status_code, 404, tipo)
+        with patch.object(services, 'documento_vigente', return_value=None):
+            self.assertEqual(Client().get('/api/privacidad/documentos/terminos').status_code, 404)
+
+    def test_no_lee_archivos_del_frontend(self):
+        self.assertFalse(hasattr(services, 'CARPETA_HTML'))
+
+
+class Registro(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
+
+    def test_cuenta_y_aceptaciones_con_la_version_vigente(self):
+        usuario = cuenta('registro@example.test')
+        actos = {d.acto: d for d in Decision.objects.filter(sujeto__usuario=usuario, sujeto__ambito='cuenta')}
+        self.assertEqual(set(actos), {'aceptacion_terminos', 'lectura_aviso'})
+        self.assertEqual(actos['aceptacion_terminos'].documento.tipo, 'terminos')
+        self.assertEqual(actos['lectura_aviso'].documento.tipo, 'aviso_privacidad')
+
+    def test_sin_textos_publicados_no_hay_registro(self):
+        with patch.object(services, 'documento_vigente', return_value=None), self.assertRaises(ValidationError), transaction.atomic():
+            cuenta('sin-textos@example.test')
+
+    def test_la_base_rechaza_una_cuenta_sin_aceptaciones(self):
+        from django.contrib.auth import get_user_model
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            get_user_model().objects.create_user('sin-aceptar@example.test', 'una frase suficientemente larga 12')
+            with connection.cursor() as cursor:
+                cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')
+
+    def test_navegador_resumido_sin_user_agent_completo(self):
+        casos = {
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0': 'Edge 130 · Windows',
+            'Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0': 'Firefox 131 · Linux',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1': 'Safari 17 · iOS',
+            '': 'Otro · Otro',
+        }
+        for agente, esperado in casos.items():
+            with self.subTest(esperado=esperado):
+                self.assertEqual(services.navegador_resumido(RequestFactory().get('/', HTTP_USER_AGENT=agente)), esperado)
+
+    def test_ip_recortada(self):
+        for ip, esperado in {'189.203.45.77': '189.203.45.0', '2001:db8:abcd:12::1': '2001:db8:abcd::', 'no-es-ip': ''}.items():
+            with self.subTest(ip=ip):
+                self.assertEqual(services.ip_recortada(RequestFactory().get('/', REMOTE_ADDR=ip)), esperado)
+
+
+class PerfilYMisDatos(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
+
+    def setUp(self):
+        self.usuario = cuenta('perfil@example.test')
+
+    def test_rectificar_audita_el_campo_y_nunca_el_valor(self):
+        services.rectificar_perfil(self.usuario, {'firstName': 'Ana', 'alias': 'Mi huerto'})
+        self.usuario.refresh_from_db()
+        self.assertEqual((self.usuario.first_name, self.usuario.alias), ('Ana', 'Mi huerto'))
+        registros = Auditoria.objects.filter(accion='rectificar_perfil', actor=self.usuario)
+        self.assertEqual(sorted(r.detalle['campo'] for r in registros), ['alias', 'first_name'])
+        self.assertNotIn('Ana', json.dumps([r.detalle for r in registros]))
+
+    def test_sin_cambios_no_audita(self):
+        services.rectificar_perfil(self.usuario, {'alias': ''})
+        self.assertFalse(Auditoria.objects.filter(accion='rectificar_perfil').exists())
+
+    def test_campos_no_permitidos_o_invalidos(self):
+        for datos in ({'alias': 'x' * 65}, {'firstName': 3}, {'lastName': 'a\nb'}):
+            with self.subTest(datos=datos), self.assertRaises(ValidationError):
+                services.rectificar_perfil(self.usuario, datos)
+
+    def test_bienvenida_se_cierra_una_vez_aun_sin_datos(self):
+        services.atender_bienvenida(self.usuario, {})
+        primera = self.usuario.__class__.objects.get(pk=self.usuario.pk).bienvenida_atendida_en
+        self.assertIsNotNone(primera)
+        services.atender_bienvenida(self.usuario, {})
+        self.assertEqual(self.usuario.__class__.objects.get(pk=self.usuario.pk).bienvenida_atendida_en, primera)
+
+    def test_mis_datos_audita_la_consulta_y_lista_solo_huertos_activos_propios(self):
+        otra = cuenta('otra-persona@example.test')
+        archivado = Huerto.objects.create(propietario=self.usuario, nombre='Archivado')
+        Huerto.objects.filter(pk=archivado.pk).update(estado='archivado', archivado_en=archivado.creado_en)
+        Huerto.objects.create(propietario=self.usuario, nombre='Activo')
+        Huerto.objects.create(propietario=otra, nombre='Ajeno')
+        datos = services.consultar_mis_datos(self.usuario)
+        self.assertEqual(datos['gardens'], ['Activo'])
+        self.assertEqual(Auditoria.objects.filter(accion='consultar_mis_datos', actor=self.usuario).count(), 1)
+
+
+class Estadisticas(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
+
+    def decidir(self, acepta):
+        pedido = RequestFactory().get('/')
+        from django.contrib.auth.models import AnonymousUser
+        pedido.user = AnonymousUser()
+        return services.decidir_cookies(pedido, None, acepta)
+
+    def test_sin_consentimiento_no_cuenta(self):
+        self.assertFalse(services.contar_seccion(None, self.decidir(False), 'id-1', 'inicio'))
+        self.assertFalse(ConteoNavegacion.objects.exists())
+
+    def test_con_consentimiento_cuenta_una_vez_por_identificador_y_seccion(self):
+        valor = self.decidir(True)
+        self.assertTrue(services.contar_seccion(None, valor, 'id-2', 'inicio'))
+        self.assertFalse(services.contar_seccion(None, valor, 'id-2', 'inicio'))
+        self.assertTrue(services.contar_seccion(None, valor, 'id-3', 'inicio'))
+        self.assertEqual(ConteoNavegacion.objects.get(seccion='inicio').visitas, 2)
+
+    def test_secciones_libres_se_rechazan(self):
         with self.assertRaises(ValidationError):
-            fila.clean()
-
-    def test_terminos_no_admiten_finalidad_opcional(self):
-        fila = DecisionPrivacidad(acto="aceptacion_terminos", decision=True)
-        fila.clean()
-        fila.finalidad_id = uuid.uuid4()
-        with self.assertRaises(ValidationError):
-            fila.clean()
-
-    def test_consentimiento_exige_finalidad_y_admite_rechazo(self):
-        fila = DecisionPrivacidad(acto="consentimiento", decision=False)
-        with self.assertRaises(ValidationError):
-            fila.clean()
-        fila.finalidad_id = uuid.uuid4()
-        fila.clean()
-        self.assertIs(fila.decision, False)
-
-    def test_acto_desconocido_rechazado(self):
-        with self.assertRaises(ValidationError):
-            DecisionPrivacidad(acto="aceptar_todo", decision=True).clean()
-
-    def test_decision_no_tiene_aceptacion_por_defecto(self):
-        campo = DecisionPrivacidad._meta.get_field("decision")
-        self.assertIs(campo.default, NOT_PROVIDED)
-        self.assertIs(campo.db_default, NOT_PROVIDED)
-        self.assertFalse(campo.null)
-
-    def test_rectificacion_restringe_campos_y_requiere_actor(self):
-        for campo in ("first_name", "last_name", "alias"):
-            EventoPrivacidad(accion="rectificacion", resultado="completado", actor_id=1, campo=campo).clean()
-        for campo in ("password", "is_superuser", "email", ""):
-            with self.subTest(campo=campo), self.assertRaises(ValidationError):
-                EventoPrivacidad(accion="rectificacion", resultado="completado", actor_id=1, campo=campo).clean()
-        with self.assertRaises(ValidationError):
-            EventoPrivacidad(accion="rectificacion", resultado="completado", campo="first_name").clean()
-
-    def test_rectificacion_no_mezcla_finalidades_ni_decisiones(self):
-        for atributo in ("decision_id", "finalidad_id"):
-            fila = EventoPrivacidad(accion="rectificacion", resultado="completado", actor_id=1, campo="first_name")
-            setattr(fila, atributo, uuid.uuid4())
-            with self.subTest(atributo=atributo), self.assertRaises(ValidationError):
-                fila.clean()
-
-    def test_oposicion_requiere_actor_finalidad_y_decision(self):
-        datos = dict(accion="oposicion", resultado="completado", actor_id=1,
-                     finalidad_id=uuid.uuid4(), decision_id=uuid.uuid4())
-        EventoPrivacidad(**datos).clean()
-        for atributo in ("actor_id", "finalidad_id", "decision_id"):
-            invalido = {**datos, atributo: None}
-            with self.subTest(atributo=atributo), self.assertRaises(ValidationError):
-                EventoPrivacidad(**invalido).clean()
-
-    def test_evento_decision_admite_visitante_sin_campo_personal(self):
-        fila = EventoPrivacidad(accion="decision", resultado="completado", decision_id=uuid.uuid4())
-        fila.clean()
-        fila.campo = "first_name"
-        with self.assertRaises(ValidationError):
-            fila.clean()
-
-    def test_resultado_no_admite_texto_libre(self):
-        with self.assertRaises(ValidationError):
-            EventoPrivacidad(accion="rectificacion", resultado="mi contraseña", actor_id=1, campo="first_name").clean()
-
-    def test_documento_exige_huella_y_referencia(self):
-        hash_field = DocumentoVersion._meta.get_field("contenido_sha256")
-        for valor in ("", "abc", "G" * 64):
-            with self.subTest(valor=valor), self.assertRaises(ValidationError):
-                hash_field.clean(valor, None)
-        self.assertEqual(hash_field.clean("a" * 64, None), "a" * 64)
-        with self.assertRaises(ValidationError):
-            DocumentoVersion._meta.get_field("contenido_ref").clean("", None)
-
-    def test_fechas_tienen_default_de_servidor_y_no_son_editables(self):
-        for modelo, nombre in ((DocumentoVersion, "registrado_en"), (SujetoPrivacidad, "creado_en"),
-                               (FinalidadOpcional, "creada_en"), (DecisionPrivacidad, "registrada_en"),
-                               (PreferenciaFinalidad, "actualizada_en"), (EventoPrivacidad, "creado_en")):
-            with self.subTest(modelo=modelo.__name__):
-                campo = modelo._meta.get_field(nombre)
-                self.assertIsInstance(campo.db_default, Now)
-                self.assertTrue(callable(campo.default))
-                self.assertFalse(campo.editable)
-
-    def test_sujeto_anonimo_no_utiliza_sesion_y_ambito_es_explicito(self):
-        a, b = SujetoPrivacidad(), SujetoPrivacidad()
-        self.assertIsInstance(a.pk, uuid.UUID)
-        self.assertNotEqual(a.pk, b.pk)
-        self.assertIsNone(a.usuario_id)
-        self.assertEqual(a.ambito, "cuenta")
-        self.assertFalse(SujetoPrivacidad._meta.get_field("usuario").unique)
-        constraint = next(c for c in SujetoPrivacidad._meta.constraints if c.name == "priv_sujeto_cuenta_unica")
-        self.assertEqual(constraint.fields, ("usuario",))
-        self.assertEqual(constraint.condition.children, [("ambito", "cuenta")])
-
-    def test_politica_cookies_es_tipo_documental_separado(self):
-        campo = DocumentoVersion._meta.get_field("tipo")
-        self.assertEqual(campo.clean("politica_cookies", None), "politica_cookies")
-
-    def test_cookies_exigen_finalidad_y_politica_versionada(self):
-        datos = dict(acto="cookies", decision=True,
-                     finalidad_id=uuid.uuid4(), politica_cookies_id=uuid.uuid4())
-        DecisionPrivacidad(**datos).clean()
-        for atributo in ("finalidad_id", "politica_cookies_id"):
-            with self.subTest(atributo=atributo), self.assertRaises(ValidationError):
-                DecisionPrivacidad(**{**datos, atributo: None}).clean()
-
-    def test_rechazar_cookies_no_se_convierte_en_aceptacion(self):
-        fila = DecisionPrivacidad(acto="cookies", decision=False,
-                                  finalidad_id=uuid.uuid4(), politica_cookies_id=uuid.uuid4())
-        fila.clean()
-        self.assertIs(fila.decision, False)
-
-    def test_cookies_no_reemplazan_la_referencia_al_aviso(self):
-        aviso, politica = uuid.uuid4(), uuid.uuid4()
-        fila = DecisionPrivacidad(acto="cookies", decision=True, documento_id=aviso,
-                                  politica_cookies_id=politica, finalidad_id=uuid.uuid4())
-        fila.clean()
-        self.assertEqual(fila.documento_id, aviso)
-        self.assertEqual(fila.politica_cookies_id, politica)
-        self.assertFalse(DecisionPrivacidad._meta.get_field("documento").null)
-
-    def test_otros_actos_no_admiten_politica_cookies(self):
-        for acto in ("lectura_aviso", "aceptacion_terminos", "consentimiento"):
-            fila = DecisionPrivacidad(acto=acto, decision=True,
-                                      politica_cookies_id=uuid.uuid4())
-            if acto == "consentimiento":
-                fila.finalidad_id = uuid.uuid4()
-            with self.subTest(acto=acto), self.assertRaises(ValidationError):
-                fila.clean()
-
-
-class EstadisticasYAmbitoOffline(SimpleTestCase):
-    def test_dos_navegadores_de_una_cuenta_no_comparten_sujeto(self):
-        uno = SujetoPrivacidad(ambito="navegador", usuario_id=1)
-        otro = SujetoPrivacidad(ambito="navegador", usuario_id=1)
-        self.assertNotEqual(uno.pk, otro.pk)
-        self.assertEqual(uno.usuario_id, otro.usuario_id)
-
-    def test_conteo_no_admite_secciones_libres_con_datos_personales(self):
-        campo = ConteoNavegacion._meta.get_field("seccion")
-        for valor in ("/cuenta/123", "correo@example.test", "admin", "inicio?token=x"):
-            with self.subTest(valor=valor), self.assertRaises(ValidationError):
-                campo.clean(valor, None)
-        self.assertEqual(campo.clean("huerto", None), "huerto")
-
-    def test_conteo_no_persiste_identificadores_personales(self):
-        self.assertEqual({f.name for f in ConteoNavegacion._meta.fields},
-                         {"id", "dia", "seccion", "visitas"})
-
-    def test_conteo_no_admite_valores_negativos(self):
-        with self.assertRaises(ValidationError):
-            ConteoNavegacion._meta.get_field("visitas").clean(-1, None)
-
-    def test_politica_no_confunde_sesion_con_cookie_opcional(self):
-        from privacidad import politicas as p
-        self.assertEqual(p.VERIFICACION_CORREO_SEGUNDOS, 600)
-        self.assertEqual(p.RECUPERACION_CONTRASENA_SEGUNDOS, 600)
-        self.assertEqual(p.SESION_ABSOLUTA_SEGUNDOS, 28800)
-        self.assertEqual(p.SESION_INACTIVA_USUARIO_SEGUNDOS, 1800)
-        self.assertEqual(p.SESION_INACTIVA_ADMIN_SEGUNDOS, 900)
-        self.assertEqual(p.PREFERENCIA_COOKIES_SEGUNDOS, 15552000)
-        self.assertEqual(p.IDENTIFICADOR_ESTADISTICAS_SEGUNDOS, 1800)
-
-    def test_acceso_admite_consulta_propia_sin_copia_del_perfil(self):
-        fila = EventoPrivacidad(accion="acceso", resultado="completado", actor_id=1)
-        fila.clean()
-        self.assertEqual(fila.campo, "")
-        self.assertIsNone(fila.decision_id)
-        self.assertIsNone(fila.finalidad_id)
-
-    def test_acceso_requiere_actor(self):
-        with self.assertRaises(ValidationError):
-            EventoPrivacidad(accion="acceso", resultado="completado").clean()
-
-    def test_acceso_no_admite_campos_decisiones_ni_finalidades(self):
-        for atributo, valor in (("campo", "first_name"), ("decision_id", uuid.uuid4()),
-                                ("finalidad_id", uuid.uuid4())):
-            fila = EventoPrivacidad(accion="acceso", resultado="completado", actor_id=1)
-            setattr(fila, atributo, valor)
-            with self.subTest(atributo=atributo), self.assertRaises(ValidationError):
-                fila.clean()
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-
-class TextoLegalEnVivo(SimpleTestCase):
-    """El texto se lee del archivo en cada petición; sin huella coincidente es borrador sin registrar."""
-    databases = set()
-
-    def _leer(self, contenido, huella=None):
-        import hashlib
-        import tempfile
-        from pathlib import Path
-        from unittest import mock
-        from . import services
-        with tempfile.TemporaryDirectory() as carpeta:
-            Path(carpeta, 'terminos.html').write_bytes(contenido)
-            registrado = DocumentoVersion(tipo='terminos', version='1.0', contenido_ref='x',
-                                          contenido_sha256=huella or hashlib.sha256(b'otro').hexdigest())
-            with mock.patch.object(services, 'CARPETA_HTML', Path(carpeta)), \
-                 mock.patch.object(services, 'documento_vigente', return_value=registrado):
-                return services.texto_vigente('terminos')
-
-    def test_cambio_guardado_se_sirve_como_borrador(self):
-        r = self._leer('<h3>Uso</h3><p>Texto nuevo</p>'.encode())
-        self.assertEqual(r['text'], '## Uso\n\nTexto nuevo')
-        self.assertFalse(r['registered'])
-        self.assertTrue(r['draft'])
-        self.assertIsNone(r['version'])
-
-    def test_texto_igual_a_la_huella_es_version_registrada(self):
-        import hashlib
-        r = self._leer(b'Final', hashlib.sha256(b'Final').hexdigest())
-        self.assertEqual((r['version'], r['registered'], r['draft']), ('1.0', True, False))
-
-    def test_tipo_desconocido_no_se_sirve(self):
-        from . import services
-        self.assertIsNone(services.texto_vigente('../settings'))
+            services.contar_seccion(None, self.decidir(True), 'id-4', 'mi-correo@example.test')
 
 
 class DocumentosHTML(SimpleTestCase):
@@ -282,44 +191,3 @@ class DocumentosHTML(SimpleTestCase):
         html, texto = sanear_html('<!-- Instrucciones de edición: <p>Ejemplo</p> -->\n')
         self.assertFalse(html.strip())
         self.assertEqual(texto, '')
-
-    def test_html_se_lee_en_cada_peticion_y_usa_huella_de_la_fuente(self):
-        import hashlib
-        import tempfile
-        from pathlib import Path
-        from unittest import mock
-        from . import services
-        original = b'<p>Texto registrado</p>'
-        registrado = DocumentoVersion(tipo='terminos', version='1.0', contenido_ref='frontend/legales/terminos.html',
-                                      contenido_sha256=hashlib.sha256(original).hexdigest())
-        with tempfile.TemporaryDirectory() as carpeta:
-            ruta = Path(carpeta, 'terminos.html')
-            ruta.write_bytes(original)
-            with mock.patch.object(services, 'CARPETA_HTML', Path(carpeta)), \
-                 mock.patch.object(services, 'documento_vigente', return_value=registrado):
-                primero = services.texto_vigente('terminos')
-                self.assertEqual((primero['html'], primero['text']), ('<p>Texto registrado</p>', 'Texto registrado'))
-                self.assertEqual((primero['version'], primero['registered'], primero['draft']), ('1.0', True, False))
-                ruta.write_text('<h3>Actualizado</h3><p>Texto nuevo</p>', encoding='utf-8')
-                segundo = services.texto_vigente('terminos')
-                self.assertEqual(segundo['text'], '## Actualizado\n\nTexto nuevo')
-                self.assertEqual((segundo['version'], segundo['registered'], segundo['draft']), (None, False, True))
-
-    def test_no_consulta_catalogo_para_nombres_fuera_de_la_lista(self):
-        from unittest import mock
-        from . import services
-        with mock.patch.object(services, 'documento_vigente') as catalogo:
-            for tipo in ('../settings', 'terminos.html', '/etc/passwd', 'aviso_privacidad'):
-                self.assertIsNone(services.texto_vigente(tipo))
-            catalogo.assert_not_called()
-
-    def test_endpoint_conserva_campos_del_contrato(self):
-        import json
-        from unittest import mock
-        from django.test import RequestFactory
-        from . import api, services
-        documento = {'version': None, 'registered': False, 'draft': True, 'text': 'Texto', 'html': '<p>Texto</p>'}
-        with mock.patch.object(services, 'texto_vigente', return_value=documento):
-            respuesta = api.document(RequestFactory().get('/api/privacidad/documentos/terminos'), 'terminos')
-        self.assertEqual(respuesta.status_code, 200)
-        self.assertEqual(json.loads(respuesta.content), {'status': 'ready', **documento})

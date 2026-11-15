@@ -45,7 +45,7 @@ const UserGardenViews = (() => {
   const dialog='<dialog class="bento-panel app-dialog user-dialog" aria-labelledby="user-dialog-title" aria-describedby="user-dialog-copy"><div data-user-dialog-content></div></dialog>';
   const line=(size='')=>`<span class="skeleton-line ${size}" aria-hidden="true"></span>`;
   const loadingNote='<p class="sr-only" role="status">Cargando la información de tu huerto.</p>';
-  const failed=`<section class="bento-panel user-empty" role="alert"><h2>No se pudo consultar el huerto</h2><p>Inténtalo de nuevo para consultar sus lecturas y acciones.</p>${button('refresh','Reintentar',true)}</section>`;
+  const failed=`<section class="bento-panel user-empty" role="alert"><h2>Esta sección se está actualizando.</h2><p>Vuelve a intentarlo más tarde.</p>${button('refresh','Reintentar',true)}</section>`;
   // Esqueleto de una pantalla con tarjetas: solo existe mientras hay una consulta en curso.
   const loadingCards=(count,gridClass)=>`${loadingNote}<section class="${gridClass}" aria-hidden="true">${Array.from({length:count},()=>`<article class="bento-panel user-metric">${line('heading')}<strong>${line('value')}</strong><p>${line()}</p></article>`).join('')}</section>`;
   // La carga y el error sustituyen a la pantalla. Sin huerto se muestra todo, vacío y bloqueado.
@@ -521,7 +521,7 @@ const MaintenanceViews = (() => {
     picker.querySelector('[data-date-grid]').replaceChildren(table);
   }
   const messages = {stale:'Otra persona cambió este registro. Revísalo de nuevo antes de continuar.',forbidden:'Tu cuenta no tiene acceso a este huerto.',invalid:'Revisa los datos e inténtalo de nuevo.',limited:'Demasiadas operaciones. Espera un momento.'};
-  const textOf = status => messages[status] || 'No se pudo completar la operación. Inténtalo de nuevo.';
+  const textOf = status => messages[status] || 'Esta sección se está actualizando.';
   // Monta el panel y devuelve las operaciones de presentación que coordina MaintenanceController.
   function mount(root) {
     root.innerHTML = shell();

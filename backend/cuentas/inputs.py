@@ -51,17 +51,15 @@ class ExactLocalSignupInput(ExactPasswordMixin, SignupInput):
     def save(self, request):
         from django.core.exceptions import PermissionDenied
         from django.db import transaction
-        from cuentas.models import ConfirmacionRegistroLocal
         from cuentas.registration import local_registration_allowed
         from privacidad.services import registrar_actos_de_registro
         casillas = (self.cleaned_data.get("termsAccepted"), self.cleaned_data.get("privacyRead"))
         if not local_registration_allowed(request) or casillas != (True, True):
             raise PermissionDenied
-        # Save the technical confirmation with the account, before attempting SMTP.
+        # La cuenta y sus dos aceptaciones se guardan juntas: la base rechaza una cuenta sin ellas.
         with transaction.atomic():
             user = super().save(request)
-            ConfirmacionRegistroLocal.objects.create(usuario=user)
-            registrar_actos_de_registro(user)
+            registrar_actos_de_registro(user, request)
         return user
 
 PASSWORD_INPUTS = {

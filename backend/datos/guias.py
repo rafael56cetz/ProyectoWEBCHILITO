@@ -131,7 +131,7 @@ def crear(actor, *, pregunta, respuesta, orden, fuente_nombre, fuente_url):
     usuario = s.require_cap(actor, CAPACIDAD)
     datos = _contenido(pregunta, respuesta, orden, fuente_nombre, fuente_url)
     guia = GuiaCuidado.objects.create(clave=_clave_nueva(datos['pregunta']), estado='borrador', creado_por=usuario, actualizado_por=usuario, **datos)
-    s.audit(usuario, 'guide-created', guia=guia)
+    s.auditar(usuario, 'crear_guia', entidad='guia', entidad_id=guia.pk)
     return _acuse(guia)
 
 
@@ -144,7 +144,7 @@ def editar(actor, guia_id, version, *, pregunta, respuesta, orden, fuente_nombre
     for campo, valor in datos.items():
         setattr(guia, campo, valor)
     _guardar(guia, usuario, datos)
-    s.audit(usuario, 'guide-updated', guia=guia)
+    s.auditar(usuario, 'editar_guia', entidad='guia', entidad_id=guia.pk)
     return _acuse(guia)
 
 
@@ -155,15 +155,15 @@ def _cambiar_estado(actor, guia_id, version, permitidos, nuevo, accion):
         raise s.RegistroDesactualizado('Transición no válida')
     guia.estado = nuevo
     _guardar(guia, usuario, ['estado'])
-    s.audit(usuario, accion, guia=guia)
+    s.auditar(usuario, accion, entidad='guia', entidad_id=guia.pk)
     return _acuse(guia)
 
 
 @transaction.atomic
 def publicar(actor, guia_id, version):
-    return _cambiar_estado(actor, guia_id, version, {'borrador', 'retirada'}, 'publicada', 'guide-published')
+    return _cambiar_estado(actor, guia_id, version, {'borrador', 'retirada'}, 'publicada', 'publicar_guia')
 
 
 @transaction.atomic
 def retirar(actor, guia_id, version):
-    return _cambiar_estado(actor, guia_id, version, {'publicada'}, 'retirada', 'guide-withdrawn')
+    return _cambiar_estado(actor, guia_id, version, {'publicada'}, 'retirada', 'retirar_guia')

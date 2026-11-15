@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from datos.services import audit
+from datos.services import auditar
 
 
 class Command(BaseCommand):
@@ -31,5 +31,5 @@ class Command(BaseCommand):
         if cuenta.pk == responsable.pk:
             raise CommandError('El operador no puede atender su propia cuenta')
         borrados, _ = Authenticator.objects.filter(user=cuenta).delete()
-        audit(responsable, 'mfa-reset')
+        auditar(responsable, 'retirar_segundo_factor', entidad='cuenta', entidad_id=cuenta.pk)
         self.stdout.write(f'Métodos retirados: {borrados}')

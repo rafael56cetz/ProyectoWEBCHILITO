@@ -11,6 +11,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from privacidad import politicas, services
 from web.api import InputError, body, endpoint, failure
+from web.respuestas import respuesta_de_base
 
 logger = logging.getLogger(__name__)
 CAMPOS_PERFIL = tuple(services.CAMPOS)
@@ -28,9 +29,9 @@ def _publica(vista):
             return vista(request, *args, **kwargs)
         except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
             return failure(400, 'invalid-input')
-        except DatabaseError:
+        except DatabaseError as fallo:
             logger.exception('privacidad-no-disponible')
-            return failure(503, 'service-unavailable')
+            return respuesta_de_base(fallo) or failure(503, 'service-unavailable')
     return envuelta
 
 
@@ -69,7 +70,7 @@ def cookies(request):
     if not ratelimit.consume(request, action='privacidad_cookies'):
         return failure(429, 'rate-limited')
     acepta = body(request, ('statistics',)).get('statistics')
-    firmado = services.decidir_cookies(request.user, valor, acepta)
+    firmado = services.decidir_cookies(request, valor, acepta)
     respuesta = JsonResponse({'status': 'accepted', 'statistics': acepta})
     _cookie(respuesta, services.COOKIE_PREFERENCIA, firmado, politicas.PREFERENCIA_COOKIES_SEGUNDOS)
     if not acepta:

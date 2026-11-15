@@ -21,7 +21,7 @@ INCLUIR = ['README.md', '.gitignore',
            'frontend/pruebas', 'sql/privilegios.sql', 'sql/instalacion',
            'backend/tools/README.md',
            *[f'backend/tools/{n}.py' for n in ('__init__', 'servir_local', 'entorno_local', 'pruebas_local', 'destino_temporal', 'comprobar_frontend_local', 'probar_seguridad', 'probar_mfa',
-                                                'probar_privacidad', 'probar_crud_runtime', 'probar_correo', 'probar_cuota_contacto', 'configurar_correo', 'correo_config',
+                                                'probar_privacidad', 'probar_correo', 'probar_cuota_contacto', 'configurar_correo', 'correo_config',
                                                 'soporte_local', 'generar_sql_instalacion')]]
 EXCLUIR = ['*/__pycache__/*', '*.pyc']
 PROHIBIDOS = ['.env', 'CLAUDE.md', 'REGISTRO-DE-CAMBIOS.md', 'CONTEXTO-COMPARTIDO-EL-CHILITO.md', 'flujo actual a 7 de noviembre del 2026.md',

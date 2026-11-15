@@ -1,61 +1,80 @@
-"""Privacidad: toda decisión y su evento se guardan en la misma transacción.
+"""Privacidad: toda decisión se guarda en la bitácora de la base, en la misma transacción que su efecto.
 
 El navegador se identifica con un valor firmado por el servidor, nunca con un ID
 aceptado de la petición. Sin decisión válida, las estadísticas no se cuentan.
+Datos mínimos (ASVS V14): IP recortada y navegador resumido, nunca el user-agent completo.
 """
 import hashlib
 import hmac
+import ipaddress
+import re
 import secrets
-from pathlib import Path
 
+from allauth.account.adapter import get_adapter
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.utils import timezone
 
-from datos.services import identity
-from huerto.models import Membresia
+from datos.services import auditar, identity
+from huerto.models import Huerto
 
 from . import politicas
 from .documentos_html import sanear_html
-from .models import (ConteoNavegacion, DecisionPrivacidad, DocumentoVersion, EventoPrivacidad,
-                     FinalidadOpcional, PreferenciaFinalidad, SujetoPrivacidad)
+from .models import Decision, DocumentoLegal, Finalidad, Preferencia, Sujeto
 
 COOKIE_PREFERENCIA = 'chilito_preferencia'
 COOKIE_ESTADISTICA = 'chilito_estadistica'
 SAL_PREFERENCIA = 'privacidad.preferencia'
 SAL_ESTADISTICA = 'privacidad.estadistica'
-SECCIONES = frozenset(codigo for codigo, _ in ConteoNavegacion.SECCIONES)
+SECCIONES = frozenset(('inicio', 'proyecto', 'prototipo', 'funcionamiento', 'huerto', 'panel_tecnico',
+                       'mantenimiento', 'soporte', 'avisos', 'cuenta', 'privacidad'))
 DOCUMENTOS_PUBLICOS = {'privacidad': 'aviso_privacidad', 'terminos': 'terminos', 'cookies': 'politica_cookies'}
-CARPETA_HTML = Path(settings.PROJECT_ROOT, 'frontend', 'legales')
-ARCHIVOS_HTML = {'privacidad': 'aviso-privacidad.html', 'terminos': 'terminos.html', 'cookies': 'politica-cookies.html'}
 CAMPOS = {'firstName': ('first_name', 150), 'lastName': ('last_name', 150), 'alias': ('alias', 64)}
+NAVEGADORES = (('Edge', r'Edg(?:e|A|iOS)?/(\d+)'), ('Opera', r'OPR/(\d+)'), ('Firefox', r'(?:Firefox|FxiOS)/(\d+)'),
+               ('Chrome', r'(?:Chrome|CriOS)/(\d+)'), ('Safari', r'Version/(\d+)[^ ]* (?:Mobile/\S+ )?Safari'))
+SISTEMAS = (('Android', 'Android'), ('iOS', 'iPhone|iPad'), ('Windows', 'Windows'), ('macOS', 'Macintosh'),
+            ('ChromeOS', 'CrOS'), ('Linux', 'Linux'))
+
+
+def ip_recortada(request):
+    """IPv4 con el último bloque en 0; IPv6 recortada a /48. Vacío si no hay una IP válida."""
+    try:
+        ip = ipaddress.ip_address(get_adapter().get_client_ip(request))
+    except (PermissionDenied, ValueError):
+        return ''
+    if ip.version == 4:
+        return '.'.join(str(ip).split('.')[:3] + ['0'])
+    return str(ipaddress.ip_network(f'{ip}/48', strict=False).network_address)
+
+
+def navegador_resumido(request):
+    """«Chrome 130 · Android». El user-agent completo no se guarda."""
+    agente = request.META.get('HTTP_USER_AGENT', '')[:512]
+    navegador = next((f'{nombre} {m.group(1)}' for nombre, patron in NAVEGADORES if (m := re.search(patron, agente))), 'Otro')
+    sistema = next((nombre for nombre, patron in SISTEMAS if re.search(patron, agente)), 'Otro')
+    return f'{navegador} · {sistema}'
 
 
 def documento_vigente(tipo):
-    return DocumentoVersion.objects.filter(tipo=tipo).order_by('-registrado_en', '-version').first()
+    """Última versión publicada del tipo; la base decide cuál es."""
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT chilito_documento_vigente(%s)', [tipo])
+        identificador = cursor.fetchone()[0]
+    return DocumentoLegal.objects.filter(pk=identificador).first() if identificador else None
 
 
 def texto_vigente(publico):
-    """Lee el HTML editable de frontend/legales en cada petición.
-
-    Solo los nombres del catálogo fijo pueden leerse. La huella corresponde a los
-    bytes originales: guardar una edición no la convierte en una versión registrada.
-    """
+    """Versión vigente del texto legal, saneada con la lista blanca. Solo se leen los tipos del catálogo fijo."""
     tipo = DOCUMENTOS_PUBLICOS.get(publico)
-    if tipo is None:
+    documento = documento_vigente(tipo) if tipo else None
+    if documento is None:
         return None
-    ruta = CARPETA_HTML / ARCHIVOS_HTML[publico]
-    contenido = ruta.read_bytes() if ruta.is_file() else b''
-    html, texto = sanear_html(contenido.decode('utf-8', errors='replace'))
-    documento = documento_vigente(tipo)
-    registrado = documento is not None and hashlib.sha256(contenido).hexdigest() == documento.contenido_sha256
-    return {'version': documento.version if registrado else None, 'registered': registrado,
-            'text': texto, 'html': html,
-            'draft': not registrado or 'borrador' in documento.version}
+    html, texto = sanear_html(documento.contenido)
+    return {'version': documento.version, 'registered': True, 'text': texto, 'html': html, 'draft': False}
 
 
 def _firmado(valor, sal, vigencia):
@@ -69,7 +88,7 @@ def _firmado(valor, sal, vigencia):
 
 def _sujeto_navegador(valor, *, bloquear=False):
     identificador = _firmado(valor, SAL_PREFERENCIA, politicas.PREFERENCIA_COOKIES_SEGUNDOS)
-    consulta = SujetoPrivacidad.objects.select_for_update() if bloquear else SujetoPrivacidad.objects
+    consulta = Sujeto.objects.select_for_update() if bloquear else Sujeto.objects
     return consulta.filter(pk=identificador, ambito='navegador').first() if identificador else None
 
 
@@ -90,63 +109,59 @@ def _sujeto_vigente(valor, actor, *, bloquear=False):
 
 
 def _sujeto_para_decidir(valor, actor):
-    """Sujeto que puede registrar una decisión nueva: el evento exige actor igual al titular."""
+    """Sujeto que puede registrar una decisión nueva: la base exige que la cuenta coincida con el titular."""
     sujeto = _sujeto_navegador(valor, bloquear=True)
     return sujeto if sujeto is not None and sujeto.usuario_id in (None, _usuario_id(actor)) else None
 
 
 def _finalidad():
-    return FinalidadOpcional.objects.get(codigo=politicas.FINALIDAD_ESTADISTICAS)
+    return Finalidad.objects.get(codigo=politicas.FINALIDAD_ESTADISTICAS)
 
 
-def _preferencia(sujeto):
-    """Decisión vigente, o None si venció o cambió algún documento."""
-    preferencia = (PreferenciaFinalidad.objects.select_related('decision')
-                   .filter(sujeto=sujeto, finalidad=_finalidad()).first())
-    if preferencia is None:
+def _preferencia(sujeto, politica):
+    """Decisión vigente, o None si venció o la política de cookies cambió."""
+    preferencia = Preferencia.objects.select_related('decision').filter(sujeto=sujeto, finalidad=_finalidad()).first()
+    if preferencia is None or politica is None:
         return None
     decision = preferencia.decision
-    aviso, politica = documento_vigente('aviso_privacidad'), documento_vigente('politica_cookies')
     edad = (timezone.now() - decision.registrada_en).total_seconds()
-    if (decision.acto != 'cookies' or decision.documento_id != aviso.pk
-            or decision.politica_cookies_id != politica.pk or edad >= politicas.PREFERENCIA_COOKIES_SEGUNDOS):
+    if decision.documento_id != politica.pk or edad >= politicas.PREFERENCIA_COOKIES_SEGUNDOS:
         return None
     return decision
 
 
 def estado_cookies(valor, actor=None):
     sujeto = _sujeto_vigente(valor, actor)
-    decision = _preferencia(sujeto) if sujeto else None
-    aviso, politica = documento_vigente('aviso_privacidad'), documento_vigente('politica_cookies')
+    politica, aviso = documento_vigente('politica_cookies'), documento_vigente('aviso_privacidad')
+    decision = _preferencia(sujeto, politica) if sujeto else None
     return {'decided': decision is not None, 'statistics': bool(decision and decision.decision),
-            'privacyVersion': aviso.version, 'cookiesVersion': politica.version}
+            'privacyVersion': aviso.version if aviso else None, 'cookiesVersion': politica.version if politica else None}
 
 
 @transaction.atomic
-def decidir_cookies(actor, valor, acepta):
+def decidir_cookies(request, valor, acepta):
     """Devuelve el valor firmado que recuerda a este navegador."""
     if not isinstance(acepta, bool):
         raise ValidationError('Decisión no válida')
+    politica = documento_vigente('politica_cookies')
+    if politica is None:
+        raise ValidationError('Política de cookies no publicada')
+    actor = request.user
     usuario = identity(actor) if getattr(actor, 'is_authenticated', False) else None
     sujeto = _sujeto_para_decidir(valor, actor)
     if sujeto is None:
-        sujeto = SujetoPrivacidad.objects.create(ambito='navegador', usuario=usuario)
+        sujeto = Sujeto.objects.create(ambito='navegador', usuario=usuario)
     elif usuario is not None and sujeto.usuario_id is None:
         sujeto.usuario = usuario
         sujeto.save(update_fields=['usuario'])
     finalidad = _finalidad()
-    decision = DecisionPrivacidad.objects.create(
-        sujeto=sujeto, documento=documento_vigente('aviso_privacidad'),
-        politica_cookies=documento_vigente('politica_cookies'), finalidad=finalidad,
-        acto='cookies', decision=acepta)
-    actualizadas = PreferenciaFinalidad.objects.filter(sujeto=sujeto, finalidad=finalidad).update(
+    decision = Decision.objects.create(sujeto=sujeto, acto='cookies', decision=acepta, documento=politica, finalidad=finalidad,
+                                       usuario=usuario, ip_recortada=ip_recortada(request),
+                                       navegador=navegador_resumido(request))
+    actualizadas = Preferencia.objects.filter(sujeto=sujeto, finalidad=finalidad).update(
         decision=decision, actualizada_en=timezone.now())
     if not actualizadas:
-        PreferenciaFinalidad.objects.create(sujeto=sujeto, finalidad=finalidad, decision=decision)
-    # La oposición exige actor: sin sesión queda como decisión de rechazo.
-    accion = 'oposicion' if usuario is not None and not acepta else 'decision'
-    EventoPrivacidad.objects.create(sujeto=sujeto, actor=usuario, accion=accion, resultado='completado',
-                                    decision=decision, finalidad=finalidad)
+        Preferencia.objects.create(sujeto=sujeto, finalidad=finalidad, decision=decision)
     return signing.dumps(str(sujeto.pk), salt=SAL_PREFERENCIA)
 
 
@@ -164,7 +179,7 @@ def contar_seccion(actor, valor_preferencia, identificador, seccion):
     if seccion not in SECCIONES:
         raise ValidationError('Sección no válida')
     sujeto = _sujeto_vigente(valor_preferencia, actor, bloquear=True)
-    decision = _preferencia(sujeto) if sujeto else None
+    decision = _preferencia(sujeto, documento_vigente('politica_cookies')) if sujeto else None
     if decision is None or decision.decision is not True or identificador is None:
         return False
     resumen = hmac.new(settings.SECRET_KEY.encode(), f'{identificador}:{seccion}'.encode(), hashlib.sha256).hexdigest()
@@ -172,28 +187,25 @@ def contar_seccion(actor, valor_preferencia, identificador, seccion):
         return False
     with connection.cursor() as cursor:
         cursor.execute(
-            'INSERT INTO public.privacidad_conteonavegacion(dia,seccion,visitas) VALUES(%s,%s,1) '
-            'ON CONFLICT(dia,seccion) DO UPDATE SET visitas=privacidad_conteonavegacion.visitas+1',
+            'INSERT INTO conteo_navegacion(dia,seccion,visitas) VALUES(%s,%s,1) '
+            'ON CONFLICT(dia,seccion) DO UPDATE SET visitas=conteo_navegacion.visitas+1',
             [timezone.localdate(), seccion])
     return True
 
 
-def _sujeto_cuenta(usuario):
-    return SujetoPrivacidad.objects.get_or_create(usuario=usuario, ambito='cuenta')[0]
-
-
-def registrar_actos_de_registro(usuario):
-    """Guarda por separado la aceptación de términos y la lectura del aviso, con su versión.
+def registrar_actos_de_registro(usuario, request):
+    """Guarda por separado la aceptación de términos y la lectura del aviso, con su versión vigente.
 
     Debe llamarse dentro de la transacción que crea la cuenta. Sin un documento vigente la
     base lo rechaza y la cuenta no se crea: no se registra un acto sin versión.
     """
-    sujeto = _sujeto_cuenta(usuario)
+    sujeto = Sujeto.objects.create(ambito='cuenta', usuario=usuario)
     for acto, tipo in (('aceptacion_terminos', 'terminos'), ('lectura_aviso', 'aviso_privacidad')):
-        decision = DecisionPrivacidad.objects.create(
-            sujeto=sujeto, documento=documento_vigente(tipo), acto=acto, decision=True)
-        EventoPrivacidad.objects.create(sujeto=sujeto, actor=usuario, accion='decision',
-                                        resultado='completado', decision=decision)
+        documento = documento_vigente(tipo)
+        if documento is None:
+            raise ValidationError('Textos legales no publicados')
+        Decision.objects.create(sujeto=sujeto, acto=acto, decision=True, documento=documento, usuario=usuario,
+                                ip_recortada=ip_recortada(request), navegador=navegador_resumido(request))
 
 
 def _limpiar(datos):
@@ -214,11 +226,9 @@ def _aplicar_perfil(usuario, datos):
         for campo, valor in cambios.items():
             setattr(usuario, campo, valor)
         usuario.save(update_fields=list(cambios))
-        sujeto = _sujeto_cuenta(usuario)
         for campo in cambios:
             # Se registra qué campo cambió, nunca sus valores.
-            EventoPrivacidad.objects.create(sujeto=sujeto, actor=usuario, accion='rectificacion',
-                                            resultado='completado', campo=campo)
+            auditar(usuario, 'rectificar_perfil', entidad='cuenta', entidad_id=usuario.pk, detalle={'campo': campo})
 
 
 def _bloqueado(actor):
@@ -246,8 +256,8 @@ def atender_bienvenida(actor, datos):
 @transaction.atomic
 def consultar_mis_datos(actor):
     usuario = identity(actor)
-    EventoPrivacidad.objects.create(sujeto=_sujeto_cuenta(usuario), actor=usuario, accion='acceso', resultado='completado')
-    huertos = Membresia.objects.filter(usuario=usuario, activa=True).select_related('huerto')
+    auditar(usuario, 'consultar_mis_datos', entidad='cuenta', entidad_id=usuario.pk)
+    huertos = Huerto.objects.filter(propietario=usuario, estado='activo').order_by('id')
     return {'email': usuario.email, 'firstName': usuario.first_name, 'lastName': usuario.last_name,
             'alias': usuario.alias, 'createdAt': usuario.date_joined.isoformat(),
-            'gardens': [m.huerto.nombre for m in huertos]}
+            'gardens': [huerto.nombre for huerto in huertos]}

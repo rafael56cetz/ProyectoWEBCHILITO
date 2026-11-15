@@ -47,13 +47,12 @@ def _sin_secretos(valor):
     return valor
 
 
-def ejecutar_idempotente(actor, clave, ruta, huella, kwargs, trabajo):
+def ejecutar_idempotente(actor, clave, ruta, huella, trabajo):
     """Ejecuta una sola vez. Un recibo guardado nunca alarga un acceso ya perdido."""
     with transaction.atomic():
         _esperar(f'{actor.pk}:{clave}')
         previo = Idempotencia.objects.filter(actor=actor, clave=clave).first()
         if previo:
-            s.check_replay(actor, ruta, kwargs, previo.respuesta)
             if previo.ruta != ruta or not hmac.compare_digest(previo.huella, huella):
                 raise Conflicto
             return previo.respuesta
@@ -79,7 +78,7 @@ def _texto_contacto(valor, maximo, *, multilinea=False):
 
 
 def enviar_contacto(datos):
-    """Consulta del producto: se guarda en el buzón administrativo y genera un aviso por correo.
+    """Consulta del producto: se guarda en el buzón administrativo; el aviso por correo lo encola la base.
     Un fallo del correo no pierde la consulta: el aviso queda como fallido y se reintenta."""
     nombre = _texto_contacto(datos.get('name', ''), 100)
     correo = _texto_contacto(datos.get('email'), 254)

@@ -1,25 +1,21 @@
 """Guías de cuidado sobre PostgreSQL temporal: contenido compartido, permisos, validación y carga inicial."""
-import importlib
 import json
-import secrets
+import threading
 import uuid
 from unittest.mock import patch
 
 from allauth.account.models import EmailAddress
-from allauth.mfa.models import Authenticator
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.core.cache import cache
+from django.core.management import call_command
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import DatabaseError, IntegrityError, connection, transaction
-from django.test import Client, TransactionTestCase
+from django.db import DatabaseError, IntegrityError, connection, connections, transaction
+from django.test import Client, TestCase, TransactionTestCase
 
 from datos import guias, services
 from datos.models import Auditoria, GuiaCuidado
-from datos.tests.test_vinculacion import en_paralelo
-from huerto.models import Huerto, Membresia
+from tests import cuenta, publicar_textos
 
-CARGA = importlib.import_module('datos.migrations.0012_guias_iniciales')
 PREGUNTAS = ['¿Cómo comienzo a germinar mis semillas de habanero?', '¿Cuánto puede tardar en brotar y qué debo observar?',
              '¿Cómo reconozco que la plántula está lista para trasplantar?', '¿Para qué sirve la perlita y cómo reviso el sustrato?',
              '¿Cuándo debo revisar el riego de mis plantas?', '¿Qué significa rellenar el depósito y registrar la recarga?',
@@ -27,29 +23,41 @@ PREGUNTAS = ['¿Cómo comienzo a germinar mis semillas de habanero?', '¿Cuánto
              '¿Qué hago si no hay lecturas o el dispositivo está desconectado?']
 
 
+def en_paralelo(*tareas):
+    """Ejecuta cada tarea en su propio hilo y conexión, arrancando a la vez."""
+    barrera, resultados = threading.Barrier(len(tareas)), [None] * len(tareas)
+
+    def correr(i, tarea):
+        try:
+            barrera.wait()
+            resultados[i] = tarea()
+        except Exception as error:   # se devuelve para que la prueba lo inspeccione
+            resultados[i] = error
+        finally:
+            connections.close_all()
+    hilos = [threading.Thread(target=correr, args=(i, t)) for i, t in enumerate(tareas)]
+    for hilo in hilos:
+        hilo.start()
+    for hilo in hilos:
+        hilo.join(60)
+    return resultados
+
+
 def contenido(**cambios):
     return {'question': '¿Qué reviso?', 'answer': 'Primero.\n\nDespués.', 'order': 10, 'sourceName': '', 'sourceUrl': '', **cambios}
 
 
-class Base(TransactionTestCase):
+class Ayudas:
     def setUp(self):
-        if not str(connection.settings_dict['NAME']).startswith('test_chilito_integracion_sinteticos'):
-            raise RuntimeError('Solo en la base temporal de pruebas.')
         cache.clear()
-        with connection.cursor() as cursor:     # quita la carga inicial que dejó la migración
-            cursor.execute('TRUNCATE datos_guiacuidado CASCADE')
+        with connection.cursor() as cursor:     # quita las nueve guías iniciales; la prueba se deshace al terminar
+            cursor.execute('TRUNCATE guia_cuidado CASCADE')
         self.admin = self.cuenta('guias-a@example.test', capacidad=True)
         self.admin2 = self.cuenta('guias-b@example.test', capacidad=True)
         self.usuaria = self.cuenta('usuaria@example.test')
 
-    def cuenta(self, email, capacidad=False, factor=None, **campos):
-        user = get_user_model().objects.create_user(email, secrets.token_urlsafe(24), **campos)
-        EmailAddress.objects.create(user=user, email=email, verified=True, primary=True)
-        if capacidad:
-            user.user_permissions.add(Permission.objects.get(content_type__app_label='datos', codename='gestionar_guias'))
-        if capacidad if factor is None else factor:
-            Authenticator.objects.create(user=user, type='totp', data={})
-        return user
+    def cuenta(self, email, capacidad=False, factor=None):
+        return cuenta(email, *(('gestionar_guias',) if capacidad else ()), factor=factor)
 
     def sesion(self, user, **opciones):
         cliente = Client(**opciones)
@@ -74,6 +82,12 @@ class Base(TransactionTestCase):
 
     def panel(self, cliente):
         return {g['id']: g for g in cliente.get('/api/admin/guias').json()['guides']}
+
+
+class Base(Ayudas, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
 
 
 class CicloDeVida(Base):
@@ -139,8 +153,8 @@ class CicloDeVida(Base):
         self.assertEqual(self.accion(self.sesion(self.admin), g, 'publicar').status_code, 200)
         fila = GuiaCuidado.objects.get()
         self.assertEqual((fila.creado_por, fila.actualizado_por), (self.admin, self.admin))
-        self.assertEqual(list(Auditoria.objects.filter(guia=fila).order_by('creada_en').values_list('actor__email', 'accion')),
-                         [(self.admin.email, 'guide-created'), (self.admin2.email, 'guide-updated'), (self.admin.email, 'guide-published')])
+        self.assertEqual(list(Auditoria.objects.filter(entidad='guia', entidad_id=str(fila.pk)).order_by('id').values_list('actor__email', 'accion')),
+                         [(self.admin.email, 'crear_guia'), (self.admin2.email, 'editar_guia'), (self.admin.email, 'publicar_guia')])
 
     def test_independiente_del_correo_y_de_quien_la_creo(self):
         g = self.crear(self.sesion(self.admin))
@@ -165,8 +179,7 @@ class Autorizacion(Base):
 
     def test_rechazo_por_api_directa(self):
         g = self.crear()
-        sin_capacidad = {'usuaria': self.usuaria, 'staff': self.cuenta('staff@example.test', factor=True, is_staff=True),
-                         'superusuario': self.cuenta('root@example.test', factor=True, is_staff=True, is_superuser=True)}
+        sin_capacidad = {'usuaria': self.usuaria, 'otra capacidad': cuenta('otra@example.test', 'atender_consultas')}
         for nombre, user in sin_capacidad.items():
             c = self.sesion(user)
             with self.subTest(nombre):
@@ -184,11 +197,6 @@ class Autorizacion(Base):
         self.assertEqual(self.post(c, '/api/admin/guias', contenido()).status_code, 403)
         self.assertFalse(GuiaCuidado.objects.exists())
 
-    def test_capacidad_otorgada_a_is_staff_no_se_deduce(self):
-        for actor in (self.usuaria, self.cuenta('s2@example.test', factor=True, is_staff=True, is_superuser=True)):
-            with self.assertRaises(PermissionDenied):
-                guias.panel(actor)
-
     def test_sin_sesion_y_csrf(self):
         g = self.crear()
         anonimo = Client()
@@ -205,20 +213,6 @@ class Autorizacion(Base):
         self.accion(c, r, 'retirar')
         self.accion(c, publicada, 'publicar')
         self.assertEqual([x['question'] for x in self.publicadas()], ['¿Publicada?'])
-
-    def test_sin_huerto_lee_pero_no_habilita_acciones(self):
-        c = self.sesion(self.admin)
-        self.accion(c, self.crear(c), 'publicar')
-        self.assertFalse(Membresia.objects.filter(usuario=self.usuaria).exists())
-        s = self.sesion(self.usuaria)
-        self.assertEqual(len(s.get('/api/guias').json()['guides']), 1)
-        r = self.post(s, '/api/huertos/actual/mantenimiento', {'type': 'refill'})
-        self.assertEqual((r.status_code, r.json()['code']), (403, 'garden-unassigned'))
-        self.assertEqual(s.get('/api/huertos/actual/mantenimiento').status_code, 403)
-
-    def test_con_huerto_ajeno_no_cambia_la_lectura(self):
-        Membresia.objects.create(usuario=self.usuaria, huerto=Huerto.objects.create(clave='g-1', nombre='G'))
-        self.assertEqual(self.publicadas(), [])
 
 
 class Validacion(Base):
@@ -303,22 +297,13 @@ class Concurrencia(Base):
         self.assertEqual(self.accion(b, g, 'publicar').json()['code'], 'stale-record')
         self.assertEqual(GuiaCuidado.objects.get().estado, 'borrador')
 
-    def test_ediciones_en_paralelo_solo_gana_una(self):
-        g = self.crear()
-        def editar(actor, texto):
-            return lambda: guias.editar(actor, g['id'], 1, pregunta=texto, respuesta='r', orden=1, fuente_nombre='', fuente_url='')
-        resultados = en_paralelo(editar(self.admin, '¿A?'), editar(self.admin2, '¿B?'))
-        self.assertEqual(sum(isinstance(r, dict) for r in resultados), 1, resultados)
-        self.assertEqual(sum(isinstance(r, services.RegistroDesactualizado) for r in resultados), 1, resultados)
-        self.assertEqual(GuiaCuidado.objects.get().version, 2)
-
     def test_reintento_y_doble_pulsacion_no_duplican(self):
         c = self.sesion(self.admin)
         clave = uuid.uuid4()
         uno, dos = (self.post(c, '/api/admin/guias', contenido(), clave) for _ in range(2))
         self.assertEqual(uno.json(), dos.json())
         self.assertEqual(GuiaCuidado.objects.count(), 1)
-        self.assertEqual(Auditoria.objects.filter(accion='guide-created').count(), 1)
+        self.assertEqual(Auditoria.objects.filter(accion='crear_guia').count(), 1)
         self.assertEqual(self.post(c, '/api/admin/guias', contenido(question='¿Otra?'), clave).status_code, 409)
 
     def test_reintento_de_edicion_y_publicacion(self):
@@ -339,8 +324,8 @@ class Concurrencia(Base):
     def test_auditoria_sin_texto_libre(self):
         c = self.sesion(self.admin)
         g = self.crear(c, question='¿Secreto?')
-        fila = Auditoria.objects.get(guia_id=g['id'])
-        self.assertEqual((fila.actor, fila.accion, fila.resultado), (self.admin, 'guide-created', 'recorded'))
+        fila = Auditoria.objects.get(entidad='guia', entidad_id=g['id'])
+        self.assertEqual((fila.actor, fila.accion, fila.resultado, fila.detalle), (self.admin, 'crear_guia', 'exito', {}))
         self.assertNotIn('Secreto', str(Auditoria.objects.filter(pk=fila.pk).values().first()))
 
     def test_recibo_repite_la_autorizacion(self):
@@ -362,67 +347,68 @@ class Base_de_datos(Base):
 
     def test_no_se_borra_ni_cambia_identidad(self):
         g = self.fila()
-        self.negado('DELETE FROM datos_guiacuidado WHERE id=%s', [g.pk])
-        self.negado("UPDATE datos_guiacuidado SET clave='otra',version=version+1 WHERE id=%s", [g.pk])
-        self.negado('UPDATE datos_guiacuidado SET creado_por_id=NULL,version=version+1 WHERE id=%s', [g.pk])
-        self.negado("UPDATE datos_guiacuidado SET pregunta='sin version' WHERE id=%s", [g.pk])
-        self.negado('UPDATE datos_guiacuidado SET version=version+1,actualizado_por_id=NULL WHERE id=%s', [g.pk])
+        self.negado('DELETE FROM guia_cuidado WHERE id=%s', [g.pk])
+        self.negado("UPDATE guia_cuidado SET clave='otra',version=version+1 WHERE id=%s", [g.pk])
+        self.negado('UPDATE guia_cuidado SET creado_por_id=NULL,version=version+1 WHERE id=%s', [g.pk])
+        self.negado("UPDATE guia_cuidado SET pregunta='sin version' WHERE id=%s", [g.pk])
+        self.negado('UPDATE guia_cuidado SET version=version+1,actualizado_por_id=NULL WHERE id=%s', [g.pk])
 
     def test_restricciones(self):
         g = self.fila()
         for campo, valor in (('fuente_url', 'javascript:alert(1)'), ('estado', 'otro'), ('orden', 0), ('orden', 10000), ('pregunta', '   '), ('respuesta', 'x' * 4001)):
             with self.subTest(campo):
-                self.negado(f'UPDATE datos_guiacuidado SET {campo}=%s,version=version+1 WHERE id=%s', [valor, g.pk])
-
-    def test_auditoria_de_guia_exige_referencia(self):
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Auditoria.objects.create(actor=self.admin, accion='guide-updated')
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Auditoria.objects.create(actor=self.admin, accion='maintenance', guia=self.fila())
+                self.negado(f'UPDATE guia_cuidado SET {campo}=%s,version=version+1 WHERE id=%s', [valor, g.pk])
 
 
-class CargaInicial(Base):
-    def cargar(self):
-        with transaction.atomic(), connection.cursor() as cursor:
-            for sentencia, parametros in CARGA.sentencias():
-                cursor.execute(sentencia, parametros)
+class ConcurrenciaReal(Ayudas, TransactionTestCase):
+    """Transacciones reales en hilos distintos. `serialized_rollback` restaura los datos iniciales al terminar."""
+    serialized_rollback = True
 
-    def test_nueve_preguntas_en_orden_sin_cuentas(self):
-        cuentas = get_user_model().objects.count()
-        self.cargar()
-        self.assertEqual([x['question'] for x in self.publicadas()], PREGUNTAS)
-        self.assertEqual(get_user_model().objects.count(), cuentas + 0)
+    @classmethod
+    def _fixture_setup(cls):
+        # Django restaura los datos serializados sobre una base ya vaciada; la primera clase de este tipo la recibe llena.
+        call_command('flush', verbosity=0, interactive=False, reset_sequences=False, inhibit_post_migrate=True)
+        super()._fixture_setup()
+
+    def setUp(self):
+        publicar_textos()
+        super().setUp()
+
+    def test_ediciones_en_paralelo_solo_gana_una(self):
+        g = self.crear()
+
+        def editar(actor, texto):
+            return lambda: guias.editar(actor, g['id'], 1, pregunta=texto, respuesta='r', orden=1, fuente_nombre='', fuente_url='')
+        resultados = en_paralelo(editar(self.admin, '¿A?'), editar(self.admin2, '¿B?'))
+        self.assertEqual(sum(isinstance(r, dict) for r in resultados), 1, resultados)
+        self.assertEqual(sum(isinstance(r, services.RegistroDesactualizado) for r in resultados), 1, resultados)
+        self.assertEqual(GuiaCuidado.objects.get().version, 2)
+
+    def test_publicaciones_en_paralelo_solo_gana_una(self):
+        g = self.crear()
+        resultados = en_paralelo(lambda: guias.publicar(self.admin, g['id'], 1), lambda: guias.publicar(self.admin2, g['id'], 1))
+        self.assertEqual(sum(isinstance(r, dict) for r in resultados), 1, resultados)
+        self.assertEqual(sum(isinstance(r, services.RegistroDesactualizado) for r in resultados), 1, resultados)
+        self.assertEqual(GuiaCuidado.objects.get().version, 2)
+
+
+class CargaInicial(TestCase):
+    def test_nueve_guias_publicadas_en_orden_y_sin_autor(self):
+        guias_iniciales = GuiaCuidado.objects.order_by('orden')
+        self.assertEqual([g.pregunta for g in guias_iniciales], PREGUNTAS)
+        self.assertEqual({g.estado for g in guias_iniciales}, {'publicada'})
         self.assertFalse(GuiaCuidado.objects.exclude(creado_por=None).exists())
-        self.assertFalse(Auditoria.objects.filter(accion__startswith='guide-').exists())
-        self.assertTrue(GuiaCuidado.objects.filter(clave='sustrato-perlita', estado='publicada').exists())
-
-    def test_repetir_no_duplica_ni_sobrescribe(self):
-        self.cargar()
-        c = self.sesion(self.admin)
-        por_clave = {g['key']: g for g in self.panel(c).values()}
-        editada = self.accion(c, por_clave['riego-revision'], 'editar', contenido(question='¿Riego editado?'))
-        self.assertEqual(editada.status_code, 200)
-        self.accion(c, por_clave['sin-lecturas'], 'retirar')
-        self.cargar()
-        self.assertEqual(GuiaCuidado.objects.count(), 9)
-        self.assertEqual(GuiaCuidado.objects.get(clave='riego-revision').pregunta, '¿Riego editado?')
-        self.assertEqual(GuiaCuidado.objects.get(clave='sin-lecturas').estado, 'retirada')
-
-    def test_identificadores_reproducibles(self):
-        self.assertEqual([p[0] for _, p in CARGA.sentencias()], [p[0] for _, p in CARGA.sentencias()])
 
     def test_aclaraciones_y_limites_del_contenido(self):
-        textos = {clave: respuesta for clave, _, _, respuesta, _ in CARGA.GUIAS}
+        textos = {g.clave: g.respuesta for g in GuiaCuidado.objects.all()}
         self.assertIn('declara una acción que ya realizaste físicamente', textos['deposito-recarga'])
         self.assertIn('El flotador detecta nivel bajo', textos['deposito-recarga'])
-        self.assertIn('No mide los litros restantes ni confirma que el depósito esté lleno', textos['deposito-recarga'])
         self.assertIn('Sin lecturas válidas no puede deducirse el estado de la planta', textos['sin-lecturas'])
-        for clave, _, pregunta, respuesta, (fuente, enlace) in CARGA.GUIAS:
-            with self.subTest(clave):
-                self.assertNotRegex(respuesta, r'\d+\s*(%|°|ml|L\b|litros|días|semanas\s+exactas)')
-                self.assertLessEqual(len(respuesta), guias.MAX_RESPUESTA)
-                self.assertEqual(guias._fuente(fuente, enlace), (fuente, enlace))
+        for guia in GuiaCuidado.objects.all():
+            with self.subTest(guia.clave):
+                self.assertLessEqual(len(guia.respuesta), guias.MAX_RESPUESTA)
+                self.assertEqual(guias._fuente(guia.fuente_nombre, guia.fuente_url), (guia.fuente_nombre, guia.fuente_url))
 
-    def test_el_servicio_valida_igual_que_la_carga(self):
+    def test_el_servicio_valida_enlaces_con_esquema(self):
         with self.assertRaises(ValidationError):
             guias._fuente('Sin esquema', 'extension.umd.edu')

@@ -2,7 +2,6 @@
 
 suite   Todas las pruebas, en una base temporal que se borra. Usa el dueño de la base (CHILITO_TEST_DB_*).
 flujos  Flujos HTTP con el rol limitado, solo en una base temporal que se borra. Usa ambos usuarios.
-crud    CRUD con privilegios reales en una base temporal que se borra. Usa ambos usuarios.
 
 Todo sale del único .env del proyecto.
 """
@@ -16,7 +15,12 @@ from entorno_local import RAIZ, leer
 BACKEND = RAIZ / 'backend'
 TEMPORAL = 'test_chilito_integracion_sinteticos'
 HERRAMIENTAS = Path(__file__).resolve().parent
-UNA_PRUEBA = 'datos.tests.test_mantenimientos.MantenimientoTests.test_motivo_obligatorio'
+UNA_PRUEBA = 'tests.test_web.Sesion.test_rol_y_capacidades_las_deriva_el_servidor'
+# Sin textos legales publicados nadie puede registrarse; solo el propietario de la base los publica.
+PUBLICAR = ('from django.db import connection\n'
+            'with connection.cursor() as k:\n'
+            '    for tipo in ("terminos", "aviso_privacidad", "politica_cookies"):\n'
+            '        k.execute("SELECT chilito_publicar_documento_legal(%s, %s, %s, %s)", [tipo, "1.0", tipo, "<p>Texto de prueba.</p>"])')
 BORRAR = ('from django.db import connection as c\n'
           'with c._nodb_cursor() as k:\n'
           f'    k.execute("DROP DATABASE IF EXISTS {TEMPORAL}")')
@@ -41,6 +45,8 @@ def entorno_runtime(base=None):
         sys.exit('.env debe usar chilito_pkg_runtime')
     if base:
         valores['CHILITO_DB_NAME'] = base
+    if valores.get('CHILITO_PRUEBAS_CLAVE_RUNTIME'):
+        valores['CHILITO_DB_PASSWORD'] = valores['CHILITO_PRUEBAS_CLAVE_RUNTIME']   # la clave del rol en la base de pruebas
     return valores
 
 
@@ -55,15 +61,15 @@ def suite():
 def flujos():
     """Flujos HTTP con el rol limitado, SOLO en la base temporal (nunca en la oficial).
 
-    Crea la base temporal con las migraciones, le aplica los privilegios como propietario y ejecuta
-    cada flujo con chilito_pkg_runtime apuntando explícitamente a ella. Cada script vuelve a
+    Crea la base temporal con las migraciones (que ya traen los privilegios), publica los textos legales
+    como propietario y ejecuta cada flujo con chilito_pkg_runtime apuntando explícitamente a ella. Cada script vuelve a
     comprobar el destino efectivo antes de escribir (destino_temporal.py). Al final se borra.
     """
-    propietario, herramienta = entorno_pruebas(), str(HERRAMIENTAS / 'probar_crud_runtime.py')
+    propietario = entorno_pruebas()
     correr(['manage.py', 'shell', '-c', BORRAR], propietario)
     try:
         estado = correr(['manage.py', 'test', UNA_PRUEBA, '--noinput', '--keepdb'], propietario)
-        estado = estado or correr([herramienta, 'privilegios'], entorno_pruebas(TEMPORAL))
+        estado = estado or correr(['manage.py', 'shell', '-c', PUBLICAR], entorno_pruebas(TEMPORAL))
         if estado:
             return estado
         resultados = [correr([str(HERRAMIENTAS / f'{n}.py')], entorno_runtime(TEMPORAL))
@@ -73,19 +79,8 @@ def flujos():
         correr(['manage.py', 'shell', '-c', BORRAR], propietario)
 
 
-def crud():
-    propietario, herramienta = entorno_pruebas(), str(HERRAMIENTAS / 'probar_crud_runtime.py')
-    correr(['manage.py', 'shell', '-c', BORRAR], propietario)
-    try:
-        estado = correr(['manage.py', 'test', UNA_PRUEBA, '--noinput', '--keepdb'], propietario)
-        estado = estado or correr([herramienta, 'preparar'], entorno_pruebas(TEMPORAL))
-        return estado or correr([herramienta, 'probar'], entorno_runtime(TEMPORAL))
-    finally:
-        correr(['manage.py', 'shell', '-c', BORRAR], propietario)
-
-
 if __name__ == '__main__':
-    modos = {'suite': suite, 'flujos': flujos, 'crud': crud}
+    modos = {'suite': suite, 'flujos': flujos}
     if len(sys.argv) != 2 or sys.argv[1] not in modos:
         sys.exit(__doc__)
     sys.exit(modos[sys.argv[1]]())

@@ -1,9 +1,8 @@
-"""Avisos automáticos por correo: cola en PostgreSQL y envío después de confirmar la transacción.
+"""Avisos automáticos por correo. La base los encola en correo_pendiente; aquí solo se envían.
 
-Solo construye y envía; quién puede provocar un aviso lo decide datos.services.
-Ningún aviso lleva el token de soporte: el token nunca llega a la base, así que no puede filtrarse aquí.
-`aceptado_smtp` solo significa que el servidor de correo aceptó el mensaje, no que llegó a la bandeja.
-"""
+Quién provoca un aviso lo decide la base. `aceptado_smtp` solo significa que el servidor de correo
+aceptó el mensaje, no que llegó a la bandeja."""
+import hashlib
 import logging
 from datetime import timedelta
 from smtplib import SMTPException
@@ -15,19 +14,19 @@ from django.utils import timezone
 
 from cuentas.email import MailUnavailable, delivery_problem
 
-from .models import AvisoCorreo, CasoSoporte
+from .models import CorreoPendiente
 
 logger = logging.getLogger(__name__)
 MAX_INTENTOS = 5
-INCIDENTES = dict(CasoSoporte.INCIDENTES)
+INCIDENTES = {'bomba': 'Bomba', 'humedad': 'Humedad', 'lampara': 'Lámpara', 'conexion': 'Conexión', 'otro': 'Otro'}
 
 
-def folio_caso(caso):
-    return 'CS-' + caso.pk.hex[:8].upper()
+def huella_consulta(correo, mensaje):
+    return hashlib.sha256((correo.strip().lower() + '\n' + mensaje.strip()).encode()).hexdigest()
 
 
-def folio_consulta(consulta):
-    return 'CP-' + consulta.pk.hex[:8].upper()
+def estado_de_consulta(consulta):
+    return CorreoPendiente.objects.filter(consulta=consulta).values_list('estado', flat=True).first()
 
 
 def _enlace(ruta):
@@ -40,43 +39,30 @@ def _mensaje(aviso):
     soporte = settings.CHILITO_CONTACTO_SOPORTE
     if aviso.tipo == 'caso_nuevo':
         caso = aviso.caso
-        folio = folio_caso(caso)
-        cuerpo = (f'Se abrió el caso de soporte {folio}.\n'
+        cuerpo = (f'Se abrió el caso de soporte {caso.folio}.\n'
                   f'Incidente: {INCIDENTES.get(caso.incidente, "Otro")}\n'
                   f'Fecha: {timezone.localtime(caso.creado_en):%Y-%m-%d %H:%M}\n\n'
-                  f'Consúltalo en el panel: {_enlace("admin/soporte")}\n\n'
-                  'Este aviso no incluye el token. La persona usuaria lo comparte por correo si decide hacerlo.\n')
-        return soporte, f'[El Chilito] Nuevo caso de soporte {folio}', cuerpo, None
-    if aviso.tipo == 'token_solicitado':
-        caso = aviso.caso
-        folio = folio_caso(caso)
-        cuerpo = (f'El equipo de soporte solicita el token de tu caso {folio}.\n\n'
-                  f'Si quieres que revise tu huerto, escribe a {soporte or "soporte"} con el asunto «Caso de soporte {folio}» '
-                  'y pega el token en el mensaje.\n'
-                  'El token solo se mostró al emitirlo. Si ya no lo tienes, revoca la autorización y genera una nueva '
-                  f'desde tu panel: {_enlace("soporte")}\n\n'
-                  'Nunca te pediremos tu contraseña ni tus códigos de acceso.\n')
-        return caso.solicitante.email, f'[El Chilito] Soporte solicita el token del caso {folio}', cuerpo, soporte or None
+                  f'Consúltalo en el panel: {_enlace("admin/soporte")}\n')
+        return soporte, f'[El Chilito] Nuevo caso de soporte {caso.folio}', cuerpo, None
     consulta = aviso.consulta
-    cuerpo = (f'Consulta {folio_consulta(consulta)}\n'
+    cuerpo = (f'Consulta {consulta.folio}\n'
               f'Nombre: {consulta.nombre or "Sin indicar"}\nCorreo: {consulta.correo}\n\n{consulta.mensaje}\n\n'
               f'Gestiónala en el panel: {_enlace("admin/solicitudes")}\n')
     return soporte, '[El Chilito] Pregunta sobre el producto', cuerpo, consulta.correo
 
 
-def encolar(tipo, *, caso=None, consulta=None):
-    """Registra el aviso dentro de la transacción en curso y lo envía solo si esta se confirma."""
-    aviso = AvisoCorreo.objects.create(tipo=tipo, caso=caso, consulta=consulta)
-    transaction.on_commit(lambda: enviar(aviso.pk))
-    return aviso
+def enviar_de_consulta(consulta):
+    aviso_id = CorreoPendiente.objects.filter(consulta=consulta).values_list('pk', flat=True).first()
+    if aviso_id:
+        enviar(aviso_id)
 
 
 def enviar(aviso_id):
     """Un intento de envío. Nunca lanza: un fallo de correo no deshace el caso ni la consulta."""
     try:
         with transaction.atomic():
-            aviso = (AvisoCorreo.objects.select_for_update(skip_locked=True, of=('self',))
-                     .select_related('caso__solicitante', 'consulta').filter(pk=aviso_id).first())
+            aviso = (CorreoPendiente.objects.select_for_update(skip_locked=True, of=('self',))
+                     .select_related('caso', 'consulta').filter(pk=aviso_id).first())
             if aviso is None or aviso.estado == 'aceptado_smtp' or aviso.intentos >= MAX_INTENTOS:
                 return aviso
             destino, asunto, cuerpo, responder = _mensaje(aviso)
@@ -107,7 +93,7 @@ def reintentar_pendientes(ahora=None):
     """Reintenta con espera creciente (2, 4, 8, 16 min). Devuelve cuántos se aceptaron."""
     ahora = ahora or timezone.now()
     aceptados = 0
-    for aviso in AvisoCorreo.objects.filter(estado__in=['pendiente', 'fallido'], intentos__lt=MAX_INTENTOS).order_by('creado_en'):
+    for aviso in CorreoPendiente.objects.filter(estado__in=['pendiente', 'fallido'], intentos__lt=MAX_INTENTOS).order_by('creado_en'):
         espera = timedelta(minutes=2 ** max(aviso.intentos, 1))
         if aviso.ultimo_intento_en and aviso.ultimo_intento_en > ahora - espera:
             continue

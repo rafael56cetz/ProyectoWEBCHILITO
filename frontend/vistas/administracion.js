@@ -96,7 +96,7 @@ const AdminViews = (() => {
     },
     focusDetail(root) { root.querySelector('#admin-ticket-detail')?.focus(); },
     render(screen,data,access={}) {
-      if(data.status!=='ready')return messages+heading('Administración')+AppViews.state(data.status==='loading'?'Consultando la plataforma':'No se pudo consultar la plataforma',data.status==='loading'?'Espera un momento.':'Comprueba tu acceso e inténtalo de nuevo.',data.status==='loading')+button('refresh','Reintentar');
+      if(data.status!=='ready')return messages+heading('Administración')+AppViews.state(data.status==='loading'?'Consultando la plataforma':'Esta sección se está actualizando.',data.status==='loading'?'Espera un momento.':'Vuelve a intentarlo más tarde.',data.status==='loading')+button('refresh','Reintentar');
       return messages+({flota:fleet,soporte:remote}[screen]||fleet)(data,access);
     }
   };
