@@ -32,6 +32,8 @@ class UsuarioManager(BaseUserManager):
 class Usuario(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
+    alias = models.CharField(max_length=64, blank=True, default="")
+    bienvenida_atendida_en = models.DateTimeField(null=True, blank=True)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = UsuarioManager()
@@ -39,15 +41,31 @@ class Usuario(AbstractUser):
     def clean(self):
         super().clean()
         self.email = self.email.strip().lower()
+        if isinstance(self.alias, str):
+            self.alias = self.alias.strip()
+
+    @property
+    def nombre_presentacion(self):
+        """Texto para la bienvenida, sin consultar datos ni completar el perfil."""
+        return self.alias.strip() or self.first_name.strip() or "Bienvenido"
 
     class Meta:
         constraints = [
             models.UniqueConstraint(Lower("email"), name="usuario_email_ci_unico"),
+            models.UniqueConstraint(
+                models.Func("email", function="public.chilito_identidad_correo",
+                            output_field=models.CharField()),
+                name="usuario_identidad_correo_unica",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(alias="") | models.Q(alias__regex=r"\S"),
+                name="usuario_alias_vacio_o_con_texto",
+            ),
         ]
 
 
 class CuotaAcceso(models.Model):
-    """Storage schema for Django DatabaseCache/allauth rate limits, not a second auth system."""
+    """Esquema de almacenamiento del DatabaseCache de Django y los límites de allauth; no es un segundo sistema de autenticación."""
     cache_key = models.CharField(max_length=255, primary_key=True)
     value = models.TextField()
     expires = models.DateTimeField(db_index=True)
@@ -57,7 +75,7 @@ class CuotaAcceso(models.Model):
 
 
 class ConfirmacionRegistroLocal(models.Model):
-    """Technical checkbox confirmation; never an approved legal consent."""
+    """Confirmación técnica con casilla; nunca es un consentimiento legal aprobado."""
     usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE, related_name="confirmacion_registro_local")
     confirmado_en = models.DateTimeField(auto_now_add=True)
     casilla_marcada = models.BooleanField(default=True, editable=False)

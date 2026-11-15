@@ -27,6 +27,8 @@ class Huerto(ValidatedModel):
         constraints = [
             models.CheckConstraint(condition=~Q(nombre=""), name="huerto_nombre_no_vacio"),
             models.CheckConstraint(condition=~Q(clave=""), name="huerto_clave_no_vacia"),
+            models.CheckConstraint(condition=Q(nombre__regex=r"\S"), name="huerto_nombre_significativo"),
+            models.CheckConstraint(condition=Q(clave__regex=r"\S"), name="huerto_clave_significativa"),
         ]
 
 class Zona(ValidatedModel):
@@ -40,6 +42,8 @@ class Zona(ValidatedModel):
             models.UniqueConstraint(fields=["huerto", "numero"], name="zona_numero_unico"),
             models.CheckConstraint(condition=Q(numero__gte=1, numero__lte=3), name="zona_rango_1_3"),
             models.CheckConstraint(condition=~Q(nombre=""), name="zona_nombre_no_vacio"),
+            models.CheckConstraint(condition=Q(nombre__regex=r"\S"), name="zona_nombre_significativo"),
+            models.CheckConstraint(condition=Q(cultivo__regex=r"\S"), name="zona_cultivo_significativo"),
         ]
 
 class Membresia(ValidatedModel):
@@ -51,6 +55,8 @@ class Membresia(ValidatedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["usuario", "huerto"], name="membresia_unica"),
+            # Regla vigente: una cuenta, un huerto activo. Las membresías inactivas se conservan.
+            models.UniqueConstraint(fields=["usuario"], condition=models.Q(activa=True), name="membresia_activa_por_cuenta"),
         ]
 
 class Aviso(ValidatedModel):
@@ -78,6 +84,8 @@ class Aviso(ValidatedModel):
             models.CheckConstraint(condition=Q(severidad__in=["informacion", "advertencia", "critico"]), name="aviso_severidad_valida"),
             models.CheckConstraint(condition=~Q(titulo=""), name="aviso_titulo_no_vacio"),
             models.CheckConstraint(condition=~Q(descripcion=""), name="aviso_descripcion_no_vacia"),
+            models.CheckConstraint(condition=Q(titulo__regex=r"\S"), name="aviso_titulo_significativo"),
+            models.CheckConstraint(condition=Q(descripcion__regex=r"\S"), name="aviso_texto_significativo"),
             models.CheckConstraint(condition=Q(resuelto_en__isnull=True) | Q(resuelto_en__gte=models.F("creado_en")), name="aviso_fechas_coherentes"),
         ]
         indexes = [models.Index(fields=["huerto", "-creado_en", "-id"], name="aviso_huerto_orden_idx")]

@@ -1,0 +1,817 @@
+/* Vidrio líquido: bordes de luz en todos los botones, refracción sobre fotos e indicador del menú.
+   Adaptación propia en CSS de un componente de referencia; sin React ni dependencias. */
+:root {
+  --lg-dark:0 2px 6px rgba(0,0,0,.14),inset 3px 3px .5px -3.5px rgba(255,255,255,.09),inset -3px -3px .5px -3.5px rgba(255,255,255,.85),inset 1px 1px 1px -.5px rgba(255,255,255,.6),inset -1px -1px 1px -.5px rgba(255,255,255,.6),inset 0 0 6px 6px rgba(255,255,255,.12),inset 0 0 2px 2px rgba(255,255,255,.06),0 0 12px rgba(0,0,0,.15);
+  /* Rellenos: filos nítidos. El brillo difuso de --lg-dark sobre un color sólido se ve como niebla. */
+  --lg-solid:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.28),inset 1px 0 0 rgba(255,255,255,.14),inset -1px 0 0 rgba(255,255,255,.14),0 8px 18px -8px rgba(8,24,15,.55);
+  --lg-light:inset 0 0 0 1px rgba(28,49,34,.17),inset 0 1px 0 #fff,0 1px 2px rgba(20,42,27,.08),0 6px 14px -8px rgba(20,42,27,.22);
+  --display-weight:800;
+}
+.glass-filter { position:absolute; }
+
+/* Botones sobre superficies oscuras */
+html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid):not(:disabled) {
+  background:rgba(255,255,255,.05)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;
+}
+html body .sidebar .btn-liquid-sidebar:not([aria-current]),
+html body .sidebar .private-menu-logout { border-color:rgba(255,255,255,.14)!important;box-shadow:var(--lg-solid)!important; }
+/* Botón principal: el mismo verde limpio en todas las pantallas. */
+html body .btn-liquid-brand:not(:disabled) { background:linear-gradient(180deg,#3f7a55 0%,#285a3c 100%)!important;border-color:rgba(255,255,255,.2)!important;box-shadow:var(--lg-solid)!important;color:#fff!important; }
+html body .btn-liquid-brand:not(:disabled):hover { background:linear-gradient(180deg,#478860 0%,#2d6444 100%)!important; }
+html body .btn-liquid-brand::before,html body .btn-liquid-brand::after { display:none!important; }
+/* Botones claros sobre superficies claras */
+html body .btn-liquid-light:not(:disabled) { background:rgba(255,255,255,.72)!important;border-color:transparent!important;box-shadow:var(--lg-light)!important; }
+
+/* La refracción solo se aprecia sobre imagen o contenido en movimiento. Safari no la dibuja. */
+@supports (backdrop-filter:url(#x)) and (not (-webkit-touch-callout:none)) {
+  @media (hover:hover) {
+    html body :is(.public-header .button,.home .button,.app-header .button):not(:disabled):not(.btn-liquid-brand) {
+      -webkit-backdrop-filter:url(#container-glass)!important;backdrop-filter:url(#container-glass)!important;
+    }
+  }
+}
+@media (hover:hover) and (prefers-reduced-motion:no-preference) {
+  html body .button:not(:disabled):not([aria-busy=true]):not(.header-nav .button):hover { transform:scale(1.04); }
+}
+
+/* Menú de la portada en escritorio: cápsula de vidrio con indicador que se desliza. */
+.nav-lamp { display:none; }
+@media (min-width:769px) {
+  /* Cápsula limpia: solo un filo de luz. El brillo difuso de los botones aquí se veía como humo. */
+  .public-header .header-nav { position:relative;gap:2px;padding:4px;border-radius:999px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2),inset 0 1px 0 rgba(255,255,255,.3); }
+  html body .public-header .header-nav .button {
+    position:relative;z-index:1;min-height:38px!important;padding:.4rem 1.05rem;overflow:visible;
+    background:transparent!important;box-shadow:none!important;border-color:transparent!important;
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  }
+  .nav-lamp { display:block;position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.28); }
+  .nav-lamp.is-ready { transition:transform .42s cubic-bezier(.34,1.3,.64,1),width .42s cubic-bezier(.34,1.3,.64,1); }
+  .nav-lamp::before { content:"";position:absolute;top:-4px;left:50%;width:30px;height:3px;margin-left:-15px;border-radius:0 0 4px 4px;background:#d6e8a7; }
+}
+
+/* Letra de título: Geist en su peso más fuerte. */
+.hero-text h1,.auth-quote h2,.page-heading h1,.garden-welcome h1,.auth-flow #auth-title { font-weight:var(--display-weight)!important;letter-spacing:-.035em; }
+.home h2 { font-weight:700!important;letter-spacing:-.025em; }
+
+/* Entrada del título: las letras suben desde detrás de su línea. */
+.is-revealing .reveal-word { display:inline-block;overflow:hidden;padding-bottom:.16em;margin-bottom:-.16em;vertical-align:top; }
+.is-revealing .reveal-letter { display:inline-block;animation:letter-rise .8s cubic-bezier(.125,.92,.69,.975) both;animation-delay:calc(var(--letter)*24ms + 120ms); }
+@keyframes letter-rise { from { transform:translateY(115%); } to { transform:none; } }
+
+@media (prefers-reduced-transparency:reduce) {
+  html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid):not(:disabled) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+}
+@media (forced-colors:active) {
+  html body .button { box-shadow:none!important;border:1px solid ButtonText!important; }
+  .nav-lamp { background:Highlight; }
+}
+
+/* Pantallas de acceso: el mismo fondo y vidrio de la portada. Los campos siguen sólidos y legibles. */
+.auth-quote h2 span { display:block; }
+.auth-layout.auth-flow { background:#0e1c14;isolation:isolate;--focus:#fff; }
+.auth-layout::before { content:"";position:fixed;inset:-48px;z-index:-1;background:#0e1c14 url('../imagenes/habanero-fondo.webp') 70% 40%/cover no-repeat;filter:blur(36px) brightness(.4) saturate(.9); }
+@media (min-width:1025px) { .auth-layout { grid-template-columns:42% minmax(0,1fr); } }
+.auth-flow.auth-layout .auth-main { padding-inline:clamp(20px,3.4vw,48px); }
+.auth-layout .auth-bento {
+  --text:#fff;--muted:rgba(255,255,255,.84);--sage:#fff;--focus:#fff;
+  width:100%;max-width:600px;padding:clamp(24px,3.2vw,44px);border-radius:28px;color:#fff;
+  background:rgba(22,44,33,.86);border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 48px -24px rgba(0,0,0,.7);
+}
+@supports (background:rgba(0,0,0,.1)) {
+  .auth-layout .auth-bento { background:linear-gradient(180deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,.05) 100%); }
+}
+/* Campos en vidrio oscuro con texto blanco: se integran sin el destello de un fondo blanco. */
+html body .auth-layout .field input,html body .auth-layout .password-input-group input { color:#fff!important;-webkit-text-fill-color:#fff;background:rgba(255,255,255,.1)!important;border-color:rgba(255,255,255,.3)!important;caret-color:#fff; }
+html body .auth-layout .password-input-group { background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3); }
+html body .auth-layout .password-input-group input { background:transparent!important;border-color:transparent!important; }
+html body .auth-layout .password-eye-btn { color:#fff!important;background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.2)!important; }
+.auth-layout .field input::placeholder { color:rgba(255,255,255,.66);-webkit-text-fill-color:rgba(255,255,255,.66); }
+.auth-layout .field input:-webkit-autofill { -webkit-text-fill-color:#fff;box-shadow:inset 0 0 0 40px #26453a;caret-color:#fff; }
+.auth-layout .field input:focus-visible { outline-color:#fff!important; }
+.auth-layout .password-input-group:focus-within { outline-color:#fff; }
+.auth-layout .auth-text-link,.auth-layout .auth-switch a,.auth-layout .terms-field a { color:#fff; }
+.auth-layout .field-error,.auth-layout .terms-field .field-error { color:#ffc4ba; }
+.auth-layout .terms-label,.auth-layout .password-tips-title { color:#fff; }
+.auth-layout .terms-label input[type=checkbox] { accent-color:#fff; }
+.auth-layout .password-meter { background:rgba(255,255,255,.2); }
+.auth-layout .password-meter>span,.auth-layout .password-length.is-met .password-meter>span { background:#fff; }
+.auth-layout .password-check [data-password-check-icon] { border-color:rgba(255,255,255,.55);color:#fff; }
+.auth-layout .auth-feedback { color:#142419; }
+/* En acceso todos los botones son vidrio puro. */
+html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled) { background:rgba(255,255,255,.08)!important;color:#fff!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important; }
+html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled):hover { background:rgba(255,255,255,.15)!important; }
+html body .auth-layout .auth-bento .button:disabled { background:rgba(255,255,255,.05)!important;color:rgba(255,255,255,.6)!important;border-color:rgba(255,255,255,.14)!important;box-shadow:none!important; }
+@media (prefers-reduced-transparency:reduce) {
+  .auth-layout::before { display:none; }
+  .auth-layout .auth-bento { background:#1c3327;-webkit-backdrop-filter:none;backdrop-filter:none; }
+}
+.auth-layout [data-step-feedback] { margin:12px 0 0; }
+.access-help-steps { margin:0 0 18px;padding-left:22px;color:rgba(255,255,255,.88);line-height:1.6; }
+.access-help-steps li + li { margin-top:10px; }
+.access-help-contact { margin:0 0 20px;color:#fff; }
+.access-help-contact a { color:#fff;font-weight:600;text-underline-offset:3px; }
+
+/* Dashboards de usuario y administración: vidrio sobre un degradado propio. Sin desenfoques por
+   tarjeta: el fondo es fijo y liso, así que un fondo translúcido con filo de luz se ve igual y no gasta GPU. */
+body[data-private=true]:is([data-role=user],[data-role=admin]) {
+  --text:#fff;--muted:rgba(255,255,255,.8);--focus:#fff;--sage:#fff;
+  --garden-ink:#fff;--garden-muted:rgba(255,255,255,.8);--garden-line:rgba(255,255,255,.16);
+  --garden-green:#fff;--garden-surface:rgba(255,255,255,.08);--garden-tint:rgba(255,255,255,.1);
+  --glass-card:linear-gradient(180deg,rgba(255,255,255,.13) 0%,rgba(255,255,255,.06) 100%);
+  --glass-edge:inset 0 1px 0 rgba(255,255,255,.22),0 14px 30px -20px rgba(4,16,13,.7);
+  color:#fff;background:#17393a!important;background-attachment:scroll!important;
+}
+body[data-private=true]:is([data-role=user],[data-role=admin])::before {
+  content:"";position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(60% 55% at 88% 8%,rgba(122,186,158,.34),transparent 70%),
+    radial-gradient(52% 60% at 6% 92%,rgba(70,142,150,.34),transparent 72%),
+    radial-gradient(42% 42% at 52% 48%,rgba(38,92,84,.5),transparent 75%),
+    linear-gradient(155deg,#17383a 0%,#1d4640 46%,#16343a 100%);
+}
+body[data-private=true]:is([data-role=user],[data-role=admin]) .private-layout,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .private-content { background:transparent!important; }
+
+/* Tarjetas */
+body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.user-care,.user-metric,.user-chart,.user-token,.user-support-callout,.notice-card,.user-log-panel) {
+  background:var(--glass-card)!important;border:1px solid rgba(255,255,255,.17)!important;box-shadow:var(--glass-edge)!important;color:#fff;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+body[data-private=true]:is([data-role=user],[data-role=admin]) .plant-pedestal,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .icon-medallion { background:rgba(255,255,255,.14)!important;border-color:rgba(255,255,255,.2)!important;box-shadow:none!important;color:#fff; }
+
+/* Texto */
+body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page :is(h1,h2,h3,h4,strong,dd,th,legend,label,summary,.plant-reading strong) { color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page :is(p,dt,small,time,td,li,span:not(.skeleton-line):not(.icon-medallion)) { color:rgba(255,255,255,.84); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page a:not(.button) { color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .user-metric-icon,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .plant-reading span { color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .garden-welcome h1 { color:#fff!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .garden-welcome-lead { color:#fff!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .garden-welcome-phrase { color:rgba(255,255,255,.86)!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .skeleton-line { background:rgba(255,255,255,.2); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .sensor-track { background:rgba(255,255,255,.18); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .sensor-track span { background:#fff; }
+
+/* Mensajes y avisos: fondo propio para que se lean sobre el vidrio. */
+body[data-private=true]:is([data-role=user],[data-role=admin]) :is(#app-feedback,.user-feedback,.user-data-warning,.notice-recommendation,.privacy-saved) {
+  background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;
+}
+body[data-private=true]:is([data-role=user],[data-role=admin]) :is(#app-feedback,.user-feedback)[role=alert] { background:rgba(180,60,48,.3)!important;border-color:rgba(255,190,180,.5)!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-meta,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-meta span { color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-condition { padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff!important;font-weight:600; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-condition.active { background:rgba(214,120,60,.42); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .privacy-unsaved { color:#fff!important;font-weight:600; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .privacy-panel>[data-privacy-state] { color:#ffc4ba; }
+
+/* Tablas, gráficas y campos */
+body[data-private=true]:is([data-role=user],[data-role=admin]) .user-table :is(th,td) { border-color:rgba(255,255,255,.14); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.user-chart-grid text,.user-chart-labels text,.user-history-chart text) { fill:rgba(255,255,255,.8); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .user-history-chart line { stroke:rgba(255,255,255,.16); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page :is(input:not([type=checkbox]):not([type=radio]),select,textarea),
+body[data-private=true]:is([data-role=user],[data-role=admin]) dialog :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
+  color:#fff!important;background:rgba(255,255,255,.1)!important;border:1px solid rgba(255,255,255,.3)!important;border-radius:12px;
+}
+body[data-private=true]:is([data-role=user],[data-role=admin]) select option { color:#142419;background:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) :is(input,select,textarea)::placeholder { color:rgba(255,255,255,.66); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) input:is([type=radio],[type=checkbox]) { accent-color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .account-password { color:#fff; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .auth-flow { background:transparent;--text:#fff;--muted:rgba(255,255,255,.84);--sage:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .password-meter { background:rgba(255,255,255,.2); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .password-meter>span,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .password-length.is-met .password-meter>span { background:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .password-input-group { background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3); }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .password-input-group input { background:transparent!important;border-color:transparent!important; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .password-eye-btn { color:#fff!important;background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.2)!important; }
+
+/* Diálogos: capa superior, así que llevan fondo casi opaco. */
+html body[data-private=true]:is([data-role=user],[data-role=admin]) dialog.app-dialog { background:#1b4042!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff;box-shadow:0 24px 60px -20px rgba(0,0,0,.7)!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) dialog :is(h2,h3,label,span) { color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) dialog p { color:rgba(255,255,255,.86); }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .logout-error { color:#ffc4ba; }
+
+/* Botones: vidrio puro en todo el dashboard. */
+html body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled),
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .account-tabs .button:not(.active),
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters .button {
+  background:rgba(255,255,255,.08)!important;color:#fff!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;
+}
+html body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled):hover { background:rgba(255,255,255,.16)!important; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .account-tabs .button.active,
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .user-range-control .btn-liquid-brand,
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters .btn-liquid-brand { background:rgba(255,255,255,.24)!important;color:#fff!important;box-shadow:var(--lg-dark)!important; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button:disabled { background:rgba(255,255,255,.05)!important;color:rgba(255,255,255,.6)!important;box-shadow:none!important;border-color:rgba(255,255,255,.14)!important; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button { --focus:#fff; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button span,
+html body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .button .icon { color:inherit; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .account-tabs,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters,
+body[data-private=true]:is([data-role=user],[data-role=admin]) .user-range-control { background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.14)!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) :is(a,button,input,select,textarea,summary):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
+
+/* Panel lateral: vidrio tenue, sin bloque de verde. */
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
+  background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.035))!important;border-right:1px solid rgba(255,255,255,.14)!important;box-shadow:none!important;
+}
+.sidebar-top { display:none; }
+.private-topbar { display:none; }
+@media (min-width:769px) {
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:0!important;padding:20px 16px!important;gap:16px; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar-top { display:flex;flex-direction:column;align-items:flex-start;gap:12px; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar-brand { color:#fff!important; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav { gap:10px; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { min-height:44px!important;padding:0 16px!important;gap:12px;font-size:15px; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .icon { width:20px;height:20px; }
+}
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button:not([aria-current]) { background:rgba(255,255,255,.06)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button[aria-current] { background:rgba(255,255,255,.24)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
+
+/* Perfil, avisos y menú: sin barra, flotan sobre el contenido. */
+body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar {
+  display:flex;align-items:center;justify-content:space-between;gap:8px;position:fixed;top:0;left:0;right:0;z-index:9999;
+  padding:14px clamp(16px,3vw,36px) 0;pointer-events:none;
+}
+.private-topbar :is(a,button) { pointer-events:auto; }
+.topbar-start,.topbar-actions { display:flex;align-items:center;gap:8px; }
+.topbar-actions { margin-left:auto; }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .button { -webkit-backdrop-filter:blur(12px)!important;backdrop-filter:blur(12px)!important;background:rgba(23,56,58,.55)!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .account-icon-link[aria-current] { background:rgba(255,255,255,.26)!important; }
+.topbar-brand { display:none!important; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.container { padding-top:76px!important; }
+@media (min-width:769px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar { left:260px; } }
+
+@media (max-width:768px) {
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { display:inline-flex!important;color:#fff!important;padding:4px 12px 4px 6px;border-radius:999px;background:rgba(23,56,58,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px); }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { flex:0 0 auto;white-space:nowrap; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-actions { flex:0 0 auto;gap:6px; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-toggle { flex:0 0 auto;white-space:nowrap;padding-inline:12px!important; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:72px!important;background:#1b4042!important; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-logout { min-height:44px!important;background:rgba(255,255,255,.06)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
+}
+@media (max-width:360px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand .brand-name { display:none; } }
+@media (prefers-reduced-transparency:reduce) {
+  body[data-private=true]:is([data-role=user],[data-role=admin])::before { display:none; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.user-care,.user-metric,.user-chart,.sidebar) { background:#1f4a4b!important; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .button { background:#1f4a4b!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+}
+@media (forced-colors:active) {
+  body[data-private=true]:is([data-role=user],[data-role=admin])::before { display:none; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.sidebar,.button) { background:Canvas!important;color:CanvasText!important;border:1px solid CanvasText!important; }
+}
+
+/* Ajustes tras revisar cada pantalla */
+html:has(body[data-private=true]:is([data-role=user],[data-role=admin])) { background:#17393a; }
+html:has(.auth-layout) { background:#0e1c14; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .icon-medallion,
+body[data-private=true]:is([data-role=user],[data-role=admin]) #app-page .icon-medallion .icon { color:#fff; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .user-support-callout { border-radius:22px;padding:22px 24px; }
+body[data-private=true]:is([data-role=user],[data-role=admin]) .notices-grid { gap:18px; }
+@media (min-width:769px) { html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { width:100%; } }
+html body[data-private=true]:is([data-role=user],[data-role=admin]) .notices-grid { display:grid!important;gap:18px!important; }
+@media (max-width:768px) {
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { background:rgba(23,56,58,.9)!important; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar .button { background:rgba(23,56,58,.9)!important; }
+}
+
+/* Administración sobre el mismo vidrio: piezas propias del panel. */
+body[data-private=true][data-role=admin] .private-role-label { margin:4px 4px 0;color:rgba(255,255,255,.78);font-size:13px;font-weight:600;letter-spacing:.02em; }
+body[data-private=true][data-role=admin] :is(.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list) {
+  background:var(--glass-card)!important;border:1px solid rgba(255,255,255,.17)!important;box-shadow:var(--glass-edge)!important;color:#fff;
+}
+body[data-private=true][data-role=admin] .admin-selected-row { background:rgba(255,255,255,.12); }
+body[data-private=true][data-role=admin] .admin-table th[scope=row] { color:#fff;border-color:rgba(255,255,255,.14); }
+body[data-private=true][data-role=admin] :is(.admin-caption,.admin-service-note,.admin-inline-status,.admin-access-state) { color:rgba(255,255,255,.84); }
+body[data-private=true][data-role=admin] .admin-service-note { border-color:rgba(255,255,255,.16); }
+body[data-private=true][data-role=admin] .admin-connection:before { background:#9fdcb4; }
+body[data-private=true][data-role=admin] .admin-connection.offline:before { background:#f0c27a; }
+body[data-private=true][data-role=admin] #app-page pre { color:#fff;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.14); }
+body[data-private=true][data-role=admin] #app-page label { color:#fff; }
+body[data-private=true][data-role=admin] #app-page > .bento-panel + .bento-panel { margin-top:24px; }
+
+/* Dashboard claro (administración y usuario): dirección visual aprobada (2026-11-07).
+   Fondo crema con luz de naranja y durazno, panel lateral de vidrio verde flotante y tarjetas translúcidas.
+   Va después de dashboard-glass.css y sustituye sus colores oscuros; la estructura es la misma. */
+body[data-private=true]:is([data-role=admin],[data-role=user]) {
+  --claro-fondo:#fdf3e8;--claro-tinta:#1b231d;--claro-titulo:#13261b;--claro-suave:#4b423a;--claro-linea:rgba(70,40,20,.12);
+  --claro-tarjeta:rgba(255,250,244,.52);--claro-tarjeta-solida:rgba(255,250,244,.94);--claro-verde:#2f6a48;--claro-peligro:#a3321f;
+  --claro-borde:rgba(255,255,255,.72);
+  --claro-filo:inset 0 1px 0 rgba(255,255,255,.85),0 18px 40px -26px rgba(150,70,20,.42),0 2px 6px -2px rgba(150,70,20,.08);
+  --claro-desenfoque:blur(22px) saturate(150%);
+  --text:var(--claro-tinta);--muted:var(--claro-suave);--focus:var(--claro-verde);--sage:var(--claro-verde);
+  --garden-ink:var(--claro-tinta);--garden-muted:var(--claro-suave);--garden-line:var(--claro-linea);
+  color:var(--claro-tinta);background:transparent!important;
+}
+/* El color base va en html: un fondo opaco en body taparía la capa de luz (z-index:-1). */
+html:has(body[data-private=true]:is([data-role=admin],[data-role=user])) { background:#fdf3e8; }
+/* Luz fija: naranja arriba a la derecha y abajo, durazno al centro y un rastro de hoja tras el panel. Sin animación. */
+body[data-private=true]:is([data-role=admin],[data-role=user])::before {
+  background:
+    radial-gradient(44% 40% at 90% 4%,rgba(255,132,60,.68),transparent 70%),
+    radial-gradient(30% 34% at 98% 58%,rgba(255,150,84,.46),transparent 72%),
+    radial-gradient(38% 32% at 56% 106%,rgba(255,138,66,.62),transparent 72%),
+    radial-gradient(30% 30% at 46% 62%,rgba(255,178,128,.34),transparent 74%),
+    radial-gradient(36% 40% at 72% 46%,rgba(255,206,168,.36),transparent 76%),
+    radial-gradient(26% 40% at 2% 92%,rgba(120,150,92,.26),transparent 72%),
+    radial-gradient(30% 30% at 20% 8%,rgba(255,226,196,.6),transparent 74%),
+    linear-gradient(160deg,#fdf6ee 0%,#fbeee1 52%,#fdf1e4 100%)!important;
+}
+
+/* Panel lateral de vidrio verde: flota con margen, esquinas redondeadas y un reflejo discreto. */
+@media (min-width:769px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
+    top:16px!important;left:16px!important;bottom:16px!important;width:268px!important;padding:24px 16px!important;border-radius:26px!important;
+    border:1px solid rgba(255,255,255,.2)!important;overflow:hidden auto;
+    background:
+      radial-gradient(120% 60% at 0% 0%,rgba(255,255,255,.16),transparent 55%),
+      radial-gradient(90% 50% at 100% 100%,rgba(140,190,120,.18),transparent 60%),
+      linear-gradient(170deg,rgba(40,98,62,.9) 0%,rgba(27,74,48,.92) 55%,rgba(22,62,42,.94) 100%)!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 0 0 1px rgba(255,255,255,.04),0 24px 50px -24px rgba(20,50,30,.55)!important;
+  }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-content { margin-left:300px!important;width:calc(100% - 300px)!important; }
+  body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar { left:300px!important; }
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%); }
+}
+@media (max-width:768px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { background:linear-gradient(170deg,#28623e 0%,#1b4a30 100%)!important; }
+}
+body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar-brand { font-size:20px; }
+body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-label { margin:6px 6px 2px;color:rgba(255,255,255,.88);font-size:15px;font-weight:600;letter-spacing:0; }
+body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group-label { margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button:not([aria-current]) {
+  background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;color:#fff!important;font-weight:600;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button:not([aria-current]):hover { background:rgba(255,255,255,.14)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button[aria-current] {
+  background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.2))!important;border:1px solid rgba(255,255,255,.4)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 16px -8px rgba(0,0,0,.35)!important;color:#fff!important;font-weight:600;
+}
+@media (min-width:769px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button { padding:0 14px!important;gap:12px; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a,button):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
+/* Elemento pendiente: se ve, pero no es un enlace ni un botón. */
+.private-pending { display:grid;gap:10px; }
+
+/* Botón de perfil flotante: el verde del panel. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .button { background:#28623e!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 18px -8px rgba(20,50,30,.5)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .account-icon-link[aria-current] { background:#2f6a48!important;box-shadow:0 0 0 3px rgba(47,106,72,.25)!important; }
+@media (max-width:768px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .topbar-brand { border-radius:999px!important;background:#28623e!important; } }
+
+/* Tarjetas translúcidas: desenfocan el fondo, filo claro y sombra cálida. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel,.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list,.admin-management) {
+  background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:22px!important;box-shadow:var(--claro-filo)!important;color:var(--claro-tinta);
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel,.admin-table-panel,.admin-ticket-detail,.admin-diagnostics,.admin-governance-list,.admin-management) {
+    background:var(--claro-tarjeta)!important;-webkit-backdrop-filter:var(--claro-desenfoque)!important;backdrop-filter:var(--claro-desenfoque)!important;
+  }
+}
+/* Iconos de trazo, sin cuadro de fondo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon { background:transparent!important;border:0!important;box-shadow:none!important;color:var(--claro-titulo)!important;margin-bottom:14px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:30px;height:30px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .icon-medallion { background:transparent!important;border:0!important;box-shadow:none!important;color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .icon-medallion .icon { color:var(--claro-titulo); }
+
+/* Jerarquía tipográfica de la referencia */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading h1 { font-size:clamp(32px,3.2vw,42px);font-weight:800;letter-spacing:-.03em;color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading p:not(.eyebrow) { font-size:17px;color:var(--claro-suave)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line p:first-child { font-weight:600;color:var(--claro-tinta)!important;font-size:16px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading h2 { font-size:clamp(21px,1.8vw,25px);font-weight:700;letter-spacing:-.015em;color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading p { font-size:15px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { font-size:17px;font-weight:700; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart h2 { font-size:17px;font-weight:700; }
+@media (min-width:1100px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-summary-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+
+/* Gestión administrativa */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;align-items:center;margin-top:28px;padding:22px 26px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management h2 { margin:0 0 4px;font-size:22px;font-weight:700;color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management-actions { display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management .admin-service-note { grid-column:1/-1;margin:0;padding-top:12px; }
+@media (max-width:900px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management { grid-template-columns:1fr; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-management-actions { justify-content:flex-start; } }
+
+/* Texto */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(h1,h2,h3,h4,strong,dd,th,legend,label,summary) { color:var(--claro-tinta)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(p,dt,small,time,td,li,span:not(.skeleton-line):not(.icon-medallion)) { color:var(--claro-suave)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page a:not(.button) { color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-table th[scope=row] { color:var(--claro-tinta);border-color:var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.admin-caption,.admin-service-note,.admin-inline-status,.admin-access-state) { color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-service-note { border-color:var(--claro-linea); }
+
+/* Mensajes */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback,.user-data-warning,.privacy-saved) {
+  background:rgba(47,106,72,.1)!important;border:1px solid rgba(47,106,72,.28)!important;color:#1d4a31!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback)[role=alert],
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is([data-maint-error],.privacy-panel>[data-privacy-state],.logout-error) { color:var(--claro-peligro)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback)[role=alert] { background:rgba(163,50,31,.08)!important;border-color:rgba(163,50,31,.3)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .privacy-unsaved { color:var(--claro-tinta)!important; }
+
+/* Tablas y gráficas */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table :is(th,td) { border-color:var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table thead th { color:var(--claro-suave);font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-selected-row { background:rgba(250,114,74,.1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-connection:before { background:#2f8a55; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-connection.offline:before { background:#b8741e; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-chart-grid text,.user-chart-labels text,.user-history-chart text) { fill:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-chart line { stroke:var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page pre { color:var(--claro-tinta);background:#f6f0e7;border:1px solid var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-facts>div,.admin-policy-list>div) { border-color:var(--claro-linea)!important; }
+
+/* Campos: vidrio oscuro con texto blanco, como en el inicio de sesión. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
+  color:#fff!important;-webkit-text-fill-color:#fff;caret-color:#fff;color-scheme:dark;
+  background:rgba(26,64,44,.95)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:14px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px -12px rgba(20,50,30,.5)!important;
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { background:rgba(26,64,44,.9)!important;-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%); }
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,textarea)::placeholder { color:rgba(255,255,255,.62);-webkit-text-fill-color:rgba(255,255,255,.62); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input:-webkit-autofill { -webkit-text-fill-color:#fff;box-shadow:inset 0 0 0 40px #1f4a33!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input::-webkit-calendar-picker-indicator { filter:invert(1);opacity:.85;cursor:pointer; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { color:#fff;background:#1f4a33; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,select,textarea):disabled { opacity:.55; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) input:is([type=radio],[type=checkbox]) { accent-color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(a,button,summary):focus-visible { outline:3px solid var(--claro-verde)!important;outline-offset:3px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,select,textarea):focus-visible { outline:3px solid #f08a4b!important;outline-offset:2px; }
+/* Lista desplegable con el mismo vidrio (Chrome y Edge recientes). Otros navegadores usan la lista nativa en modo oscuro. */
+@supports (appearance:base-select) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select { appearance:base-select;display:flex;align-items:center;gap:8px;min-height:46px;padding:0 14px!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker-icon { color:#fff;transition:rotate .18s ease-out; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select:open::picker-icon { rotate:180deg; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker(select) {
+    appearance:base-select;margin-block:6px;padding:6px;border:1px solid rgba(255,255,255,.22);border-radius:16px;color:#fff;
+    background:rgba(24,58,40,.9);-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 22px 44px -18px rgba(20,40,25,.6);
+  }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { min-height:40px;padding:8px 12px;border-radius:10px;color:#fff;background:transparent;cursor:pointer; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:is(:hover,:focus-visible) { background:rgba(255,255,255,.14);outline:none; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:checked { background:rgba(255,255,255,.22);font-weight:600; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option::checkmark { color:#ffb27a; }
+}
+
+/* Botones: un solo sistema, tomado de los botones claros y verdes de la portada.
+   Misma altura, radio y letra; solo cambia el material según su función. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button {
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px!important;padding:0 20px!important;
+  border-radius:999px!important;font:600 14px/1.2 var(--body)!important;white-space:nowrap;
+  transition:transform 160ms ease-out,background-color 150ms ease,box-shadow 150ms ease;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:active:not(:disabled) { transform:scale(.97); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-light:not(:disabled) {
+  background:rgba(255,252,247,.72)!important;color:var(--claro-titulo)!important;border:1px solid rgba(255,255,255,.85)!important;
+  box-shadow:inset 0 1px 0 #fff,0 6px 16px -10px rgba(150,70,20,.4),0 0 0 1px rgba(70,40,20,.06)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-light:not(:disabled):hover { background:rgba(255,255,255,.95)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button .icon { width:20px;height:20px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-brand:not(:disabled) {
+  background:linear-gradient(180deg,#3f7a55 0%,#285a3c 100%)!important;color:#fff!important;border:0!important;box-shadow:var(--lg-solid)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .btn-liquid-brand:not(:disabled):hover { background:linear-gradient(180deg,#478860 0%,#2d6444 100%)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true]:not(:disabled) {
+  color:#fff!important;border:0!important;background:linear-gradient(180deg,#c4553a 0%,#9c3220 100%)!important;box-shadow:var(--lg-solid)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true]:not(:disabled):hover { background:linear-gradient(180deg,#cf6146 0%,#a83826 100%)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:disabled {
+  background:rgba(31,25,21,.06)!important;color:rgba(31,25,21,.45)!important;box-shadow:none!important;border:0!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button :is(span,.icon) { color:inherit!important; }
+
+/* Mi cuenta: selector de apartados tipo pestañas segmentadas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs {
+  display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(31,25,21,.06)!important;border:0!important;box-shadow:inset 0 1px 2px rgba(31,25,21,.08)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button {
+  min-height:40px!important;padding:0 22px!important;background:transparent!important;border:0!important;color:var(--claro-suave)!important;box-shadow:none!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button:hover { color:var(--claro-tinta)!important;background:rgba(255,255,255,.5)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button.active {
+  background:#fff!important;color:var(--claro-tinta)!important;box-shadow:0 1px 2px rgba(31,25,21,.1),0 0 0 1px rgba(31,25,21,.06)!important;
+}
+
+/* Privacidad: opciones legibles y alineadas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .privacy-choice .cookie-option { display:flex;align-items:center;gap:12px;min-height:44px;margin:0;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--claro-linea);color:var(--claro-tinta);cursor:pointer; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .privacy-choice .cookie-option:has(input:checked) { box-shadow:inset 0 0 0 2px var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .privacy-choice input { margin:0; }
+
+/* Diálogos sobre fondo claro */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog.app-dialog { background:#fffdf9!important;border:0!important;color:var(--claro-tinta);box-shadow:0 0 0 1px rgba(31,25,21,.08),0 28px 64px -24px rgba(60,30,10,.45)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog :is(h2,h3,label,span,strong) { color:var(--claro-tinta)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog p { color:var(--claro-suave)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog::backdrop { background:rgba(31,25,21,.38); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .maint-dialog-actions { display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:20px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .maint-dialog-actions [data-danger] { order:-1;margin-right:auto; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .maint-dialog-actions [type=submit]:not([data-danger]) { order:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog[data-maint-dialog] { width:min(560px,calc(100vw - 32px))!important;max-width:none; }
+
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog[data-maint-dialog] { position:fixed; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog .maint-dialog-close {
+  position:absolute;top:14px;right:14px;display:grid;place-items:center;width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:50%;
+  color:var(--claro-tinta);background:transparent;box-shadow:none;cursor:pointer;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog .maint-dialog-close:hover { background:rgba(31,25,21,.06); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog .maint-dialog-close .icon { width:20px;height:20px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog[data-maint-dialog] h2 { padding-right:48px; }
+
+/* Formularios de mantenimiento: cuadrícula estable en vez de filas que se parten. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-create] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) auto;gap:16px;align-items:end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-filter] { display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;align-items:end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .maint-form label { display:flex;flex-direction:column;gap:6px;margin:0;font-size:13px;font-weight:600; }
+@media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-create] { grid-template-columns:1fr; } }
+
+/* Contraseña */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .auth-flow { --text:var(--claro-tinta);--muted:var(--claro-suave);--sage:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-input-group { background:#fff;border-color:rgba(31,25,21,.22); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-eye-btn { color:var(--claro-tinta)!important;background:rgba(31,25,21,.05)!important;border-color:var(--claro-linea)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-meter { background:rgba(31,25,21,.12); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.password-meter>span,.password-length.is-met .password-meter>span) { background:var(--claro-verde); }
+
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.admin-table-panel,.admin-management) { background:var(--claro-tarjeta-solida)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { -webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:#1f5236!important; }
+}
+@media (forced-colors:active) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel,.user-metric,.admin-management) { border:1px solid CanvasText!important; }
+}
+
+/* Ritmo vertical cercano a la referencia: menos aire arriba y tarjetas más compactas. */
+@media (min-width:769px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .dashboard.container { padding-top:28px!important; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric { padding:20px 24px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { margin:0 0 6px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { margin:6px 0 8px;line-height:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading { margin-top:8px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button:not(.active) { -webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button::before,html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button::after { display:none!important; }
+
+/* Acceso a la página principal bajo el logotipo (sustituye al botón de ocultar). */
+.sidebar-home { display:flex;align-items:center;gap:10px;min-height:40px;margin:2px 0 4px;padding:0 14px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
+.sidebar-home:hover { background:rgba(255,255,255,.16); }
+.sidebar-home .icon { width:18px;height:18px; }
+.sidebar-home:focus-visible { outline:3px solid #fff;outline-offset:3px; }
+
+
+/* Mi cuenta: datos de la cuenta y datos personales lado a lado; la sesión debajo. */
+@media (min-width:1000px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px;align-items:start; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > * { grid-column:1/-1;margin:0; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > :is(.account-profile,[data-profile-form]) { grid-column:auto;height:100%; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > [data-profile-form] > * { height:100%;margin:0; }
+}
+
+/* Componentes del usuario sobre el fondo claro */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:22px!important;box-shadow:var(--claro-filo)!important; }
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.user-support-callout,.notice-card) { background:var(--claro-tarjeta)!important;-webkit-backdrop-filter:var(--claro-desenfoque)!important;backdrop-filter:var(--claro-desenfoque)!important; }
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-pedestal { background:rgba(255,255,255,.6)!important;border:1px solid var(--claro-borde)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track { background:rgba(70,40,20,.12); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track span { background:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .skeleton-line { background:rgba(70,40,20,.12); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-condition { background:rgba(70,40,20,.08);color:var(--claro-tinta)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-condition.active { background:rgba(240,138,75,.24); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1 { font-weight:800;color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-token-code { color:var(--claro-tinta)!important;background:rgba(255,255,255,.7);border:1px solid var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-locked .button:disabled { opacity:1; }
+
+/* Gráfica sin datos: el marco ocupa su espacio real y el aviso queda centrado. */
+.user-chart-frame { position:relative; }
+.user-chart-empty-note { position:absolute;inset:0 0 28px 56px;display:grid;place-items:center;margin:0!important;text-align:center;font-size:14px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-chart line { stroke:rgba(70,40,20,.14);stroke-width:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart.is-empty .user-history-chart line { stroke-dasharray:4 6; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart.is-empty .user-chart-heading p { color:var(--claro-suave)!important; }
+
+/* Enlaces de documentos: texto subrayado, como «¿Olvidaste tu contraseña?». */
+.doc-links { display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;margin:28px 0 8px;padding-top:20px;border-top:1px solid var(--claro-linea,rgba(0,0,0,.12)); }
+.doc-links span { width:100%;font-size:13px;font-weight:600;color:var(--claro-suave,#5c534a); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .doc-links a { display:inline-flex;align-items:center;min-height:32px;color:var(--claro-verde)!important;font-weight:600;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .doc-links a:hover { text-decoration-thickness:2px; }
+
+/* Llaves de acceso */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-keys { display:grid;gap:10px;margin:16px 0 0;padding:0;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-keys:empty::before { content:"Aún no has agregado ninguna llave.";font-size:14px;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item { display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 8px 8px 12px;border-radius:16px;background:rgba(255,255,255,.62);border:1px solid var(--claro-borde);box-shadow:0 6px 16px -12px rgba(150,70,20,.4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item-icon { display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:12px;color:#fff;background:linear-gradient(180deg,#3f7a55,#285a3c);box-shadow:var(--lg-solid); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item-icon .icon { width:18px;height:18px;color:#fff; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item-name { flex:1;min-width:0;font-weight:600;color:var(--claro-tinta)!important;overflow-wrap:anywhere; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form { margin-top:18px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form label { display:block;margin:0 0 8px;font-size:13px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row { position:relative;display:flex;gap:10px;align-items:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row input { flex:1;min-width:0;min-height:46px;padding-left:44px!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { position:absolute;left:14px;top:50%;translate:0 -50%;z-index:1;color:rgba(255,255,255,.8);pointer-events:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon .icon { width:18px;height:18px; }
+@media (max-width:520px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row { flex-wrap:wrap; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row .button { width:100%; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { top:23px; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-diagnosis-mark,.user-support-callout>div>.icon,.user-support-callout .icon) { color:var(--claro-titulo)!important;background:transparent!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-mark .icon { color:var(--claro-titulo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > .account-session { max-width:none;width:100%; }
+/* El texto de los botones hereda su color: gana a la regla general de texto suave. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:not(#_) :is(span,.icon) { color:inherit!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon:not(#_) { color:rgba(255,255,255,.82)!important; }
+
+/* Acceso externo al correo de soporte, en el grupo Gestión del panel. */
+.private-mail-link { display:grid;grid-template-columns:20px minmax(0,1fr) 16px;column-gap:12px;align-items:center;min-height:44px;padding:9px 16px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;line-height:1.3;text-decoration:none;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
+.private-mail-link:hover { background:rgba(255,255,255,.14); }
+.private-mail-link .icon { width:20px;height:20px; }
+.private-mail-link .icon:last-of-type { width:15px;height:15px;opacity:.75; }
+.private-mail-link:focus-visible { outline:3px solid #fff;outline-offset:3px; }
+html body .sidebar .private-mail-link:not(#_) { background:rgba(255,255,255,.07)!important;color:#fff!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;width:100%!important; }
+html body .sidebar .private-mail-link:not(#_):hover { background:rgba(255,255,255,.14)!important; }
+html body .sidebar .private-mail-link:not(#_) :is(span,.icon) { color:#fff!important; }
+
+/* Buzón de consultas del producto */
+.inquiry-filters { margin-bottom:12px; }
+.inquiry-status { margin:8px 0 16px!important;font-size:14px; }
+.inquiry-list { display:grid;gap:16px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .inquiry-item { padding:22px 24px; }
+.inquiry-head { display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:8px; }
+.inquiry-folio { font-size:15px;letter-spacing:.02em; }
+.inquiry-state { padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(70,40,20,.08); }
+.inquiry-state.is-nueva { background:rgba(240,138,75,.22); }
+.inquiry-state.is-atendida { background:rgba(47,106,72,.16); }
+.inquiry-date { margin-left:auto;font-size:13px; }
+.inquiry-who { margin:0 0 10px!important;overflow-wrap:anywhere; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .inquiry-message { margin:0 0 12px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.6);border:1px solid var(--claro-linea);color:var(--claro-tinta)!important;white-space:pre-wrap;overflow-wrap:anywhere; }
+.inquiry-meta { margin:0 0 4px!important;font-size:13px; }
+.inquiry-pager { display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px 18px;margin-top:32px;padding-top:20px;border-top:1px solid rgba(70,40,20,.1); }
+.inquiry-pager[hidden] { display:none; }
+.inquiry-page { min-width:9ch;text-align:center;font-size:14px;font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button.active { background:#fff!important;color:var(--claro-tinta)!important; }
+
+/* Soporte: resolución del caso y pasos del token */
+.admin-resolve-form { margin-top:28px;padding-top:22px;border-top:1px solid var(--claro-linea); }
+.admin-resolve-form h3 { margin:0 0 4px;font-size:18px; }
+.admin-resolve-form textarea { width:100%; }
+.user-token-steps { margin:12px 0;padding-left:20px;display:grid;gap:6px;font-size:14px; }
+
+/* Solo las fechas Desde/Hasta de Registros. El icono SVG sustituye al indicador nativo. */
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-control { display:flex;flex-direction:column;gap:6px;min-width:0; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-control > label { flex:none; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field { position:relative;min-width:0; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field input { width:100%;min-height:46px;padding-inline:10px 46px!important;font-variant-numeric:tabular-nums; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button {
+  position:absolute;inset:1px 1px 1px auto;display:grid;place-items:center;width:44px;min-height:44px;padding:0;
+  color:#fffdf3;background:transparent;border:0;border-radius:12px!important;box-shadow:none;
+}
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:hover { background:rgba(255,255,255,.14); }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:focus-visible { outline:2px solid #fffdf3!important;outline-offset:-4px; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field .icon { width:21px;height:21px;color:#fffdf3!important; }
+html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field input[aria-invalid=true] { outline:2px solid var(--claro-peligro);outline-offset:2px; }
+
+/* Se monta fuera de la tarjeta para evitar sus recortes y su contexto de desenfoque. */
+.maint-calendar {
+  position:fixed;inset:auto;z-index:1200;margin:0;padding:14px;width:min(340px,calc(100vw - 16px));max-width:calc(100vw - 16px);
+  max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow:auto;overscroll-behavior:contain;
+  color:#1b231d;background:rgba(255,250,244,.97);border:1px solid rgba(255,255,255,.85);border-radius:20px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 16px 40px -18px rgba(60,45,25,.38),0 0 0 1px rgba(47,106,72,.12);
+  color-scheme:light;font-size:14px;line-height:1.4;
+}
+.maint-calendar[hidden] { display:none!important; }
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .maint-calendar { background:rgba(255,250,244,.95);-webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%); }
+}
+.maint-calendar .maint-calendar-header { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px; }
+.maint-calendar .maint-calendar-header h2 { margin:0;color:#1b231d;font-size:16px;line-height:1.3;font-weight:650; }
+.maint-calendar button {
+  display:inline-flex;align-items:center;justify-content:center;min-width:0;min-height:36px;padding:6px;border:1px solid transparent;border-radius:10px!important;
+  color:#224f35;background:transparent;box-shadow:none;font-size:14px;font-weight:550;line-height:1.2;
+}
+.maint-calendar button:hover:not(:disabled) { background:rgba(47,106,72,.1);border-color:rgba(47,106,72,.16); }
+.maint-calendar button:disabled { opacity:.35; }
+.maint-calendar .icon { width:19px;height:19px; }
+.maint-calendar .maint-calendar-header button { width:36px;flex:none; }
+.maint-calendar .maint-calendar-navigation { display:grid;grid-template-columns:36px minmax(0,1fr) 78px 36px;align-items:center;gap:8px; }
+.maint-calendar [data-date-action=prev] .icon { rotate:180deg; }
+.maint-calendar :is([data-date-month],[data-date-year]) {
+  width:100%;min-width:0;min-height:40px;padding:7px 8px;color:#224f35;-webkit-text-fill-color:#224f35;background:rgba(255,255,255,.7);
+  border:1px solid rgba(47,106,72,.24);border-radius:10px;font-size:14px;line-height:1.2;color-scheme:light;
+}
+.maint-calendar [data-date-month] option { color:#224f35;background:#fffaf4; }
+.maint-calendar [data-date-year] { appearance:textfield;-moz-appearance:textfield; }
+.maint-calendar [data-date-year]::-webkit-inner-spin-button,
+.maint-calendar [data-date-year]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
+.maint-calendar [data-date-heading] { margin:14px 0 8px;color:#224f35;font-size:14px;font-weight:650;text-align:center;line-height:1.4; }
+.maint-calendar .maint-calendar-grid { width:100%;margin:0;border-collapse:separate;border-spacing:3px 4px;table-layout:fixed; }
+.maint-calendar .maint-calendar-grid th { padding:3px 0 5px;color:#675c4f;font-size:12px;font-weight:600;text-align:center; }
+.maint-calendar .maint-calendar-grid td { padding:0;text-align:center; }
+.maint-calendar .maint-calendar-grid button { position:relative;width:100%;min-height:36px;padding:6px 2px;font-variant-numeric:tabular-nums; }
+.maint-calendar .maint-calendar-grid [aria-current=date] { border-color:#c4672e;box-shadow:inset 0 0 0 1px #c4672e; }
+.maint-calendar .maint-calendar-grid [aria-selected=true] button { color:#fffdf3;background:#2f6a48;border-color:#2f6a48; }
+.maint-calendar .maint-calendar-grid [aria-selected=true] button:hover { background:#255639; }
+.maint-calendar .maint-calendar-grid [aria-selected=true] [aria-current=date] { box-shadow:inset 0 0 0 2px #f4b47e; }
+.maint-calendar .maint-calendar-footer { display:flex;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(47,106,72,.15); }
+.maint-calendar .maint-calendar-footer button { min-height:38px;padding:8px 14px;background:rgba(47,106,72,.07);border-color:rgba(47,106,72,.15); }
+html body[data-private=true][data-role=admin] .maint-calendar :is(button,input,select):focus-visible { outline:3px solid #c4672e!important;outline-offset:2px; }
+@media (max-width:360px) {
+  .maint-calendar .maint-calendar-navigation { grid-template-columns:36px minmax(0,1fr) 36px;gap:6px; }
+  .maint-calendar [data-date-month] { grid-column:2;grid-row:1; }
+  .maint-calendar [data-date-year] { grid-column:2;grid-row:2;width:100px;justify-self:center; }
+  .maint-calendar [data-date-action=prev] { grid-column:1;grid-row:1; }
+  .maint-calendar [data-date-action=next] { grid-column:3;grid-row:1; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  .maint-calendar { background:#fffaf4;-webkit-backdrop-filter:none;backdrop-filter:none; }
+}
+@media (forced-colors:active) {
+  .maint-calendar { color:CanvasText;background:Canvas;border-color:CanvasText;box-shadow:none; }
+  .maint-calendar :is(button,[data-date-month],[data-date-year]),.maint-calendar .maint-calendar-grid th,.maint-calendar [data-date-heading],.maint-calendar .maint-calendar-header h2 { color:CanvasText;-webkit-text-fill-color:CanvasText;border-color:ButtonText;background:Canvas; }
+  .maint-calendar .maint-calendar-grid [aria-selected=true] button { color:HighlightText;-webkit-text-fill-color:HighlightText;background:Highlight;forced-color-adjust:none; }
+  .maint-calendar .maint-calendar-grid [aria-current=date] { outline:1px solid CanvasText;outline-offset:-4px; }
+}
+
+/* Vinculación de huertos (persona usuaria y operador) */
+.binding-form { display:grid;gap:8px;margin-top:16px; }
+.binding-form label { font-weight:600;font-size:14px; }
+.binding-row { display:flex;flex-wrap:wrap;gap:12px;align-items:stretch; }
+.binding-row input { flex:1 1 280px;min-width:0;min-height:48px;padding-inline:14px!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase; }
+.binding-help { margin:0!important;font-size:13px; }
+.binding-support { margin-top:16px;padding:0 16px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:18px;background:rgba(255,255,255,.34);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%); }
+.binding-support summary { min-height:44px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;cursor:pointer; }
+.binding-support summary::before { content:"›";font-size:18px;line-height:1;transition:transform .16s ease; }
+.binding-support[open] summary::before { transform:rotate(90deg); }
+.binding-support > .binding-status { margin:0 0 14px!important; }
+.binding-support-body,.binding-support-form { display:grid;gap:10px; }
+.binding-support-body { padding-bottom:16px; }
+.binding-support-body[hidden],.binding-support-detail[hidden] { display:none; }
+.binding-support-actions { display:flex;flex-wrap:wrap;gap:10px; }
+@media (max-width:520px) { .binding-support-actions .button { flex:1 1 100%; } }
+.binding-support-detail { display:grid;gap:6px; }
+.binding-support-detail label { font-weight:600;font-size:14px; }
+.binding-support-detail textarea { width:100%;box-sizing:border-box;resize:vertical; }
+.binding-support-contact { display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--claro-linea,rgba(70,40,20,.14)); }
+.binding-support-address { display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
+.binding-support-address strong { overflow-wrap:anywhere;user-select:all; }
+@media (prefers-reduced-motion:reduce) { .binding-support summary::before { transition:none; } }
+@media (prefers-reduced-transparency:reduce) { .binding-support { background:var(--claro-tarjeta-solida,#fff);-webkit-backdrop-filter:none;backdrop-filter:none; } }
+.binding-status { margin:4px 0 0!important;font-size:14px;font-weight:600; }
+.binding-status[hidden] { display:none; }
+.binding-form[aria-busy=true] .binding-status { font-weight:500; }
+.binding-issue-form { display:grid;gap:10px;max-width:560px;margin-top:14px; }
+.binding-issue-form label { font-weight:600;font-size:14px; }
+.binding-issue-form > button { justify-self:start;margin-top:6px; }
+.binding-delivery { margin:6px 0 0;padding:12px 14px;border:1px solid var(--claro-linea,rgba(70,40,20,.14));border-radius:14px;display:grid;gap:8px; }
+.binding-delivery legend { padding:0 6px;font-weight:600;font-size:14px; }
+.binding-delivery label { display:flex;gap:10px;align-items:flex-start;font-weight:500; }
+.binding-delivery input { margin-top:3px;accent-color:#2f6a48; }
+.binding-reveal { margin-top:24px;padding-top:20px;border-top:1px solid var(--claro-linea,rgba(70,40,20,.14));display:grid;gap:10px;justify-items:start; }
+.binding-reveal[hidden] { display:none; }
+.binding-reveal h3 { margin:0;font-size:17px; }
+.binding-code { margin:0!important;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.75);border:1px solid rgba(47,106,72,.25);
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(17px,2.2vw,24px);font-weight:700;letter-spacing:.08em;overflow-wrap:anywhere;user-select:all; }
+.binding-list { margin-top:20px; }
+.binding-list h2 { margin-bottom:4px; }
+.binding-row-mail { display:block;margin-top:4px;font-size:12px;font-weight:500;max-width:28ch; }
+.binding-empty { margin:8px 0 0!important;font-size:14px; }
+.binding-reauth { max-width:440px; }
+.binding-reauth form { display:grid;gap:10px; }
+.binding-reauth label { font-weight:600;font-size:14px; }
+@media (forced-colors:active) { .binding-code { border:1px solid CanvasText;background:Canvas;color:CanvasText; } }
+
+/* Guías de cuidado (persona usuaria y administración) */
+.care-guides { margin-top:32px; }
+.care-guides-notice { margin:0 0 12px!important;font-size:14px;font-weight:600; }
+.care-guides-notice[hidden] { display:none; }
+.care-guides-state { margin:0!important;font-size:14px; }
+.care-guides-problem { display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between; }
+.care-guides-problem p { margin:0!important; }
+.care-guide-list { display:grid;gap:12px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-guide { padding:0; }
+.care-guide summary { display:flex;gap:12px;align-items:flex-start;min-height:44px;padding:18px 22px;font-size:17px;font-weight:600;line-height:1.35;cursor:pointer;list-style:none; }
+.care-guide summary::-webkit-details-marker { display:none; }
+.care-guide summary::before { content:"›";flex:none;width:14px;font-size:22px;line-height:1.05;transition:transform .16s ease; }
+.care-guide[open] summary::before { transform:rotate(90deg); }
+.care-guide-answer { display:grid;gap:12px;padding:0 22px 22px 48px;max-width:72ch; }
+.care-guide-answer p { margin:0!important;font-size:16px;line-height:1.6;white-space:pre-line; }
+html body[data-private=true] #app-page .care-guide-answer .care-guide-source { font-size:13px; }
+.care-guide-source a { overflow-wrap:anywhere; }
+.user-care-guide-link { margin-bottom:10px; }
+.care-admin-toolbar { display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:0 0 18px; }
+.care-admin-filters,.care-admin-actions,.care-admin-row-actions { display:flex;flex-wrap:wrap;gap:8px; }
+.care-admin-filters .button.active { font-weight:700;box-shadow:inset 0 0 0 2px #2f6a48; }
+.care-admin-editor { margin-bottom:20px; }
+.care-admin-editor[hidden] { display:none; }
+.care-admin-editor h2 { margin:0 0 6px; }
+.care-admin-hint { margin:0 0 14px!important;font-size:14px;font-weight:600; }
+.care-admin-form { display:grid;gap:14px;max-width:720px; }
+.care-admin-field { display:grid;gap:6px;min-width:0; }
+.care-admin-field label { font-weight:600;font-size:14px; }
+.care-admin-field :is(input,textarea) { width:100%;box-sizing:border-box;min-height:46px; }
+.care-admin-field textarea { resize:vertical; }
+.care-guides-state[data-guide-summary] { margin-bottom:10px!important; }
+.care-admin-list { display:grid;gap:12px; }
+.care-admin-row { display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between; }
+.care-admin-row-main { flex:1 1 320px;min-width:0; }
+.care-admin-row h3 { margin:8px 0 4px;font-size:17px;overflow-wrap:anywhere; }
+.care-admin-meta { margin:0!important;font-size:13px;overflow-wrap:anywhere; }
+.care-admin-state { display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid currentColor;font-size:12px;font-weight:700; }
+.care-admin-state.is-publicada { color:#1f5b3a; }
+.care-admin-state.is-borrador { color:#6b4a12; }
+.care-admin-state.is-retirada { color:#7a2e20; }
+@media (max-width:520px) {
+  .care-guide summary { padding:16px; font-size:16px; }
+  .care-guide-answer { padding:0 16px 18px; }
+  .care-admin-toolbar > .button,.care-admin-actions .button { flex:1 1 100%; }
+  .care-admin-row-actions .button { flex:1 1 auto; }
+}
+@media (prefers-reduced-motion:reduce) { .care-guide summary::before { transition:none; } }

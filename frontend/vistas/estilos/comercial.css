@@ -1,0 +1,47 @@
+/* Piezas comerciales sobre el dashboard existente; no cambia su diseño global. */
+.commerce-workspace { min-width:0; }
+.commerce-workspace [hidden] { display:none!important; }
+html body[data-private=true][data-role=admin] #app-page .commerce-workspace .commerce-tabs { display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));width:100%!important;max-width:none!important;box-sizing:border-box;gap:4px;margin-bottom:24px;border-radius:20px!important; }
+html body[data-role=admin] #app-page .commerce-workspace .button { min-width:0;white-space:normal!important;text-align:center; }
+html body[data-private=true][data-role=admin] #app-page .commerce-workspace .commerce-tabs .button { padding:10px 12px!important;min-height:46px!important; }
+.commerce-workspace [role=tabpanel] > .bento-panel + .bento-panel { margin-top:24px; }
+.commerce-workspace :is(h2,h3,p) { overflow-wrap:anywhere; }
+.commerce-section-head { display:flex;justify-content:space-between;gap:20px;align-items:start; }
+.commerce-section-head > .icon { flex:none;width:24px;height:24px;color:var(--claro-verde); }
+.commerce-form { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 22px;align-items:start; }
+.commerce-field { min-width:0; }
+body[data-role=admin] .commerce-workspace .commerce-field > label { margin:12px 0 7px; }
+.commerce-workspace .commerce-hint { font-size:13px;line-height:1.65;margin:8px 0 0; }
+.commerce-workspace .commerce-form-footer { display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:12px; }
+.commerce-form-footer,.commerce-full,.commerce-errors { grid-column:1/-1; }
+.commerce-form-footer .commerce-hint { flex:1 1 240px;margin:0; }
+.commerce-filter { grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));margin-bottom:16px; }
+.commerce-filter-action { align-self:end; }
+.commerce-workspace .user-table-scroll { margin-top:16px; }
+.commerce-workspace .user-table { min-width:680px; }
+.commerce-workspace .user-table td { white-space:normal; }
+html body[data-role=admin] #app-page .commerce-workspace :is(.commerce-error,.commerce-errors) { color:var(--claro-peligro)!important;font-size:14px;line-height:1.5; }
+.commerce-error { display:block;margin-top:6px; }
+.commerce-workspace [aria-invalid=true] { border-color:var(--claro-peligro)!important;outline:1px solid var(--claro-peligro); }
+.commerce-workspace .maint-date-field { position:relative; }
+html body[data-role=admin] .commerce-workspace .maint-date-field input { padding-inline-end:48px!important;font-variant-numeric:tabular-nums; }
+.commerce-workspace .maint-date-field button { position:absolute;inset:1px 1px 1px auto;display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:12px;background:transparent;color:#fffdf3; }
+.commerce-workspace .maint-date-field .icon { color:#fffdf3!important; }
+.commerce-workspace .maint-date-field button:hover { background:rgba(47,106,72,.1); }
+.commerce-facts { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:12px 0 20px; }
+.commerce-facts > div { min-width:0;padding:12px 0;border-bottom:1px solid var(--claro-linea); }
+.commerce-facts dt { font-size:13px;color:var(--claro-suave); }
+.commerce-facts dd { margin:6px 0 0;overflow-wrap:anywhere;font-size:15px;line-height:1.6; }
+.commerce-review .app-actions { margin-top:20px; }
+.commerce-chain { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:0;list-style-position:inside;gap:14px;margin:24px 0; }
+.commerce-chain li { min-width:0;border-top:2px solid rgba(47,106,72,.3);padding-top:12px;font-size:14px; }
+.commerce-chain strong { font-weight:650; }
+.commerce-chain span { display:block;margin-top:8px;line-height:1.6; }
+.commerce-context { padding:18px 0;border-block:1px solid var(--claro-linea);margin-bottom:20px; }
+.commerce-metrics { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:24px 0; }
+.commerce-metrics > .bento-panel { min-width:0;padding:20px!important; }
+.commerce-metrics h3 { font-size:16px;margin:0; }
+.commerce-workspace .commerce-metric-value { font-size:32px;line-height:1.3;margin:14px 0; }
+@media (max-width:1150px) { .commerce-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .commerce-chain { grid-template-columns:1fr; } }
+@media (max-width:600px) { .commerce-form,.commerce-facts,.commerce-metrics { grid-template-columns:minmax(0,1fr); } html body[data-private=true][data-role=admin] #app-page .commerce-workspace .commerce-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } .commerce-form-footer > .button { width:100%; } }
+@media (forced-colors:active) { .commerce-workspace :is(.commerce-error,.commerce-errors) { color:CanvasText; } .commerce-workspace [aria-invalid=true] { outline:2px solid CanvasText; } }

@@ -1,0 +1,310 @@
+// VISTA · Común: iconos, escape de HTML, plantilla del panel y calendario de filtros. Va primero entre las vistas.
+// Define: icons, icon, iconEye, iconEyeOff, escaparHTML, AppViews, DateFilterViews.
+
+// ── Componentes ──
+const icons={leaf:'<path d="M19 4C9 3 3 8 5 15s14 4 14-11Z"/><path d="M4 21 15 9M7 16h6"/>',drop:'<path d="M12 3C9 8 5 11 5 15a7 7 0 0 0 14 0c0-4-4-7-7-12Z"/><path d="M9 15a3 3 0 0 0 3 3"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>',temp:'<path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0Z"/><path d="M12 8v9"/>',bell:'<path d="M5 17h14l-2-4V9a5 5 0 0 0-10 0v4l-2 4Zm5 3h4"/>',user:'<circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',play:'<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/>',arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',wifi:'<path d="M3 8a15 15 0 0 1 18 0M6 12a10 10 0 0 1 12 0m-9 4a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".7"/>',off:'<path d="m3 3 18 18M3 8a15 15 0 0 1 5-2m6-1a15 15 0 0 1 7 3M6 12a10 10 0 0 1 6-2m-3 6a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".7"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',tank:'<path d="M6 5h12l2 4v11H4V9l2-4Zm3 0V2h6v3M4 13h16"/>',check:'<path d="m5 12 4 4L19 6"/>',plus:'<path d="M12 4v16M4 12h16"/>',sparkle:'<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/>',shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3M18.5 4.5l3 3"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>',external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',list:'<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/>',inbox:'<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5l2.5-8Z"/>',refresh:'<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/>'};
+Object.assign(icons, {
+ calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h2M12 14h2M7 18h2M12 18h2"/>',
+ panel:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>',
+ home:'<path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5M10 20v-6h4v6"/>',
+ menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+ close:'<path d="m6 6 12 12M18 6 6 18"/>',
+ logout:'<path d="M10 4H4v16h6M10 12h11m-4-4 4 4-4 4"/>',
+ activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+ tool:'<path d="m14.5 6.5 3 3M21 4a6 6 0 0 1-8 7.5L5.5 19a2 2 0 0 1-3-3l7.5-7.5A6 6 0 0 1 17.5 1L14 4.5l2.5 2.5L20 3.5Z"/>',
+ support:'<path d="M4 14v-3a8 8 0 0 1 16 0v3M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3ZM20 18v1a3 3 0 0 1-3 3h-4"/>'
+});
+const icon=name=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.leaf}</svg>`;
+const iconEye=`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+const iconEyeOff=`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.447 10.447 0 0 1-1.449 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>`;
+
+// ── Escape de html ──
+const escaparHTML = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+
+// ── Panel ──
+const AppViews = (() => {
+  const date = value => `<time${value && Number.isFinite(new Date(value).getTime()) ? ` datetime="${escaparHTML(new Date(value).toISOString())}"` : ''}>${escaparHTML(AppModel.date(value))}</time>`;
+  const heading = (title,intro='') => `<div class="page-heading"><div><h1>${escaparHTML(title)}</h1>${intro?`<p>${escaparHTML(intro)}</p>`:''}</div></div>`;
+  const state = (title,text,loading=false,retry=false) => `<div class="app-state bento-panel" role="${retry?'alert':'status'}"${loading?' aria-busy="true"':''}><span class="icon-medallion">${icon(loading?'clock':'info')}</span><h2>${escaparHTML(title)}</h2><p>${escaparHTML(text)}</p>${retry?'<button class="button btn-liquid-brand" type="button" data-app-action="reload">Reintentar</button>':''}</div>`;
+  const logoutConfirmation = () => `<dialog class="bento-panel app-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description"><h2 id="logout-title">¿Cerrar sesión?</h2><p id="logout-description">Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.</p><p class="logout-error" role="alert" tabindex="-1" hidden></p><div class="app-dialog-actions"><button class="button btn-liquid-light" type="button" data-app-action="cancel-logout" autofocus>Cancelar</button><button class="button btn-liquid-brand" type="button" data-app-action="confirm-logout">Cerrar sesión</button></div></dialog>`;
+  // Sin huerto: formulario «Vincular mi huerto». La confirmación llega siempre del servidor.
+  const gardenLink = () => BindingViews.userPanel();
+  const accountGreeting = greeting => greeting?(greeting==='Bienvenido'?greeting:'Hola, '+greeting):'Tu información de acceso.';
+  // `nav` lo prepara AppController según la sesión y sus capacidades; la vista solo pinta los enlaces.
+  function shell(route,{isAdmin,links,account}) {
+    const selected=route.screen==='admin'?'admin/'+route.detail:route.screen;
+    const link=item=>`<a class="button btn-liquid-sidebar" href="#${item.id}"${selected===item.id?' aria-current="page"':''}>${icon(item.icon)}<span>${item.label}</span></a>`;
+    const accountLink=`<a class="button compact btn-liquid-nav account-icon-link" href="#cuenta" aria-label="Mi cuenta" title="Mi cuenta">${icon('user')}</a>`;
+    // Encabezado limpio en ambos roles: a la portada se vuelve con el logotipo.
+    const noticesLink=`<a class="button compact btn-liquid-nav account-icon-link" href="#avisos" aria-label="Avisos" title="Avisos"${selected==='avisos'?' aria-current="page"':''}>${icon('bell')}</a>`;
+    const menuButton=`<button class="button compact btn-liquid-nav private-menu-toggle" type="button" data-app-action="toggle-menu" aria-controls="garden-navigation" aria-expanded="false" aria-label="Abrir menú de navegación"><span class="private-menu-open-icon">${icon('menu')}</span><span class="private-menu-close-icon">${icon('close')}</span><span>Menú</span></button>`;
+    // Sin barra superior: logotipo y botón de ocultar viven en el panel; perfil, avisos (solo usuario) y menú flotan arriba.
+    const topbar=`<div class="private-topbar"><div class="topbar-start">${brand('#inicio','El Chilito, inicio','topbar-brand')}</div><div class="topbar-actions">${accountLink}${isAdmin?'':noticesLink}${menuButton}</div></div>`;
+    const sidebarTop=`<div class="sidebar-top">${brand('#inicio','El Chilito, inicio','sidebar-brand')}</div><a class="sidebar-home" href="#inicio">${icon('home')}<span>Ver página principal</span></a>${isAdmin?'<p class="private-role-label">Administración</p>':''}`;
+    // Enlace externo: abre otra pestaña y el panel sigue abierto. Si no hay correo configurado, no se muestra.
+    const mailLink=()=>{const url=AppModel.supportMailUrl();return url?`<a class="private-mail-link" href="${escaparHTML(url)}" target="_blank" rel="noopener noreferrer">${icon('mail')}<span>Abrir correo de soporte</span>${icon('external')}<span class="sr-only">(se abre en otra pestaña)</span></a>`:'';};
+    // Grupo «Gestión»: correo de soporte y buzón de consultas (este solo con atender_consultas).
+    const inbox=links.find(item=>item.id==='admin/solicitudes');
+    const commerce=links.find(item=>item.id==='admin/comercial');
+    const binding=links.find(item=>item.id==='admin/vinculacion');
+    const guides=links.find(item=>item.id==='admin/guias');
+    const adminGroup=isAdmin?`<p class="private-role-label private-group-label">Gestión</p><div class="private-pending">${mailLink()}${inbox?link(inbox):''}${commerce?link(commerce):''}${binding?link(binding):''}${guides?link(guides):''}</div>`:'';
+    // En administración, el grupo «Gestión» va antes de Mi cuenta, que queda al pie del panel.
+    const navigation=isAdmin?links.filter(item=>item!==account&&item!==inbox&&item!==commerce&&item!==binding&&item!==guides).map(link).join('')+adminGroup+link(account):links.map(link).join('');
+    // La página principal ya tiene acceso fijo bajo el logotipo, también en móvil.
+    const menuFooter=`<div class="private-menu-footer"><button class="button private-menu-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></div>`;
+    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>${logoutConfirmation()}`;
+  }
+  function noticeCard(item) {
+    const importance={high:'Alta',medium:'Media',info:'Informativa'}[item.importance];
+    return `<article class="bento-panel notice-card" data-notice-id="${escaparHTML(item.id)}"><div class="notice-meta"><span class="notice-condition ${item.condition}">${item.condition==='active'?'Activo':'Resuelto'}</span><span class="read-state">${item.read?'Leído':'No leído'}</span></div><h2>${escaparHTML(item.title)}</h2><p>${escaparHTML(item.description)}</p><dl class="notice-facts"><div><dt>Zona</dt><dd>${escaparHTML(item.zone)}</dd></div><div><dt>Importancia</dt><dd>${importance}</dd></div><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div></dl><a class="button btn-liquid-light" href="#avisos/${encodeURIComponent(item.id)}">Ver detalle<span class="sr-only">: ${escaparHTML(item.title)}</span></a></article>`;
+  }
+  function notices(data, filter='all', detail=null, name='') {
+    if(data.status==='unassigned')return heading('Avisos')+state('Sin huerto asignado','Tu cuenta todavía no tiene un huerto asignado.');
+    if(detail) {
+      const item=data.items.find(item=>item.id===detail);
+      if(data.status==='loading')return heading('Avisos')+state('Cargando aviso','Consultando su información.',true);
+      if(data.status==='error')return heading('Avisos')+state('No se pudo consultar el aviso','Inténtalo de nuevo.',false,true);
+      if(!item)return heading('Aviso no disponible')+`<div class="bento-panel"><p>Este aviso no está disponible.</p><a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div>`;
+      return heading('Detalle del aviso')+`<article class="bento-panel notice-detail"><div class="notice-meta"><span class="notice-condition ${item.condition}">${item.condition==='active'?'Activo':'Resuelto'}</span><span class="read-state">${item.read?'Leído':'No leído'}</span></div><h2>${escaparHTML(item.title)}</h2><p>${escaparHTML(item.description)}</p><dl class="notice-facts"><div><dt>Zona</dt><dd>${escaparHTML(item.zone)}</dd></div><div><dt>Importancia</dt><dd>${{high:'Alta',medium:'Media',info:'Informativa'}[item.importance]}</dd></div><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div>${item.resolvedAt?`<div><dt>Resolución</dt><dd>${date(item.resolvedAt)}</dd></div>`:''}</dl><div class="notice-recommendation"><h3>Recomendación</h3><p>${escaparHTML(item.recommendation)}</p></div><div class="app-actions">${!item.read?`<button class="button btn-liquid-brand" data-app-action="mark-read" data-id="${escaparHTML(item.id)}" type="button">Marcar como leído</button>`:''}<a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div></article>`;
+    }
+    const filters=`<div class="notice-filters" role="group" aria-label="Filtrar avisos">${[['all','Todos'],['active','Activos'],['resolved','Resueltos']].map(([id,label])=>`<button class="button ${filter===id?'btn-liquid-brand':'btn-liquid-light'}" type="button" data-filter="${id}" aria-pressed="${filter===id}">${label}</button>`).join('')}</div>`;
+    const items=AppModel.filterNotices(data.items,filter);
+    let body;
+    if(data.status==='loading')body=state('Cargando avisos','Consultando los avisos del huerto.',true);
+    else if(data.status==='error')body=state('No se pudieron consultar los avisos','Inténtalo de nuevo para revisar los avisos.',false,true);
+    else if(!items.length)body=state(filter==='all'?'No hay avisos para mostrar':'No hay avisos en este filtro','Los avisos de cultivo y comunicación aparecerán aquí cuando estén disponibles.');
+    else body=`<div class="notices-grid">${items.map(noticeCard).join('')}</div>`;
+    return heading('Avisos',AppModel.addressed(name,'Revisa lo que necesita atención en tu huerto.'))+filters+`<p class="sr-only" role="status">${data.status==='ready'?`${items.length} avisos en este filtro.`:''}</p>`+body;
+  }
+  // Salida al pie de Mi cuenta. Sigue disponible aunque el perfil no haya podido cargarse.
+  const signOut = () => `<section class="bento-panel account-session" aria-labelledby="session-title"><div><h2 id="session-title">Tu sesión</h2><p>Saldrás de tu cuenta en este navegador.</p></div><button class="button btn-liquid-light account-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></section>`;
+  function account(data) {
+    const privacyLink = '<nav class="account-tabs" aria-label="Apartados de mi cuenta"><a class="button btn-liquid-brand active" href="#cuenta" aria-current="page">Perfil</a><a class="button btn-liquid-light" href="#cuenta/seguridad">Seguridad</a><a class="button btn-liquid-light" href="#cuenta/privacidad">Privacidad</a></nav>';
+    if(data.status==='loading')return heading('Mi cuenta')+privacyLink+state('Cargando cuenta','Consultando la información de tu cuenta.',true)+signOut();
+    if(data.status==='error')return heading('Mi cuenta')+privacyLink+state('No se pudo consultar tu cuenta','Inténtalo de nuevo.',false,true)+signOut();
+    return heading('Mi cuenta',accountGreeting(data.greeting))+privacyLink+`<section class="bento-panel account-profile" aria-labelledby="profile-title"><span class="icon-medallion">${icon('user')}</span><h2 id="profile-title">Datos de la cuenta</h2><dl class="profile-facts"><div><dt>Correo electrónico</dt><dd>${data.email?escaparHTML(data.email):'Esperando información de la cuenta'}</dd></div><div><dt>Verificación del correo</dt><dd>${data.verified===true?'Correo verificado':data.verified===false?'Correo sin verificar':'Sin información disponible'}</dd></div></dl><div class="app-actions"><a class="button btn-liquid-brand" href="#cuenta/contrasena">Cambiar contraseña</a></div></section><div data-profile-form></div>${signOut()}`;
+  }
+  // Marco privado ya pintado: operaciones de presentación que coordina AppController.
+  function frame(root,route,nav) {
+    root.innerHTML=shell(route,nav);
+    const page=root.querySelector('#app-page'),feedback=root.querySelector('#app-feedback'),logoutDialog=root.querySelector('.logout-dialog');
+    const sidebar=root.querySelector('.sidebar'),toggle=root.querySelector('.private-menu-toggle'),shade=root.querySelector('.private-menu-shade');
+    const confirmButton=()=>logoutDialog.querySelector('[data-app-action="confirm-logout"]');
+    const logoutError=()=>logoutDialog.querySelector('.logout-error');
+    const messages={failed:'No se pudo completar la solicitud. Inténtalo de nuevo.',read:'Aviso marcado como leído. Su condición no ha cambiado.'};
+    return {page,logoutDialog,sidebar,toggle,
+      message(code,error=false){feedback.hidden=false;feedback.textContent=messages[code];feedback.setAttribute('role',error?'alert':'status');feedback.focus();},
+      hideMessage(){feedback.hidden=true;},
+      pageBusy(on){page.inert=on;if(on)page.setAttribute('aria-busy','true');else page.removeAttribute('aria-busy');},
+      // Devuelve el contenedor del perfil cuando la cuenta está lista; el controlador monta su formulario.
+      draw(screen,data,filter,detail,alias){
+        const focusedFilter=page.contains(document.activeElement)?document.activeElement.dataset.filter:null;
+        let profileHost=null;
+        if(screen==='avisos')page.innerHTML=notices(data,filter,detail,alias);
+        if(screen==='cuenta'){page.innerHTML=account(data);if(data.status==='ready')profileHost=page.querySelector('[data-profile-form]');}
+        if(focusedFilter)page.querySelector(`[data-filter="${focusedFilter}"]`)?.focus();
+        return profileHost;
+      },
+      isEmpty:()=>!page.hasChildNodes(),
+      focusFilter(value){page.querySelector(`[data-filter="${value}"]`)?.focus();},
+      greeting(value){const intro=page.querySelector('.page-heading p');if(intro)intro.textContent=accountGreeting(value);},
+      securityUnavailable(){page.innerHTML=heading('Página no disponible')+'<p><a href="#cuenta/seguridad">Seguridad de mi cuenta</a></p>';},
+      markCurrent(href){root.querySelectorAll('.private-nav a,.account-icon-link[href]').forEach(link=>{
+        if(link.getAttribute('href')===href)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});},
+      focusMain(options){root.querySelector('main')?.focus(options);},
+      actionBusy(target,on){target.disabled=on;if(on)target.setAttribute('aria-busy','true');else target.removeAttribute('aria-busy');},
+      openLogout(){
+        const error=logoutError();error.hidden=true;error.textContent='';
+        logoutDialog.showModal();logoutDialog.querySelector('[data-app-action="cancel-logout"]').focus();
+      },
+      closeLogout(focusTarget){if(logoutDialog.open)logoutDialog.close();focusTarget?.focus({preventScroll:true});},
+      logoutButton:()=>root.querySelector('[data-app-action="logout"]'),
+      logoutBusy(on){
+        if(on){logoutDialog.setAttribute('aria-busy','true');const error=logoutError();error.hidden=true;error.textContent='';}
+        else logoutDialog.removeAttribute('aria-busy');
+        logoutDialog.querySelectorAll('button').forEach(button=>{button.disabled=on;});
+        confirmButton().textContent=on?'Cerrando sesión…':'Cerrar sesión';
+      },
+      logoutFailed(){const error=logoutError();error.hidden=false;error.textContent='No se pudo cerrar la sesión. Inténtalo de nuevo.';error.focus();},
+      // Menú lateral: siempre visible en escritorio; en móvil, desplegable.
+      sidebarHidden(hidden){sidebar.inert=hidden;if(hidden)sidebar.setAttribute('aria-hidden','true');else sidebar.removeAttribute('aria-hidden');},
+      menu(open){
+        sidebar.dataset.open=String(open);
+        toggle?.setAttribute('aria-expanded',String(open));
+        toggle?.setAttribute('aria-label',open?'Cerrar menú de navegación':'Abrir menú de navegación');
+        if(shade)shade.hidden=!open;
+        document.body.classList.toggle('private-menu-open',open);
+      },
+      focusToggle(){toggle.focus({preventScroll:true});},
+      focusCurrentLink(){sidebar.querySelector('[aria-current="page"]')?.focus();},
+      keepVisible(focused){
+        if(!page.contains(focused)||focused.closest('.account-tabs')||!focused.matches('input,select,textarea,button,a'))return;
+        const available=window.visualViewport?window.visualViewport.height+window.visualViewport.offsetTop:innerHeight;
+        if(focused.getBoundingClientRect().bottom>available-16)focused.scrollIntoView({block:'center'});
+      }};
+  }
+  return {shell,frame,heading,state,date,notices,account,accountGreeting,gardenLink,
+    assistant(){return heading('Asistente')+`<section class="bento-panel assistant-panel" aria-label="Disponibilidad del asistente"><span class="icon-medallion">${icon('sparkle')}</span><p>Aquí podrás consultar orientación para cuidar tu huerto y comprender sus avisos. La asistencia con inteligencia artificial se incorporará en una próxima etapa.</p></section>`;},
+    reading(raw,unit){return `<strong class="${raw.value==null?'absent':''}">${raw.value==null?'—':escaparHTML(AppModel.number(raw.value))}${raw.value==null?'':`<small>${unit}</small>`}</strong>`;},
+    readingNote(raw){return raw.quality==='invalid'?'Lectura inválida. Revisa este sensor.':raw.value==null?'Aún no hay lecturas disponibles.':`Última lectura: ${date(raw.at)}`;}
+  };
+})();
+
+// ── Calendario ──
+// Calendario de filtros de fecha: componente de presentación (posición, foco, teclado y validación visual).
+// Lo usan Mantenimientos y Equipos y ventas. Las fechas se interpretan con MaintenanceDates (modelo).
+const DateFilterViews = (() => {
+  // Calendario compartido: sirve a todos los campos con [data-date-open] dentro de «filter»
+  // (un formulario o un contenedor con varios). Desde/Hasta de un mismo formulario se validan como rango.
+  function mount(filter, signal) {
+    const dates = MaintenanceDates;
+    const buttons = [...filter.querySelectorAll('[data-date-open]')];
+    const fieldOf = button => button.closest('form').elements.namedItem(button.dataset.dateOpen);
+    const fields = buttons.map(fieldOf);
+    const picker = MaintenanceViews.datePicker();
+    document.body.append(picker);
+    let active = null, opener = null, focused = dates.today();
+    function validate(form = null) {
+      for(const field of fields) {
+        field.setCustomValidity(field.value && !dates.parse(field.value) ? 'Escribe una fecha válida con el formato AAAA-MM-DD.' : '');
+      }
+      for(const owner of new Set(fields.map(field => field.form))) {
+        const since = owner.elements.namedItem('since'), until = owner.elements.namedItem('until');
+        if(since && until && dates.parse(since.value) && dates.parse(until.value) && since.value > until.value) {
+          until.setCustomValidity('Hasta debe ser igual o posterior a Desde.');
+        }
+      }
+      for(const field of fields) {
+        if(field.validity.valid) field.removeAttribute('aria-invalid');
+        else field.setAttribute('aria-invalid','true');
+      }
+      return fields.find(field => (!form || field.form === form) && !field.validity.valid)?.validationMessage || '';
+    }
+    function position() {
+      if(!active) return;
+      const viewport = window.visualViewport;
+      const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+      const width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
+      const anchor = active.parentElement.getBoundingClientRect();
+      picker.style.maxHeight = `${Math.max(0,height-16)}px`;
+      picker.style.maxWidth = `${Math.max(0,width-16)}px`;
+      const box = picker.getBoundingClientRect();
+      const below = top+height-anchor.bottom-8, above = anchor.top-top-8;
+      let y = below >= box.height || below >= above ? anchor.bottom+8 : anchor.top-box.height-8;
+      y = Math.max(top+8,Math.min(y,top+height-box.height-8));
+      picker.style.left = `${Math.max(left+8,Math.min(anchor.left,left+width-box.width-8))}px`;
+      picker.style.top = `${y}px`;
+    }
+    function render(focusDay = false) {
+      const year = focused.getUTCFullYear(), month = focused.getUTCMonth();
+      picker.querySelector('[data-date-year]').setCustomValidity('');
+      MaintenanceViews.renderCalendar(picker,{year,month,days:dates.weeks(year,month),
+        selected:active.value,today:dates.format(dates.today()),focused:dates.format(focused)});
+      position();
+      if(focusDay) picker.querySelector('[data-date-value][tabindex="0"]')?.focus({preventScroll:true});
+    }
+    function close(restore = true) {
+      if(!active) return;
+      const target = opener;
+      opener.setAttribute('aria-expanded','false');
+      if(picker.hidePopover && picker.matches(':popover-open')) picker.hidePopover();
+      picker.hidden = true;
+      active = null; opener = null;
+      if(restore && target.isConnected) target.focus({preventScroll:true});
+    }
+    function open(field, button) {
+      if(active === field) { close(); return; }
+      close(false);
+      active = field; opener = button;
+      focused = dates.parse(field.value) || dates.today();
+      picker.querySelector('[data-date-year]').setCustomValidity('');
+      picker.querySelector('#maint-calendar-title').textContent = `Calendario: ${button.dataset.dateLabel || (field.name === 'since' ? 'Desde' : 'Hasta')}`;
+      opener.setAttribute('aria-expanded','true');
+      picker.hidden = false;
+      if(picker.showPopover) picker.showPopover();
+      render(true);
+    }
+    function select(value) {
+      const field = active;
+      field.value = value;
+      validate(); close();
+      field.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    buttons.forEach(button => {
+      const field = fieldOf(button);
+      button.addEventListener('click',() => open(field,button),{signal});
+      field.addEventListener('input',() => validate(),{signal});
+      field.addEventListener('keydown',event => {
+        if(event.key === 'Escape' && active) { event.preventDefault(); close(); return; }
+        if(event.key === 'ArrowDown' || event.key === 'Enter') {
+          event.preventDefault(); open(field,button);
+        }
+      },{signal});
+    });
+    picker.addEventListener('click',event => {
+      const day = event.target.closest('[data-date-value]');
+      if(day) { select(day.dataset.dateValue); return; }
+      const action = event.target.closest('[data-date-action]')?.dataset.dateAction;
+      if(action === 'close') close();
+      if(action === 'clear') select('');
+      if(action === 'today') select(dates.format(dates.today()));
+      if(action === 'prev' || action === 'next') { focused = dates.shift(focused,0,action === 'prev' ? -1 : 1); render(); }
+    },{signal});
+    picker.addEventListener('change',event => {
+      if(!event.target.matches('[data-date-month],[data-date-year]')) return;
+      const year = Number(picker.querySelector('[data-date-year]').value);
+      const month = Number(picker.querySelector('[data-date-month]').value);
+      const yearField = picker.querySelector('[data-date-year]');
+      if(!Number.isInteger(year) || year < 1 || year > 9999) {
+        yearField.setCustomValidity('Escribe un año entre 1 y 9999.'); yearField.reportValidity(); return;
+      }
+      yearField.setCustomValidity('');
+      focused = dates.make(year,month,Math.min(focused.getUTCDate(),dates.make(year,month+1,0).getUTCDate()));
+      render();
+    },{signal});
+    picker.addEventListener('keydown',event => {
+      if(event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
+      if(event.key === 'Tab') {
+        const stops = [...picker.querySelectorAll('button:not(:disabled),input,select')].filter(item => item.tabIndex >= 0);
+        if((event.shiftKey && event.target === stops[0]) || (!event.shiftKey && event.target === stops.at(-1))) {
+          event.preventDefault();
+          let target = opener;
+          if(!event.shiftKey) {
+            const controls = [...document.querySelectorAll('a[href],button,input,select,textarea,[tabindex]')]
+              .filter(item => !picker.contains(item) && item.tabIndex >= 0 && !item.disabled && item.getClientRects().length);
+            target = controls[controls.indexOf(opener)+1] || opener;
+          }
+          close(false); target.focus();
+        }
+        return;
+      }
+      const day = event.target.closest('[data-date-value]');
+      if(!day) return;
+      const date = dates.parse(day.dataset.dateValue);
+      const weekday = (date.getUTCDay()+6)%7;
+      const steps = {ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7,Home:-weekday,End:6-weekday};
+      if(Object.hasOwn(steps,event.key)) focused = dates.shift(date,steps[event.key]);
+      else if(event.key === 'PageUp' || event.key === 'PageDown') focused = dates.shift(date,0,(event.key === 'PageUp' ? -1 : 1)*(event.shiftKey ? 12 : 1));
+      else return; // Enter y espacio conservan la activación nativa del botón.
+      event.preventDefault(); render(true);
+    },{signal});
+    document.addEventListener('pointerdown',event => {
+      if(active && !picker.contains(event.target) && !active.parentElement.contains(event.target) && !event.target.closest('[data-date-open]')) close();
+    },{signal});
+    document.addEventListener('focusin',event => {
+      if(active && !picker.contains(event.target) && !active.parentElement.contains(event.target)) close(false);
+    },{signal});
+    window.addEventListener('resize',position,{signal});
+    window.addEventListener('scroll',position,{signal,capture:true});
+    window.visualViewport?.addEventListener('resize',position,{signal});
+    window.visualViewport?.addEventListener('scroll',position,{signal});
+    const resize = new ResizeObserver(position);
+    resize.observe(picker);
+    resize.observe(filter.closest('#app-page') || filter);
+    document.fonts?.ready.then(() => { if(!signal.aborted) position(); });
+    signal.addEventListener('abort',() => { resize.disconnect(); close(false); picker.remove(); },{once:true});
+    return {validate,close};
+  }
+  return Object.freeze({mount});
+})();

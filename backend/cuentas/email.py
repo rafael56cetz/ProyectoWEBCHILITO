@@ -1,71 +1,85 @@
-"""Local, explicitly authorized SMTP delivery; never a console fallback."""
-import json
+"""Perfiles de envío explícitos, sin depender de credenciales privadas antiguas.
+
+Archivo y memoria son buzones de prueba. SMTP es opcional, restringido y nunca un respaldo."""
+import os
 import smtplib
+from pathlib import Path
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.mail.backends.base import BaseEmailBackend
+from django.core.mail.backends.filebased import EmailBackend as FileBackend
 from django.core.mail.backends.smtp import EmailBackend as SMTPBackend
+from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from config.private import PRIVATE_ROOT, secret
-from cuentas.registration import local_email_recipients_allowed
+
 
 class MailUnavailable(Exception):
-    """Public errors must never include SMTP responses, recipients or tokens."""
+    pass
 
-def mail_configuration():
+
+def smtp_configuration():
+    if getattr(settings, 'ELCHILITO_SMTP_ENABLED', False) is not True:
+        raise MailUnavailable
+    sender = settings.EMAIL_HOST_USER
+    password = settings.EMAIL_HOST_PASSWORD
+    mode = getattr(settings, 'ELCHILITO_SMTP_RECIPIENT_MODE', 'restricted')
+    recipients = {value.strip().lower() for value in getattr(settings, 'ELCHILITO_SMTP_ALLOWED_RECIPIENTS', ())}
+    if mode not in {'restricted', 'any-valid'}:
+        raise MailUnavailable
+    if (not sender or not password or not settings.EMAIL_HOST or (mode == 'restricted' and not recipients)
+            or not settings.EMAIL_USE_TLS or settings.EMAIL_USE_SSL):
+        raise MailUnavailable
     try:
-        data = json.loads((PRIVATE_ROOT / "correo_local.json").read_text(encoding="utf-8-sig"))
-        sender = data["sender"].strip().lower()
-        recipients = {address.strip().lower() for address in data.get("authorized_recipients", [])}
         validate_email(sender)
-        if not sender.endswith("@gmail.com") or (not recipients and not local_email_recipients_allowed()):
-            raise ValueError
-        for address in recipients:
-            validate_email(address)
-        password = secret("ELCHILITO_SMTP_PASSWORD", "gmail_app_password.txt").replace(" ", "")
-        if len(password) != 16:
-            raise ValueError
-        return sender, recipients, password
-    except (OSError, UnicodeError, ValueError, KeyError, TypeError, ImproperlyConfigured, ValidationError):
+        for recipient in recipients:
+            validate_email(recipient)
+    except ValidationError:
         raise MailUnavailable from None
+    return recipients if mode == 'restricted' else None
 
-def recipient_allowed(address, recipients):
-    if not isinstance(address, str):
+
+def permitted_recipient(email, recipients):
+    if not isinstance(email, str):
         return False
-    normalized = address.strip().lower()
     try:
-        validate_email(normalized)
+        validate_email(email.strip())
     except ValidationError:
         return False
-    return normalized in recipients or local_email_recipients_allowed()
+    return recipients is None or email.strip().lower() in recipients
+
 
 def delivery_problem(email=None):
-    # Test-only backend is selected by settings.testing, never by a query parameter.
-    if settings.EMAIL_BACKEND == "django.core.mail.backends.locmem.EmailBackend":
+    backend = settings.EMAIL_BACKEND
+    if backend in {'django.core.mail.backends.locmem.EmailBackend',
+                   'cuentas.email.ProtectedFileEmailBackend',
+                   'django.core.mail.backends.filebased.EmailBackend'}:
         return None
+    if backend != 'cuentas.email.AuthorizedSMTPBackend':
+        return 'mail-unavailable'
     try:
-        _, recipients, _ = mail_configuration()
+        recipients = smtp_configuration()
     except MailUnavailable:
-        return "mail-unavailable"
-    if email is not None and not recipient_allowed(email, recipients):
-        return "email-not-authorized"
+        return 'mail-unavailable'
+    if email is not None and not permitted_recipient(email, recipients):
+        return 'email-not-authorized'
     return None
+
 
 def delivery_available(email=None):
     return delivery_problem(email) is None
 
+
 class AuthorizedSMTPBackend(BaseEmailBackend):
     def send_messages(self, email_messages):
-        sender, recipients, password = mail_configuration()
+        recipients = smtp_configuration()
         messages = list(email_messages)
         for message in messages:
-            if not message.recipients() or any(not recipient_allowed(address, recipients) for address in message.recipients()):
+            if not message.recipients() or any(not permitted_recipient(address, recipients) for address in message.recipients()):
                 raise MailUnavailable
-            message.from_email = sender
         try:
-            with SMTPBackend(host="smtp.gmail.com", port=587, username=sender,
-                             password=password, use_tls=True, use_ssl=False,
-                             timeout=10, fail_silently=False) as connection:
+            with SMTPBackend(host=settings.EMAIL_HOST, port=settings.EMAIL_PORT,
+                             username=settings.EMAIL_HOST_USER, password=settings.EMAIL_HOST_PASSWORD,
+                             use_tls=True, use_ssl=False, timeout=settings.EMAIL_TIMEOUT,
+                             fail_silently=False) as connection:
                 sent = connection.send_messages(messages)
             if sent != len(messages):
                 raise MailUnavailable
@@ -73,7 +87,30 @@ class AuthorizedSMTPBackend(BaseEmailBackend):
         except (smtplib.SMTPException, OSError):
             raise MailUnavailable from None
 
-class DisabledEmailBackend(BaseEmailBackend):
-    """Retained for explicit closed-environment checks."""
-    def send_messages(self, email_messages):
-        raise MailUnavailable
+
+class ProtectedFileEmailBackend(FileBackend):
+    """Buzón local de pruebas: permisos restrictivos y fuera de los archivos del frontend que se sirven."""
+    def __init__(self, *args, **kwargs):
+        path = Path(settings.EMAIL_FILE_PATH).expanduser()
+        try:
+            path.mkdir(mode=0o700, parents=True, exist_ok=True)
+            os.chmod(path, 0o700)
+            super().__init__(*args, **kwargs)
+        except OSError:
+            raise MailUnavailable from None
+
+    def open(self):
+        try:
+            created = super().open()
+            if self.stream is not None:
+                os.fchmod(self.stream.fileno(), 0o600)
+            return created
+        except OSError:
+            raise MailUnavailable from None
+
+    def send_messages(self, messages):
+        try:
+            return super().send_messages(messages)
+        except OSError:
+            raise MailUnavailable from None
+

@@ -1,36 +1,34 @@
-# Configuración y secretos locales
 .env
 .env.*
 !.env.example
-*.pem
-*.key
-
-# Entornos y archivos generados de Python
-.venv/
-venv/
 __pycache__/
-*.py[cod]
-.pytest_cache/
-*.sqlite3
-
-# Herramientas y archivos temporales
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
+*.pyc
+.venv/
+*.dump
 *.log
-*.tmp
 node_modules/
 
-# Revisión y evidencias locales: no forman parte de esta entrega
-/revision/
-/referencia/
-/output/
-
-# Private backups, scratch work and local test output
-/scratch/
-*.dump
-*.backup
-*.pgpass
-coverage.xml
-htmlcov/
+.estado-local/
+*.eml
+*.session
+*.cookies
+smtp.json
+runtime.json
+owner.json
+.pytest_cache/
+*.py[cod]
+*.sqlite3
+*.pem
+*.key
+*.bak
+*.tmp
+*.orig
+*.zip
+.DS_Store
+.idea/
+.vscode/
+.claude/
+respaldos/
+buzon/
+correo-pruebas/
+.generado-por-armar-entrega
