@@ -18,6 +18,9 @@ REL = 'noopener noreferrer nofollow'
 def _enlace_seguro(valor):
     if not valor or '\\' in valor or any(ord(caracter) <= 32 or ord(caracter) == 127 for caracter in valor):
         return False
+    # Enlaces internos del sitio; «//» sería otro dominio.
+    if valor.startswith('#') or (valor.startswith('/') and not valor.startswith('//')):
+        return True
     try:
         partes = urlsplit(valor)
     except ValueError:

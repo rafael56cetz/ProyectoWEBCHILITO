@@ -114,7 +114,7 @@ EMAIL_HOST_PASSWORD=os.environ.get('CHILITO_SMTP_PASSWORD','')
 EMAIL_USE_TLS=True;EMAIL_USE_SSL=False;EMAIL_TIMEOUT=10
 DEFAULT_FROM_EMAIL=os.environ.get('CHILITO_FROM_EMAIL','El Chilito <no-reply@example.test>')
 ACCOUNT_EMAIL_SUBJECT_PREFIX='[El Chilito] '
-DATA_UPLOAD_MAX_MEMORY_SIZE=262144
+DATA_UPLOAD_MAX_MEMORY_SIZE=32768
 CACHES={'default':{'BACKEND':'django.core.cache.backends.db.DatabaseCache','LOCATION':'cuentas_cuotas_acceso','TIMEOUT':3600,'OPTIONS':{'MAX_ENTRIES':10000}}}
 LOGGING={'version':1,'disable_existing_loggers':False,
  'formatters':{'seguro':{'()':'config.registro.FormatoSeguro','format':'%(asctime)s %(levelname)s %(name)s %(message)s'}},

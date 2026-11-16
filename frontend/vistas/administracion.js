@@ -461,7 +461,7 @@ const LegalAdminViews = (() => {
   const ERRORS = {'version-no-mayor':'La versión debe ser mayor que la vigente.', 'version-existente':'Ya existe esa versión de este documento.', 'documento-publicado':'Una versión publicada no se edita ni se borra: crea una nueva.',
     'stale-record':'Alguien cambió este borrador. Vuelve a abrirlo para ver la versión nueva.', 'documento-no-docx':'Sube un documento de Word guardado como .docx.',
     'documento-ilegible':'No se pudo leer el documento. Ábrelo en Word y guárdalo de nuevo como .docx.', 'documento-grande':'El documento pasa de 2 MB.',
-    'request-too-large':'El documento pasa de 2 MB.', 'documento-largo':'El texto pasa de 200 000 caracteres. Divide el documento.'};
+    'request-too-large':'Es demasiado grande: un .docx puede pesar hasta 2 MB y el texto del borrador hasta 256 KB.', 'pegado-grande':'Lo que pegaste pasa de 256 KB. Pégalo por partes o sube el .docx.', 'documento-largo':'El texto pasa de 200 000 caracteres. Divide el documento.'};
   const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
   const sha = value => escaparHTML(value.slice(0, 8));
 

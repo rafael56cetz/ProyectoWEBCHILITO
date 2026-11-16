@@ -25,6 +25,7 @@ VERSION = re.compile(r'^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?$')
 MAXIMO_TITULO = 120
 MAXIMO_CONTENIDO = 200000
 MAXIMO_ARCHIVO = 2 * 1024 * 1024
+MAXIMO_PEGADO = 256 * 1024
 # Un .docx es un ZIP: estos topes detienen un archivo pequeño que se descomprime en cientos de MB.
 MAXIMO_ENTRADAS = 200
 MAXIMO_DESCOMPRIMIDO = 20 * 1024 * 1024
@@ -151,8 +152,8 @@ def importar_docx(actor, archivo):
 def sanear_pegado(actor, archivo):
     """HTML del portapapeles saneado con la misma lista blanca. Llega como archivo para no chocar con el límite de JSON."""
     s.require_cap(actor, CAPACIDAD)
-    if archivo.size > MAXIMO_ARCHIVO:
-        raise ReglaDeNegocio('documento-grande', 'Lo que pegaste pasa de 2 MB.')
+    if archivo.size > MAXIMO_PEGADO:
+        raise ReglaDeNegocio('pegado-grande', 'Lo que pegaste pasa de 256 KB. Pégalo por partes o sube el .docx.')
     try:
         contenido = archivo.read().decode('utf-8')
     except UnicodeDecodeError:

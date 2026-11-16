@@ -185,11 +185,11 @@ class DocumentosHTML(SimpleTestCase):
 
     def test_validacion_de_enlaces_no_admite_atajos_de_protocolo(self):
         from .documentos_html import sanear_html
-        for enlace in ('data:text/html,x', '//example.test/x', '/\\example.test', 'java\nscript:alert(1)', 'https://[', '#privacidad', '/ayuda'):
+        for enlace in ('data:text/html,x', '//example.test/x', '/\\example.test', 'java\nscript:alert(1)', 'https://[', '//evil.com', 'javascript:alert(1)'):
             with self.subTest(enlace=enlace):
                 html, _ = sanear_html(f'<a href="{enlace}">Texto</a>')
                 self.assertEqual(html, '<a>Texto</a>')
-        for enlace in ('https://example.test', 'http://example.test', 'mailto:soporte@example.test'):
+        for enlace in ('#privacidad', '/ayuda', 'https://example.test', 'http://example.test', 'mailto:soporte@example.test'):
             with self.subTest(enlace=enlace):
                 html, _ = sanear_html(f'<a href="{enlace}">Texto</a>')
                 self.assertIn('href=', html)
@@ -395,6 +395,18 @@ class TextosLegales(AdminBase):
                             {'expectedAt': documento['updatedAt'], 'version': '1.1', 'title': 'T', 'content': largo + '<p>más</p>'})
         self.assertEqual(editado.status_code, 200)
 
+    def test_los_borradores_admiten_256_kb_y_nada_mas(self):
+        enorme = '<p>' + 'x' * (300 * 1024) + '</p>'
+        for ruta, datos in (('/api/admin/legales', {'type': 'terminos', 'version': '1.1', 'title': 'T', 'content': enorme}),
+                            ('/api/admin/legales/vista-previa', {'content': enorme})):
+            with self.subTest(ruta=ruta):
+                respuesta = self.post(self.sesion, ruta, datos)
+                self.assertEqual((respuesta.status_code, respuesta.json()['code']), (413, 'request-too-large'))
+        self.assertEqual(self.post(self.sesion, '/api/admin/legales/vista-previa', {'content': '<p>' + 'x' * 100000 + '</p>'}).status_code, 200)
+        # El límite mayor es solo de los borradores: otra ruta de administración sigue en 32 KB.
+        otra = self.post(self.sesion, '/api/admin/guias', {'question': 'x' * 40000})
+        self.assertEqual((otra.status_code, otra.json()['code']), (413, 'request-too-large'))
+
 
 W = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
@@ -493,6 +505,8 @@ class ImportarDocumentos(AdminBase):
             with self.subTest(codigo=codigo, nombre=nombre):
                 self.assertEqual(self.codigo(self.subir(datos, nombre)), (409, codigo))
         self.assertEqual(self.codigo(self.subir(b'0' * (3 * 1024 * 1024))), (413, 'request-too-large'))
+        self.assertEqual(self.codigo(self.subir(b'<p>' + b'x' * (300 * 1024), 'pegado.html', campo='html', ruta='/api/admin/legales/sanear')),
+                         (413, 'request-too-large'))
         self.assertFalse(Auditoria.objects.filter(accion='importar_documento_legal').exists())
 
     def test_solo_un_archivo_en_su_campo_y_con_la_capacidad(self):

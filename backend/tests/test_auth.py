@@ -344,6 +344,15 @@ class AuthenticationHTTPTests(TestCase):
             self.assertEqual(response.status_code, 413)
             self.assertEqual(response.json()['code'], 'request-too-large')
 
+    def test_login_and_signup_still_reject_more_than_32_kb(self):
+        grande = json.dumps({'email': 'a@example.test', 'password': 'x' * 40000})
+        for ruta in ('auth/login', 'auth/signup'):
+            with self.subTest(ruta=ruta):
+                response = self.client.post(P + ruta, grande, content_type='application/json',
+                                            HTTP_X_CSRFTOKEN=self.client.cookies['csrftoken'].value)
+                self.assertEqual((response.status_code, response.json()['code']), (413, 'request-too-large'))
+        self.assertFalse(get_user_model().objects.filter(email='a@example.test').exists())
+
     def test_smtp_is_opt_in_and_never_connects_without_authorization(self):
         from django.core.mail import EmailMessage
         with override_settings(ELCHILITO_SMTP_ENABLED=False), patch('cuentas.email.SMTPBackend') as smtp:

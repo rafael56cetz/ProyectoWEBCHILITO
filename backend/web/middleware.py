@@ -1,3 +1,7 @@
+import re
+from io import BytesIO
+
+from django.conf import settings
 from django.db import DatabaseError, connection, transaction
 
 from .respuestas import error, respuesta_de_base
@@ -17,17 +21,34 @@ class SecurityHeaders:
 
 
 class LimiteDeSubida:
-    """Rechaza un formulario con archivo de más de 2 MB antes de que CSRF lo lea: Django no limita el tamaño de los archivos."""
-    MAXIMO = 2 * 1024 * 1024 + 64 * 1024
+    """Tamaño máximo de cada petición, antes de que CSRF o la vista lean el cuerpo.
+
+    Toda ruta usa DATA_UPLOAD_MAX_MEMORY_SIZE (32 KB), salvo los borradores legales (256 KB) y la subida del .docx (2 MB).
+    Django solo conoce un límite global y no limita los archivos: por eso aquí se elige por ruta y, si la ruta admite más,
+    se lee el cuerpo ya acotado para que `request.body` no vuelva a aplicar el límite global."""
+    BORRADORES = re.compile(r'^/api/admin/legales(/vista-previa|/sanear|/[0-9a-f-]{36}/editar)?$')
+    DOCX = '/api/admin/legales/importar'
+    MAXIMO_BORRADOR = 256 * 1024
+    MAXIMO_DOCX = 2 * 1024 * 1024 + 64 * 1024
 
     def __init__(self, get_response):
         self.get_response = get_response
 
+    def _maximo(self, request):
+        if request.method == 'POST' and request.path == self.DOCX:
+            return self.MAXIMO_DOCX
+        if request.method == 'POST' and self.BORRADORES.match(request.path):
+            return self.MAXIMO_BORRADOR
+        return settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+
     def __call__(self, request):
-        if request.content_type == 'multipart/form-data':
-            largo = request.META.get('CONTENT_LENGTH', '')
-            if not largo.isdecimal() or int(largo) > self.MAXIMO:
-                return error(413, 'request-too-large')
+        largo = request.META.get('CONTENT_LENGTH') or '0'
+        maximo = self._maximo(request)
+        if not largo.isdecimal() or (request.content_type == 'multipart/form-data' and largo == '0') or int(largo) > maximo:
+            return error(413, 'request-too-large')
+        if maximo > settings.DATA_UPLOAD_MAX_MEMORY_SIZE and request.content_type != 'multipart/form-data':
+            request._body = request.read()
+            request._stream = BytesIO(request._body)
         return self.get_response(request)
 
 
