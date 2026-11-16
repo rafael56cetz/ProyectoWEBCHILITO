@@ -100,6 +100,9 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   const editor = run('LegalAdminViews.editorScreen(editorState)');
   assert.ok(editor.includes('&lt;img src=x') && !editor.includes('<img src=x') && editor.includes('<p>servidor</p>'), 'el contenido va escapado en el editor; la vista previa es el HTML del servidor');
   assert.ok(editor.includes('data-admin-action="upload"') && editor.includes('data-legal-file') && editor.includes('accept=".docx') && editor.includes('maxlength="200000"') && editor.includes('data-legal-saved'));
+  const toolbar = editor.match(/<div class="legal-toolbar"[^]*?<\/div>/)[0], upload = editor.match(/<div class="legal-upload">[^]*?<\/div>/)[0];
+  assert.ok(!toolbar.includes('upload') && upload.includes('data-admin-action="upload"') && upload.includes('btn-liquid-accent') && upload.includes('aria-describedby="lg-upload-help"')
+    && upload.includes('Sube tu Word y se conserva el formato') && upload.includes('data-legal-file'), 'el .docx va fuera de la barra, destacado y con su ayuda');
   assert.ok(/data-admin-action="publish-editor" hidden/.test(run("LegalAdminViews.editorScreen({status:'ready', type:'terminos', document:null})")), 'un borrador nuevo se publica cuando ya existe');
   assert.ok(run('LegalAdminViews.confirmations.publish("politica_cookies", "2.0").texto').includes('volver a decidir sobre cookies'));
   assert.ok(!run('LegalAdminViews.editorScreen({...editorState, document:{...editorState.document, state:"publicada", publishedAt:"2026-11-08T11:00:00Z"}})').includes('Guardar borrador'));

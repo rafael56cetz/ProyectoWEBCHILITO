@@ -3,7 +3,7 @@
 .glass-filter { position:absolute; }
 
 /* Botones sobre superficies oscuras */
-html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid) {
+html body :is(.btn-liquid-nav,.btn-liquid-primary) {
   background:rgba(255,255,255,.05)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;
 }
 html body .sidebar .btn-liquid-sidebar:not([aria-current]),
@@ -52,7 +52,7 @@ html body .btn-liquid-light { background:rgba(255,255,255,.72)!important;border-
 @keyframes letter-rise { from { transform:translateY(115%); } to { transform:none; } }
 
 @media (prefers-reduced-transparency:reduce) {
-  html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+  html body :is(.btn-liquid-nav,.btn-liquid-primary) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
 }
 @media (forced-colors:active) {
   html body .button { box-shadow:none!important;border:1px solid ButtonText!important; }
@@ -186,8 +186,7 @@ html:has(.auth-layout) { background:#0e1c14; }
 
 
 /* Dashboard claro (administración y usuario): dirección visual aprobada (2026-11-07).
-   Fondo crema con luz de naranja y durazno, panel lateral de vidrio verde flotante y tarjetas translúcidas.
-   Va después de dashboard-glass.css y sustituye sus colores oscuros; la estructura es la misma. */
+   Fondo crema con luz de naranja y durazno, panel lateral de vidrio verde flotante y tarjetas translúcidas. */
 body[data-private=true]:is([data-role=admin],[data-role=user]) {
   color:var(--claro-tinta);background:transparent!important;
 }
@@ -251,6 +250,15 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
   background:var(--menu-fondo)!important;border:1px solid var(--menu-borde)!important;
   box-shadow:var(--menu-filo),var(--menu-sombra)!important;
   -webkit-backdrop-filter:var(--menu-desenfoque);backdrop-filter:var(--menu-desenfoque);
+}
+@media (max-width:1024px) {
+  /* El menú empieza bajo la barra, así que su alto descuenta esa misma medida: si no, el final (Cerrar sesión) queda fuera de la pantalla.
+     La sombra inferior avisa que hay más opciones; la tapa viaja con el contenido y la cubre al llegar al final. */
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
+    max-height:calc(100vh - var(--barra-alto) - var(--esp-2) - var(--esp-3) - env(safe-area-inset-bottom))!important;
+    max-height:calc(100dvh - var(--barra-alto) - var(--esp-2) - var(--esp-3) - env(safe-area-inset-bottom))!important;
+    background:var(--menu-pie-tapa) bottom/100% var(--esp-6) no-repeat local,var(--menu-pie-sombra) bottom/100% var(--esp-4) no-repeat scroll,var(--menu-fondo)!important;
+  }
 }
 @media (min-width:1025px) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { padding:var(--esp-5) var(--esp-2) var(--esp-3)!important;gap:0; }
@@ -340,7 +348,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page a:not(.button) { color:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-table th[scope=row] { color:var(--claro-tinta);border-color:var(--claro-linea); }
 
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is([data-maint-error],.privacy-panel>[data-privacy-state]) { color:var(--claro-peligro)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .privacy-panel>[data-privacy-state] { color:var(--claro-peligro)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .privacy-unsaved { color:var(--claro-tinta)!important; }
 
 /* Tablas y gráficas */
@@ -440,8 +448,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.passwor
 
 @media (prefers-reduced-transparency:reduce) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { -webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:#1f5236!important; }
-}
-@media (forced-colors:active) {
 }
 
 /* Ritmo vertical cercano a la referencia: menos aire arriba y tarjetas más compactas. */
@@ -942,6 +948,8 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-profile [data-profile] small { margin:0;color:var(--claro-suave);font-size:var(--texto-meta);font-weight:400;line-height:1.4; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-profile [data-profile] .app-actions { grid-column:1/-1;margin:0;padding-top:var(--esp-4);box-shadow:inset 0 1px 0 var(--claro-linea); }
 @media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-profile [data-profile] { grid-template-columns:minmax(0,1fr); } }
+/* La bienvenida usa los mismos campos: la ayuda del alias va debajo del campo, no a su lado. */
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] small { display:block;margin:var(--esp-2) 0 0;color:var(--claro-suave);font-size:var(--texto-meta);font-weight:400;line-height:1.4; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card { display:flex;flex-direction:column;gap:var(--esp-2); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card>.app-actions:last-child { margin-top:auto; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .my-garden>h2 { font-size:22px!important;font-weight:650;letter-spacing:-.02em; }
@@ -1244,6 +1252,12 @@ html body[data-private=true][data-role=admin] #app-page .legal-list a:not(.butto
 html body[data-private=true][data-role=admin] #app-page .legal-toolbar { justify-self:start;display:inline-flex;flex-wrap:wrap;gap:var(--esp-1);margin:0 0 var(--esp-2);padding:var(--esp-1);border-radius:var(--radio-boton);background:var(--segmento-fondo); }
 html body[data-private=true][data-role=admin] #app-page .legal-toolbar .button { min-height:var(--boton-alto-compacto)!important;padding:0 var(--esp-4)!important;background:transparent!important;border:0!important;box-shadow:none!important; }
 html body[data-private=true][data-role=admin] #app-page .legal-toolbar .button:hover { background:var(--segmento-activo)!important; }
+html body[data-private=true][data-role=admin] #app-page .legal-upload { display:flex;flex-wrap:wrap;align-items:center;gap:var(--esp-2) var(--esp-3);margin:0 0 var(--esp-4); }
+html body[data-private=true][data-role=admin] #app-page .legal-upload .user-small-copy { margin:0; }
+html body[data-private=true][data-role=admin] #app-page .legal-upload .btn-liquid-accent {
+  background:var(--boton-acento)!important;color:var(--boton-acento-texto)!important;border:0!important;box-shadow:var(--boton-acento-filo)!important;font-weight:650;
+}
+html body[data-private=true][data-role=admin] #app-page .legal-upload .btn-liquid-accent:hover:not(:disabled) { background:var(--boton-acento-hover)!important; }
 html body[data-private=true][data-role=admin] #app-page .legal-preview { font-size:var(--texto-cuerpo);line-height:1.65;color:var(--claro-tinta); }
 /* La regla de los títulos de tarjeta no aplica al texto legal: la vista previa usa la misma escala que la página pública. */
 html body[data-private=true][data-role=admin] #app-page .legal-preview h2 { margin:var(--legal-h2-arriba) 0 var(--esp-3);font-size:var(--legal-h2); }

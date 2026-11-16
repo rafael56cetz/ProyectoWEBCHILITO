@@ -484,11 +484,13 @@ const LegalAdminViews = (() => {
     const title = published ? `${TYPES[doc.type]} · versión ${doc.version}` : doc ? `Editar borrador ${doc.version}` : `Nueva versión · ${TYPES[state.type]}`;
     const back = `<a class="garden-back" href="#admin/legales">← Textos legales</a>`;
     const facts = published ? `<p>${tag('Publicada', 'verde')} ${T.merida(doc.publishedAt)}${doc.publishedBy ? ` · ${escaparHTML(doc.publishedBy)}` : ''} · huella ${sha(doc.sha256)}…</p>` : '';
-    const toolbar = published ? '' : `<div class="legal-toolbar" role="group" aria-label="Formato">${[['h2', 'Título'], ['ul', 'Lista'], ['strong', 'Negrita'], ['a', 'Enlace']].map(([tagName, text]) => T.button('tag', text, 'light', `data-tag="${tagName}"`)).join('')}${T.button('upload', 'Subir documento (.docx)', 'light')}</div>
-      <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-legal-file hidden>`;
+    const toolbar = published ? '' : `<div class="legal-toolbar" role="group" aria-label="Formato">${[['h2', 'Título'], ['ul', 'Lista'], ['strong', 'Negrita'], ['a', 'Enlace']].map(([tagName, text]) => T.button('tag', text, 'light', `data-tag="${tagName}"`)).join('')}</div>`;
+    const upload = published ? '' : `<div class="legal-upload">${T.button('upload', `${icon('document')}<span>Subir documento (.docx)</span>`, 'accent', 'aria-describedby="lg-upload-help"')}
+      <p class="user-small-copy" id="lg-upload-help">Sube tu Word y se conserva el formato.</p>
+      <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-legal-file hidden></div>`;
     const form = `<form data-admin-form="legal" novalidate><label for="lg-version">Versión (formato 1.2)</label><input id="lg-version" name="version" type="text" maxlength="11" placeholder="1.2" value="${escaparHTML(doc?.version || '')}"${published ? ' readonly' : ''} required>
       <label for="lg-title">Título</label><input id="lg-title" name="title" type="text" maxlength="120" value="${escaparHTML(doc?.title || TYPES[state.type] || '')}"${published ? ' readonly' : ''} required>
-      <label for="lg-content">Contenido</label>${toolbar}<textarea id="lg-content" name="content" rows="18" maxlength="200000"${published ? ' readonly' : ''} required${published ? '' : ' aria-describedby="lg-content-help"'}>${escaparHTML(doc?.content || '')}</textarea>
+      ${upload}<label for="lg-content">Contenido</label>${toolbar}<textarea id="lg-content" name="content" rows="18" maxlength="200000"${published ? ' readonly' : ''} required${published ? '' : ' aria-describedby="lg-content-help"'}>${escaparHTML(doc?.content || '')}</textarea>
       ${published ? '' : `<p class="user-small-copy" id="lg-content-help">Puedes pegar desde Word: el formato se limpia en el servidor. El borrador se guarda solo cada 10 segundos.</p>
       <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Guardar borrador</button>${T.button('preview-editor', 'Vista previa')}${T.button('publish-editor', 'Publicar', 'brand', doc ? '' : 'hidden')}</div>
       <p class="user-small-copy" data-legal-saved role="status"></p>`}</form>`;

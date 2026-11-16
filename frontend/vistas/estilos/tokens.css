@@ -115,6 +115,9 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) {
   --boton-secundaria-filo:inset 0 1px 0 #fff,0 6px 16px -10px rgba(150,70,20,.4),0 0 0 1px rgba(70,40,20,.06);
   --boton-peligro:linear-gradient(180deg,rgba(196,85,58,.92) 0%,rgba(156,50,32,.92) 100%);
   --boton-peligro-hover:linear-gradient(180deg,rgba(207,97,70,.94) 0%,rgba(168,56,38,.94) 100%);
+  /* Acento: coral con texto oscuro (5,8:1); el blanco sobre coral no llega a AA. */
+  --boton-acento:var(--coral);--boton-acento-hover:#fb8670;--boton-acento-texto:var(--claro-titulo);
+  --boton-acento-filo:inset 0 1px 0 rgba(255,255,255,.35),0 8px 20px -10px rgba(250,114,90,.75);
 
   /* Series de las gráficas con varias líneas (se distinguen también por el trazo) */
   --serie-1:#2f6a48;--serie-2:#b8741e;--serie-3:#3f6f9a;
@@ -140,6 +143,8 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) {
   body[data-private=true]:is([data-role=admin],[data-role=user]) {
     --menu-fila-alto:44px;--menu-fuente:15px;--menu-gap-icono:12px;
     --menu-fondo:linear-gradient(170deg,rgba(38,94,60,.97) 0%,rgba(22,62,42,.98) 100%);
+    --menu-pie-sombra:radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.42),transparent);
+    --menu-pie-tapa:linear-gradient(rgba(22,62,42,0),rgb(22,62,42) 55%);
   }
 }
 /* Barra superior de ambos paneles: sin franja; las acciones flotan en una cápsula de vidrio claro. */
