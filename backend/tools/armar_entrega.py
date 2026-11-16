@@ -19,7 +19,6 @@ INCLUIR = ['README.md', '.gitignore',
            'backend/huerto', 'backend/privacidad', 'backend/tests', 'backend/web',
            'frontend/index.html', 'frontend/favicon.svg', 'frontend/controladores', 'frontend/modelos', 'frontend/vistas',
            'frontend/pruebas', 'sql/privilegios.sql', 'sql/instalacion',
-           'backend/tools/README.md',
            *[f'backend/tools/{n}.py' for n in ('__init__', 'servir_local', 'entorno_local',
                                                 'configurar_correo', 'correo_config', 'soporte_local', 'generar_sql_instalacion')]]
 EXCLUIR = ['*/__pycache__/*', '*.pyc']
