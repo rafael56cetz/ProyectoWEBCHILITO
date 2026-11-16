@@ -58,7 +58,7 @@ const PrivacyData = (() => {
 // Solo contratos de presentación; la autorización y el estado guardado son de Django.
 const AppModel = (() => {
   const destinations = [
-    {id:'huerto',label:'Mi huerto',icon:'grid'},
+    {id:'huerto',label:'Mi huerto',icon:'leaf'},
     {id:'telemetria',label:'Panel técnico',icon:'activity'},
     {id:'mantenimiento',label:'Mantenimiento',icon:'tool'},
     {id:'soporte',label:'Soporte técnico',icon:'support'},
@@ -68,19 +68,19 @@ const AppModel = (() => {
   // Destinos de administración por grupo (plan 2.2). Cada uno se ve solo con su capacidad; el servidor la vuelve a exigir en cada endpoint.
   const adminGroups = [
     {label:'Operación', items:[
-      {id:'admin/flota',label:'Telemetría de flota',icon:'grid',capability:'ver_flota'},
-      {id:'admin/soporte',label:'Consola remota',icon:'support',capability:'atender_soporte'},
+      {id:'admin/flota',label:'Telemetría de flota',icon:'activity',capability:'ver_flota'},
+      {id:'admin/soporte',label:'Consola remota',icon:'terminal',capability:'atender_soporte'},
       {id:'admin/mantenimientos',label:'Mantenimientos',icon:'tool',capability:'gestionar_mantenimientos'}]},
     {label:'Gestión', items:[
       {id:'admin/solicitudes',label:'Solicitudes del producto',icon:'inbox',capability:'atender_consultas'},
-      {id:'admin/equipos',label:'Inventario de equipos',icon:'wifi',capability:'gestionar_dispositivos'},
-      {id:'admin/ventas',label:'Ventas',icon:'leaf',capability:'gestionar_ventas'},
-      {id:'admin/guias',label:'Guías de cuidado',icon:'list',capability:'gestionar_guias'}]},
+      {id:'admin/equipos',label:'Inventario de equipos',icon:'chip',capability:'gestionar_dispositivos'},
+      {id:'admin/ventas',label:'Ventas',icon:'tag',capability:'gestionar_ventas'},
+      {id:'admin/guias',label:'Guías de cuidado',icon:'book',capability:'gestionar_guias'}]},
     {label:'Legal', items:[
-      {id:'admin/legales',label:'Textos legales',icon:'shield',capability:'gestionar_legales'},
-      {id:'admin/consentimientos',label:'Bitácora de consentimientos',icon:'check',capability:'ver_consentimientos'}]},
+      {id:'admin/legales',label:'Textos legales',icon:'document',capability:'gestionar_legales'},
+      {id:'admin/consentimientos',label:'Bitácora de consentimientos',icon:'clipboard',capability:'ver_consentimientos'}]},
     {label:'Super admin', items:[
-      {id:'admin/administradores',label:'Administradores',icon:'key',capability:'gestionar_administradores'}]}
+      {id:'admin/administradores',label:'Administradores',icon:'users',capability:'gestionar_administradores'}]}
   ];
   const adminDestinations = adminGroups.flatMap(group=>group.items);
   const adminCapabilities = Object.fromEntries(adminDestinations.map(item=>[item.id,item.capability]));

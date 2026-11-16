@@ -43,7 +43,7 @@ html body .btn-liquid-light { background:rgba(255,255,255,.72)!important;border-
 }
 
 /* Letra de título: Geist en su peso más fuerte. */
-.hero-text h1,.auth-quote h2,.page-heading h1,.garden-welcome h1,.auth-flow #auth-title { font-weight:var(--display-weight)!important;letter-spacing:-.035em; }
+.hero-text h1,.auth-quote h2,.page-heading h1,.auth-flow #auth-title { font-weight:var(--display-weight)!important;letter-spacing:-.035em; }
 .home h2 { font-weight:700!important;letter-spacing:-.025em; }
 
 /* Entrada del título: las letras suben desde detrás de su línea. */
@@ -113,7 +113,6 @@ body[data-private=true]:is([data-role=user],[data-role=admin]) .private-layout,
 body[data-private=true]:is([data-role=user],[data-role=admin]) .private-content { background:transparent!important; }
 
 html body[data-private=true]:is([data-role=user],[data-role=admin]) .auth-flow { background:transparent; }
-html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar :is(a,button):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
 
 /* Panel lateral: la estructura; el vidrio verde está en el bloque claro de abajo. */
 html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
@@ -130,14 +129,11 @@ html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .icon { width:20px;height:20px; }
 }
 
-/* Barra superior de vidrio: cuenta, avisos y menú. El contenido nunca pasa por debajo sin una superficie detrás. */
+/* Barra superior sin franja: la capa no se pinta ni recibe clics; solo sus cápsulas (acciones y, en móvil, logotipo). */
 body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar {
   display:flex;align-items:center;justify-content:space-between;gap:var(--esp-2);position:fixed;top:0;left:0;right:0;z-index:var(--z-encabezado);
   height:var(--barra-alto);box-sizing:border-box;padding:0 clamp(16px,3vw,36px);
-  background:var(--vidrio-flotante-fondo);border-bottom:1px solid var(--vidrio-flotante-borde);box-shadow:var(--vidrio-barra-sombra);
-}
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar { background:var(--vidrio-barra-fondo);-webkit-backdrop-filter:var(--vidrio-flotante-desenfoque);backdrop-filter:var(--vidrio-flotante-desenfoque); }
+  background:transparent;border:0;box-shadow:none;pointer-events:none;
 }
 .topbar-start,.topbar-actions { display:flex;align-items:center;gap:var(--esp-2); }
 .topbar-actions { margin-left:auto; }
@@ -203,38 +199,110 @@ body[data-private=true]:is([data-role=admin],[data-role=user])::before {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { background:linear-gradient(170deg,#28623e 0%,#1b4a30 100%)!important; }
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar-brand { font-size:20px; }
-body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-label { margin:var(--esp-2) var(--esp-2) var(--esp-1);color:rgba(255,255,255,.88);font-size:13px;font-weight:600;letter-spacing:.02em; }
-body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-label:not(.private-group-label) {
-  width:fit-content;margin:0 var(--esp-2);padding:var(--esp-1) var(--esp-3);border:1px solid rgba(255,255,255,.22);border-radius:var(--radio-insignia);
-  background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-}
-body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group-label { margin-top:var(--esp-1);padding-top:var(--esp-2);border-top:1px solid rgba(255,255,255,.18); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button:not([aria-current]) {
-  background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;color:#fff!important;font-weight:600;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button:not([aria-current]):hover { background:rgba(255,255,255,.14)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button[aria-current] {
-  background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.2))!important;border:1px solid rgba(255,255,255,.4)!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 16px -8px rgba(0,0,0,.35)!important;color:#fff!important;font-weight:600;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a,button):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
-/* Elemento pendiente: se ve, pero no es un enlace ni un botón. */
-.private-group { display:grid;gap:2px; }
 
-/* Botón de perfil flotante: el verde del panel. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .button { background:#28623e!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 18px -8px rgba(20,50,30,.5)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .account-icon-link[aria-current] { background:#2f6a48!important;box-shadow:0 0 0 3px rgba(47,106,72,.25)!important; }
+/* Acciones superiores: una cápsula de vidrio claro; los botones van sin borde propio y el apartado abierto en verde. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-actions {
+  pointer-events:auto;gap:2px;padding:4px;border:1px solid var(--capsula-borde);border-radius:var(--radio-boton);
+  background:var(--capsula-fondo);box-shadow:var(--capsula-sombra);
+  -webkit-backdrop-filter:var(--vidrio-flotante-desenfoque);backdrop-filter:var(--vidrio-flotante-desenfoque);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-actions .button {
+  background:transparent!important;color:var(--claro-verde)!important;border:1px solid transparent!important;box-shadow:none!important;transform:none!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-actions .button:hover { background:var(--capsula-boton-hover)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-actions .button:active { background:var(--claro-linea)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-actions .button:is([aria-current],[aria-expanded=true]) {
+  background:var(--boton-primaria)!important;color:#fff!important;border-color:rgba(255,255,255,.2)!important;box-shadow:var(--lg-solid)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar :is(a,button):focus-visible { outline:3px solid var(--claro-verde)!important;outline-offset:2px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-brand { pointer-events:auto; }
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .topbar-actions { background:var(--vidrio-opaco);-webkit-backdrop-filter:none;backdrop-filter:none; }
+}
+
+/* Menú lateral (administración y usuario): una sola pieza de vidrio verde. Los apartados son filas sin cápsula;
+   solo el activo lleva el vidrio de los botones de la portada. Los grupos se separan con aire, no con líneas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
+  background:var(--menu-fondo)!important;border:1px solid var(--menu-borde)!important;
+  box-shadow:var(--menu-filo),var(--menu-sombra)!important;
+  -webkit-backdrop-filter:var(--menu-desenfoque);backdrop-filter:var(--menu-desenfoque);
+}
+@media (min-width:1025px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { padding:var(--esp-5) var(--esp-2) var(--esp-3)!important;gap:0; }
+}
+/* «Administración» se lee como subtítulo del logotipo; no es enfocable, así que reordenarlo no cambia el orden de Tab. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar-top { padding-inline:var(--menu-pad-x); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar>.private-role-label { order:0;margin:2px 0 var(--esp-4);padding:0 var(--menu-pad-x);color:var(--menu-texto-suave);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar>.sidebar-home { order:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar>.private-nav { order:2; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar>.private-menu-footer { order:3; }
+
+/* Sin subtítulo ni títulos de grupo, el menú del usuario separa logotipo, portada y apartados con aire. */
+html body[data-private=true][data-role=user] .sidebar>.sidebar-top { margin-bottom:var(--esp-4); }
+html body[data-private=true][data-role=user] .sidebar>.private-nav { margin-top:var(--menu-gap-grupo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav { gap:0!important;flex:1 0 auto!important;min-height:min-content;padding-inline:0!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group-label {
+  margin:var(--menu-gap-grupo) 0 6px;padding:0 var(--menu-pad-x);border:0;
+  color:var(--menu-texto-suave);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group { display:grid;gap:var(--menu-gap); }
+
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.sidebar .private-nav a.button,.sidebar a.sidebar-home,.sidebar .private-nav a.private-mail-link) {
+  position:relative;display:flex;align-items:center;justify-content:flex-start!important;gap:var(--menu-gap-icono);box-sizing:border-box;
+  width:100%!important;min-height:var(--menu-fila-alto)!important;margin:0;padding:var(--esp-2) var(--menu-pad-x)!important;
+  border:1px solid transparent!important;border-radius:var(--radio-boton)!important;background:transparent!important;box-shadow:none!important;
+  color:var(--menu-texto)!important;font-size:var(--menu-fuente)!important;font-weight:500!important;line-height:1.25!important;text-align:left!important;
+  text-decoration:none;white-space:normal!important;transform:none!important;
+  transition:background var(--duracion-corta) ease,color var(--duracion-corta) ease!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a.button,a.sidebar-home,a.private-mail-link) .icon { flex:0 0 20px;width:20px;height:20px;opacity:var(--menu-icono-reposo);color:inherit; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a.button,a.sidebar-home,a.private-mail-link) span:not(.sr-only) { min-width:0;overflow-wrap:break-word;color:inherit!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(.private-nav a.button,a.sidebar-home,.private-nav a.private-mail-link):hover { background:var(--menu-fila-hover)!important;color:#fff!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a.button,a.sidebar-home,a.private-mail-link):hover .icon { opacity:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(.private-nav a.button,a.sidebar-home,.private-nav a.private-mail-link):active { background:var(--menu-fila-pulsada)!important; }
+
+/* Apartado activo: la cápsula de vidrio de la portada y un punto de color habanero. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.button[aria-current] {
+  background:var(--menu-activo-fondo)!important;border-color:var(--menu-activo-borde)!important;box-shadow:var(--menu-activo-filo)!important;
+  color:#fff!important;font-weight:600!important;padding-right:calc(var(--menu-pad-x) + 6px)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.button[aria-current] .icon { opacity:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.button[aria-current]::after {
+  content:"";position:absolute;right:8px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--menu-acento);
+}
+
+/* Acceso a la portada: secundario, bajo el logotipo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar a.sidebar-home { min-height:34px!important;margin-bottom:var(--esp-1);font-size:13px!important;color:var(--menu-texto-suave)!important; }
+
+/* Pie: correo de soporte y Mi cuenta quedan abajo, separados por el espacio libre. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav>.private-group:last-of-type { margin-bottom:var(--menu-gap-grupo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.private-mail-link { margin-top:auto;font-size:13px!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.private-mail-link .icon:last-of-type { flex-basis:14px;width:14px;height:14px;margin-left:auto; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.private-mail-link+a[href="#cuenta"] { margin-top:var(--esp-1); }
+
+html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a,button):focus-visible { outline:2px solid #fff!important;outline-offset:2px; }
+
+@media (prefers-reduced-motion:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a,button) { transition:none!important; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { background:#1f5236!important;-webkit-backdrop-filter:none;backdrop-filter:none; }
+}
+@media (forced-colors:active) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar,
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(.private-nav a.button,a.sidebar-home) { background:Canvas!important;color:CanvasText!important;border-color:CanvasText!important;box-shadow:none!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.button[aria-current] { border-color:Highlight!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.button[aria-current]::after { background:Highlight; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar .private-nav a.private-mail-link { color:LinkText!important; }
+}
 
 /* Iconos de trazo, sin cuadro de fondo. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon { background:transparent!important;border:0!important;box-shadow:none!important;color:var(--claro-titulo)!important;margin-bottom:14px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:30px;height:30px; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .icon-medallion { background:transparent!important;border:0!important;box-shadow:none!important;color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .icon-medallion .icon { color:var(--claro-titulo); }
 
 /* Jerarquía tipográfica de la referencia */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading h1 { font-size:clamp(32px,3.2vw,42px);font-weight:800;letter-spacing:-.03em;color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading p:not(.eyebrow) { font-size:17px;color:var(--claro-suave)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line p:first-child { font-weight:600;color:var(--claro-tinta)!important;font-size:16px; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading h2 { font-size:clamp(21px,1.8vw,25px);font-weight:700;letter-spacing:-.015em;color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading p { font-size:15px; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart h2 { font-size:17px;font-weight:700; }
@@ -272,10 +340,23 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-pag
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .password-input-group input:not([type=checkbox]):not([type=radio]) {
   background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;outline:none!important;
 }
+/* Desplegable y campos de una línea del usuario: mismo alto y ancho que el campo de fecha en cualquier navegador.
+   Sin base-select la flecha nativa desaparece y se dibuja una «V» de trazo con dos degradados. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(select,.garden-form input:is([type=text],[type=number])) {
+  width:100%;height:var(--campo-alto);min-height:var(--campo-alto);box-sizing:border-box;padding-inline:14px;font-size:var(--texto-cuerpo);
+}
+@supports not (appearance:base-select) {
+  /* :not([multiple]):not([size]) iguala la especificidad del fondo de los campos, que va antes. */
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select:not([multiple]):not([size]) {
+    appearance:none;padding-inline-end:44px;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent calc(50% - 1px),var(--claro-tinta) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px)),linear-gradient(135deg,transparent calc(50% - 1px),var(--claro-tinta) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px))!important;
+    background-position:calc(100% - 24px) 55%,calc(100% - 18px) 55%!important;background-size:6px 6px!important;background-repeat:no-repeat!important;
+  }
+}
 /* Lista desplegable con el mismo vidrio claro (Chrome y Edge recientes). Otros navegadores usan la lista nativa. */
 @supports (appearance:base-select) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select { appearance:base-select;display:flex;align-items:center;gap:8px;min-height:46px;padding:0 14px!important; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker-icon { color:var(--claro-tinta);transition:rotate .18s ease-out; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker-icon { content:"";width:7px;height:7px;margin:0 4px 4px auto;border:solid var(--claro-tinta);border-width:0 2px 2px 0;transform:rotate(45deg);transition:rotate .18s ease-out; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select:open::picker-icon { rotate:180deg; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker(select) {
     appearance:base-select;margin-block:6px;padding:6px;border:1px solid var(--campo-borde);border-radius:16px;color:var(--claro-tinta);
@@ -357,11 +438,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 
 /* Componentes del usuario sobre el fondo claro */
 
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-pedestal { background:rgba(255,255,255,.6)!important;border:1px solid var(--vidrio-tarjeta-borde)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track { background:rgba(70,40,20,.12); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track span { background:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .skeleton-line { background:rgba(70,40,20,.12); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1 { font-weight:800;color:var(--claro-titulo)!important; }
 
 /* Gráfica sin datos: el marco ocupa su espacio real y el aviso queda centrado. */
 .user-chart-frame { position:relative; }
@@ -391,20 +468,10 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .k
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon .icon { width:18px;height:18px; }
 @media (max-width:520px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row { flex-wrap:wrap; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-row .button { width:100%; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-form-icon { top:23px; } }
 
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-mark .icon { color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page:has(> .account-profile) > .account-session { max-width:none;width:100%; }
 /* El texto de los botones hereda su color: gana a la regla general de texto suave. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button:not(#_) :is(span,.icon) { color:inherit!important; }
 
-/* Acceso externo al correo de soporte, en el grupo Gestión del panel. */
-.private-mail-link { display:grid;grid-template-columns:20px minmax(0,1fr) 16px;column-gap:12px;align-items:center;min-height:44px;padding:9px 16px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;line-height:1.3;text-decoration:none;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
-.private-mail-link:hover { background:rgba(255,255,255,.14); }
-.private-mail-link .icon { width:20px;height:20px; }
-.private-mail-link .icon:last-of-type { width:15px;height:15px;opacity:.75; }
-.private-mail-link:focus-visible { outline:3px solid #fff;outline-offset:3px; }
-html body .sidebar .private-mail-link:not(#_) { background:rgba(255,255,255,.07)!important;color:#fff!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;width:100%!important; }
-html body .sidebar .private-mail-link:not(#_):hover { background:rgba(255,255,255,.14)!important; }
-html body .sidebar .private-mail-link:not(#_) :is(span,.icon) { color:#fff!important; }
 
 /* Buzón de consultas del producto */
 .inquiry-filters { margin-bottom:12px; }
@@ -531,14 +598,635 @@ html body[data-private=true] #app-page .care-guide-answer .care-guide-source { f
 }
 @media (prefers-reduced-motion:reduce) { .care-guide summary::before { transition:none; } }
 
-/* Barra superior: transparente con la página arriba; el vidrio aparece al desplazarse (solo con animaciones ligadas al scroll). */
-@supports (animation-timeline:scroll()) {
-  @media (prefers-reduced-motion:no-preference) {
-    body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar {
-      animation:barra-vidrio linear both;animation-timeline:scroll(root block);animation-range:0 48px;
-    }
-    @keyframes barra-vidrio {
-      from { background:transparent;border-bottom-color:transparent;box-shadow:none;-webkit-backdrop-filter:blur(0);backdrop-filter:blur(0); }
-    }
-  }
+/* ── Panel del usuario ────────────────────────────────────────────────────────────────────────────
+   Piezas protagonistas en vidrio verde (plantas, resumen con IA, revisión técnica, riego); el resto en vidrio claro.
+   El foco de campos es un halo, no un contorno; en botones y enlaces el anillo solo aparece con teclado. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):focus-visible {
+  outline:none!important;border-color:var(--foco-borde)!important;box-shadow:var(--campo-filo),var(--foco-halo)!important;
 }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(a,button,summary,[tabindex="0"],input[type=checkbox],input[type=radio]):focus-visible { outline:2px solid var(--foco-anillo)!important;outline-offset:2px!important; }
+
+/* Saludo: «Hola,» ligero, el alias firme y el huerto en verde en su propia línea. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome { margin:0 0 var(--esp-4);min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1 {
+  display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.28em;margin:0;color:var(--claro-titulo);
+  font-size:var(--saludo-tam);font-weight:650;line-height:1.06;letter-spacing:-.035em;overflow-wrap:anywhere;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome-hello { font-weight:300;color:var(--claro-suave);letter-spacing:-.03em; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome-garden {
+  display:inline-flex;align-items:flex-start;line-height:1.3;gap:var(--esp-2);flex-basis:100%;margin-top:var(--esp-2);
+  color:var(--claro-verde);font-size:var(--saludo-huerto-tam);font-weight:550;letter-spacing:-.01em;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome-garden::before { content:"";flex:0 0 8px;width:8px;height:8px;margin-top:.5em;border-radius:50%;background:var(--coral); }
+/* El separador se oye con lector de pantalla; a la vista lo sustituye el salto de línea. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome-dot { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1>.garden-welcome-garden:first-child { flex-basis:auto;margin:0;color:inherit;font-size:inherit;font-weight:inherit;letter-spacing:inherit; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome h1>.garden-welcome-garden:first-child::before { display:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.garden-welcome-lead,.garden-welcome-phrase) { margin:var(--esp-3) 0 0;max-width:60ch;color:var(--claro-suave);font-size:16px;line-height:1.5; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome-lead { color:var(--claro-tinta);font-weight:500; }
+
+/* Resumen: un bloque dividido en cuatro, etiqueta con ícono pequeño, cifra y nota. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 var(--esp-6);padding:0!important;overflow:hidden; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat { display:flex;flex-direction:column;gap:var(--esp-1);min-width:0;padding:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat+.garden-stat { box-shadow:inset 1px 0 0 var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat h2 { display:flex;align-items:flex-start;gap:var(--esp-2);margin:0 0 var(--esp-2)!important;color:var(--claro-suave);font-size:var(--etiqueta-tam)!important;font-weight:500;line-height:1.3; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat h2 .icon { flex:0 0 18px;width:18px;height:18px;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat strong { color:var(--claro-titulo);font-size:var(--cifra-tam);font-weight:600;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat strong small { margin-left:3px;color:var(--claro-suave);font-size:.55em;font-weight:500;letter-spacing:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat.is-ok strong { color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat.is-low strong { color:var(--insignia-ambar-texto); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat p { margin:0;color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.45; }
+@media (max-width:1100px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat:nth-child(odd) { box-shadow:none; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat:nth-child(n+3) { box-shadow:inset 0 1px 0 var(--claro-linea); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat:nth-child(4) { box-shadow:inset 1px 0 0 var(--claro-linea),inset 0 1px 0 var(--claro-linea); }
+}
+@media (max-width:480px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat { padding:var(--esp-4); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat strong { font-size:22px; }
+}
+@media (max-width:400px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats { grid-template-columns:minmax(0,1fr); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat:nth-child(n) { box-shadow:inset 0 1px 0 var(--claro-linea); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat:first-child { box-shadow:none; }
+}
+
+/* Plantas: vidrio verde sobre la foto del habanero, un encuadre por planta. La lectura vive en un panel claro abajo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--esp-4);margin:0 0 var(--esp-6); }
+/* Siempre son tres plantas: tres columnas o una, nunca dos con una sola abajo. */
+@media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-grid { grid-template-columns:minmax(0,1fr); } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card {
+  --foto-pos:70% 60%;
+  display:flex;flex-direction:column;gap:var(--esp-3);min-width:0;min-height:340px;padding:var(--esp-4);
+  border:1px solid var(--pieza-verde-borde);border-radius:var(--radio-tarjeta);overflow:hidden;color:#fff;
+  background:var(--foto-velo),var(--foto-habanero) var(--foto-pos)/auto 190% no-repeat,#16402a;box-shadow:var(--pieza-verde-filo);
+  transition:transform var(--duracion-boton) var(--curva-boton),box-shadow var(--duracion-boton) ease;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-photo-1 { --foto-pos:82% 90%; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-photo-2 { --foto-pos:100% 10%; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-photo-3 { --foto-pos:58% 38%; }
+@media (hover:hover) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card:hover { transform:translateY(-2px); } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card>* { min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .card-top { display:flex;flex-wrap:wrap;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card .badge { color:#fff;background:var(--vidrio-sobre-verde);border-color:var(--vidrio-sobre-verde-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card .badge.tone-ambar { color:#fff;background:rgba(232,150,60,.42);border-color:rgba(255,206,150,.5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-name { margin-top:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-name h3 { margin:0 0 var(--esp-1);color:#fff;font-size:26px;font-weight:650;line-height:1.15;letter-spacing:-.025em;overflow-wrap:anywhere; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-name p { margin:0;color:var(--pieza-verde-suave);font-size:14px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading {
+  margin-top:auto;padding:var(--esp-3) var(--esp-4) var(--esp-4);border:1px solid var(--lectura-borde);border-radius:16px;
+  color:var(--claro-tinta);background:var(--lectura-fondo);box-shadow:0 12px 26px -16px rgba(0,0,0,.5);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading>span { display:flex;align-items:center;gap:6px;color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading .icon { width:16px;height:16px;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading strong { display:block;margin:2px 0 var(--esp-2);color:var(--claro-titulo);font-size:30px;font-weight:600;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading strong small { margin-left:3px;color:var(--claro-suave);font-size:.5em;font-weight:500; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading strong.absent { margin-bottom:0;color:var(--claro-suave);font-size:20px;font-weight:500; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track { height:6px;border-radius:var(--radio-boton);background:var(--medidor-fondo);overflow:hidden; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track span { display:block;height:100%;border-radius:inherit;background:var(--medidor-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card.is-dry .sensor-track span { background:var(--medidor-ambar); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card>.button {
+  width:100%;color:#fff!important;background:var(--vidrio-sobre-verde)!important;border:1px solid var(--vidrio-sobre-verde-borde)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card>.button:hover { background:var(--vidrio-sobre-verde-hover)!important; }
+
+/* Resumen con IA: vidrio claro con una luz verde y naranja; la marca en una cápsula verde. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis { display:grid;gap:var(--esp-3);margin-bottom:var(--esp-6);padding:var(--esp-5) var(--esp-6)!important;background:var(--ia-luz),var(--vidrio-tarjeta-fondo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-head { display:flex;align-items:center;gap:var(--esp-3); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-mark { display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:var(--radio-boton);color:#fff;background:var(--pieza-verde);box-shadow:var(--pieza-verde-filo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-mark .icon { width:20px;height:20px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis h2 { margin:0!important;color:var(--claro-titulo);font-size:18px!important;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-copy { min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-copy>p:first-child { margin:0;max-width:72ch;color:var(--claro-tinta);font-size:17px;line-height:1.6; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis-meta { margin:var(--esp-3) 0 var(--esp-3)!important;color:var(--claro-suave);font-size:var(--texto-meta)!important; }
+@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-diagnosis { padding:var(--esp-4)!important; } }
+
+/* Acciones rápidas: fichas iguales con ícono arriba; la revisión técnica es la ficha destacada en vidrio verde. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--esp-3);margin:0 0 var(--esp-3); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button {
+  flex-direction:column;align-items:flex-start;justify-content:space-between;gap:var(--esp-4);height:auto;min-height:112px!important;
+  padding:var(--esp-4)!important;border-radius:var(--radio-ficha)!important;white-space:normal;text-align:left;font-size:15px!important;line-height:1.3!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button .icon { width:24px;height:24px;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button.is-featured { color:#fff!important;background:var(--pieza-verde)!important;border:1px solid var(--pieza-verde-borde)!important;box-shadow:var(--pieza-verde-filo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button.is-featured .icon { color:#fff; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button.is-featured:hover { filter:brightness(1.06); }
+@media (max-width:1100px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:640px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button { min-height:96px!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-actions>.button.is-featured { grid-column:1/-1;min-height:64px!important;flex-direction:row;align-items:center;justify-content:flex-start; }
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-safety-copy { margin:var(--esp-2) var(--esp-1) var(--esp-6); }
+
+/* Selector de periodo y pestañas: un control segmentado; la opción activa es una pastilla clara elevada. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-range-control { display:inline-flex;gap:2px;padding:3px;border-radius:var(--radio-boton);background:var(--segmento-fondo);box-shadow:inset 0 1px 2px rgba(60,45,25,.08); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-range-control .button[aria-pressed=true] { color:var(--claro-titulo)!important;background:var(--segmento-activo)!important;border:0!important;box-shadow:var(--segmento-sombra)!important; }
+
+/* Gráficas: línea de 2 px, área que se desvanece, cuadrícula punteada y el último punto con halo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-heading p { color:var(--claro-titulo);font-size:28px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-grid line { stroke-dasharray:2 5; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-line { stroke-width:2; }
+/* La gráfica ocupa el ancho de su tarjeta; el alto crece hasta un tope para que no domine la pantalla. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-chart { max-height:280px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-band { fill-opacity:.08; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-area { stroke:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-fill-top { stop-color:var(--serie-1);stop-opacity:var(--serie-relleno); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-fill-bottom { stop-color:var(--serie-1);stop-opacity:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart-dot { fill:var(--serie-1);stroke:var(--segmento-activo);stroke-width:2;filter:drop-shadow(0 0 4px rgba(47,106,72,.45)); }
+
+/* Ficha de planta: banda con la foto de su tarjeta; listas de historial como línea de tiempo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero {
+  --foto-pos:70% 60%;
+  display:grid;gap:var(--esp-4);margin:0 0 var(--esp-5);padding:var(--esp-5);border:1px solid var(--pieza-verde-borde);border-radius:var(--radio-tarjeta);
+  color:#fff;background:var(--foto-velo-banda),var(--foto-habanero) var(--foto-pos)/cover no-repeat,#16402a;box-shadow:var(--pieza-verde-filo);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .garden-back {
+  justify-self:start;display:inline-flex;align-items:center;min-height:36px;padding:0 var(--esp-4);border:1px solid var(--vidrio-sobre-verde-borde);
+  border-radius:var(--radio-boton);color:#fff!important;background:var(--vidrio-sobre-verde);font-size:14px;font-weight:600;text-decoration:none;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading { margin:0;padding:0;align-items:flex-end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading h1 { color:#fff!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading :is(p,time) { color:var(--pieza-verde-suave)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading .button { color:#fff!important;background:var(--vidrio-sobre-verde)!important;border:1px solid var(--vidrio-sobre-verde-borde)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-5);margin-top:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns>.bento-panel { margin:0!important; }
+@media (max-width:900px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns { grid-template-columns:1fr; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating { color:#fff;background:var(--pieza-verde)!important;border-color:var(--pieza-verde-borde)!important;box-shadow:var(--pieza-verde-filo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating :is(h2,p,label) { color:#fff!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating p { color:var(--pieza-verde-suave)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating .btn-liquid-brand { color:var(--claro-verde)!important;background:var(--segmento-activo)!important;box-shadow:var(--segmento-sombra)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating .btn-liquid-brand:hover:not(:disabled) { background:#fff!important; }
+
+/* Diálogos: vidrio flotante, campos en rejilla, nota con ícono y acciones a la derecha. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog.app-dialog { width:min(520px,calc(100% - 32px));padding:var(--esp-6)!important;border-radius:var(--radio-dialogo)!important;box-shadow:var(--dialogo-sombra)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog::backdrop { background:var(--dialogo-velo);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog.app-dialog h2 { margin:0 0 var(--esp-5);color:var(--claro-titulo);font-size:22px;font-weight:650;letter-spacing:-.02em; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-form { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-field { display:grid;gap:6px;min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-field.is-wide,html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-form>:is(.dialog-note,.app-dialog-actions) { grid-column:1/-1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-field label { color:var(--claro-tinta);font-size:14px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-field :is(input,select) { width:100%;min-height:var(--campo-alto);box-sizing:border-box;padding:0 14px;font:500 15px/1.3 var(--body); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-note { display:flex;align-items:flex-start;gap:var(--esp-2);margin:0!important;padding:var(--esp-3);border-radius:var(--radio-campo);background:rgba(47,106,72,.07);color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-note .icon { flex:0 0 16px;width:16px;height:16px;margin-top:1px;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-form .app-dialog-actions { justify-content:flex-end;margin-top:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-form .app-dialog-actions .button { flex:0 0 auto;min-width:120px; }
+@media (max-width:480px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog.app-dialog { padding:var(--esp-5)!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-form { grid-template-columns:1fr; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .dialog-form .app-dialog-actions .button { flex:1 1 0; }
+}
+
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.plant-hero) { background:#16402a; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog::backdrop { -webkit-backdrop-filter:none;backdrop-filter:none; }
+}
+@media (prefers-reduced-motion:reduce) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card { transition:none; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card:hover { transform:none; } }
+@media (forced-colors:active) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-card,.plant-hero,.user-operating,.garden-actions>.button.is-featured,.user-diagnosis-mark) { background:Canvas!important;color:CanvasText!important;border:1px solid CanvasText!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-history-list li>span,.user-status-mark) { background:Canvas;color:CanvasText;border:1px solid CanvasText; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(input,select,textarea):focus-visible { outline:2px solid Highlight!important; }
+}
+
+/* Panel técnico: lecturas en el bloque dividido; con tres lecturas, tres columnas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats.is-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats.is-3 .garden-stat+.garden-stat { box-shadow:inset 1px 0 0 var(--claro-linea); }
+@media (max-width:640px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats.is-3 { grid-template-columns:1fr; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stats.is-3 .garden-stat+.garden-stat { box-shadow:inset 0 1px 0 var(--claro-linea); }
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-small-copy { color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.5; }
+
+/* Tablas: cabeceras pequeñas en tono suave, filas con línea tenue y cifras alineadas a la derecha. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table th { padding:var(--esp-3);color:var(--claro-suave);font-size:var(--texto-meta);font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table td { padding:var(--esp-3);font-size:var(--texto-etiqueta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table td { color:var(--claro-tinta);font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table tbody tr:hover { background:rgba(47,106,72,.04); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table.is-readings :is(th,td):is(:nth-child(2),:nth-child(3)) { text-align:right; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-log-panel] { margin-top:var(--esp-6); }
+/* En pantallas angostas la tabla se desplaza de lado en su contenedor en vez de partir fechas letra por letra. */
+@media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table :is(th,td) { white-space:nowrap; } }
+
+/* Regar una planta: etiquetas arriba, campos claros sobre el verde y el botón en la misma fila. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating:has(.user-water-form) { align-items:flex-end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form { display:grid;grid-template-columns:repeat(2,minmax(150px,1fr)) auto;gap:6px var(--esp-3);align-items:end;flex:0 1 540px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form label[for=water-plant] { grid-area:1/1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form #water-plant { grid-area:2/1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form label[for=water-seconds] { grid-area:1/2; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form #water-seconds { grid-area:2/2; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form>.button { grid-area:2/3; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form label { margin:0;color:var(--pieza-verde-suave)!important;font-size:var(--texto-meta);font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating .user-water-form select { width:100%;min-height:var(--campo-alto);background:var(--lectura-fondo)!important;border-color:transparent!important; }
+@media (max-width:640px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form { grid-template-columns:repeat(2,minmax(0,1fr));width:100%;flex-basis:auto; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form>.button { grid-area:3/1/4/3;width:100%; }
+}
+
+/* Mantenimiento: el formulario a la izquierda y los accesos rápidos como fichas a la derecha. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register { grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:var(--esp-4) var(--esp-6);align-items:start;max-width:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>h2 { grid-column:1/-1;margin:0!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form { grid-column:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form>.button[type=submit] { justify-self:end;min-width:160px;margin-top:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions {
+  grid-column:2;grid-row:2;display:grid;grid-template-columns:1fr;gap:var(--esp-2);margin:0;padding:0 0 0 var(--esp-6);
+  border-top:0;box-shadow:inset 1px 0 0 var(--claro-linea);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-actions>.button { justify-content:flex-start;gap:var(--esp-3);min-height:52px!important;padding:0 var(--esp-4)!important;border-radius:16px!important;white-space:normal;text-align:left; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-actions>.button .icon { flex:0 0 20px;color:var(--claro-verde); }
+@media (max-width:900px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register { grid-template-columns:1fr; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions { grid-column:1;grid-row:auto;grid-template-columns:repeat(2,minmax(0,1fr));padding:var(--esp-4) 0 0;box-shadow:inset 0 1px 0 var(--claro-linea); }
+}
+@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions { grid-template-columns:1fr; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form>.button[type=submit] { justify-self:stretch; } }
+
+/* Historiales (cuidados, solicitudes, planta, resúmenes): cada registro es una fila de vidrio base con su ícono en un medallón,
+   el título firme arriba y fecha y lugar debajo. Las insignias van a la derecha cuando hay espacio. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list { display:grid;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li {
+  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:var(--esp-3) var(--esp-4);padding:var(--esp-4);border:1px solid var(--vidrio-base-borde);
+  border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);box-shadow:var(--vidrio-base-sombra);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li:not(:has(>span)) { grid-template-columns:minmax(0,1fr); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li>span { display:grid;place-items:center;width:var(--medallon);height:var(--medallon);border-radius:var(--radio-sm);background:var(--insignia-verde-fondo);color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li>span .icon { width:20px;height:20px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li>div { display:grid;gap:var(--esp-1);min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list h3 { margin:0;color:var(--claro-titulo);font-size:var(--texto-cuerpo);font-weight:600;line-height:1.35;letter-spacing:-.01em; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list :is(p,small) { margin:0;color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.45; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li>div>p:first-child { color:var(--claro-tinta);font-size:var(--texto-etiqueta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list .badge { justify-self:start;margin-top:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks { display:flex;flex-wrap:wrap;gap:var(--esp-2);margin-top:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks .badge { margin:0; }
+@media (min-width:720px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row>div { grid-template-columns:minmax(0,1fr) auto;column-gap:var(--esp-4); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row>div>:not(.care-row-marks) { grid-column:1; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks { grid-column:2;grid-row:1/span 2;align-self:center;justify-content:flex-end;margin:0; }
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided { background:var(--fila-anulada); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided>span { background:var(--insignia-rojo-fondo);color:var(--insignia-rojo-texto); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided h3 { color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list details { margin-top:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list summary { width:fit-content;color:var(--claro-verde);font-size:var(--texto-meta);font-weight:600;cursor:pointer; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list details p { margin-top:var(--esp-1);color:var(--claro-tinta); }
+
+/* Soporte: los dos pasos lado a lado, cada uno con su número en una marca verde. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-steps { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-5);align-items:start;margin-bottom:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-steps>.support-step-card { max-width:none;margin:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title) { max-width:none; }
+@media (max-width:1000px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-steps { grid-template-columns:1fr; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card>h2 { display:flex;align-items:center;gap:var(--esp-3);margin:0 0 var(--esp-1)!important;color:var(--claro-titulo);font-size:20px!important;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step { display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;color:#fff;background:var(--pieza-verde);box-shadow:var(--pieza-verde-filo);font-size:15px;font-weight:650;font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-sep { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card>.button { justify-self:start; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card textarea { min-height:120px;padding:var(--esp-3) 14px;resize:vertical;font:400 var(--texto-cuerpo)/1.5 var(--body); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card form>.user-small-copy { justify-self:end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card form>.button[type=submit] { margin-top:var(--esp-2); }
+
+/* Resultado de la revisión: una cuadrícula de componentes, cada uno en su fila con su insignia. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-card { margin-top:var(--esp-2);padding:var(--esp-4)!important;background:var(--vidrio-base-fondo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-card h3 { margin:0;color:var(--claro-titulo);font-size:17px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-list { grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:var(--esp-2);margin-top:var(--esp-3); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-list li { flex-direction:column;align-items:flex-start;justify-content:center;flex-wrap:nowrap;gap:var(--esp-2);min-height:44px;padding:var(--esp-3);border-radius:var(--radio-campo);background:rgba(255,255,255,.62);color:var(--claro-tinta);font-size:var(--texto-etiqueta);font-weight:500; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-list li .badge { flex:0 0 auto; }
+@media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-list li { flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-list li small { flex-basis:100%;color:var(--claro-suave);font-size:var(--texto-meta); }
+
+/* Casillas de autorización: una fila clara que se marca en verde al aceptar. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .legal-check { display:flex!important;align-items:flex-start;gap:var(--esp-3);padding:var(--esp-3) var(--esp-4);border-radius:var(--radio-campo);background:rgba(255,255,255,.62);box-shadow:inset 0 0 0 1px var(--campo-borde);color:var(--claro-tinta);font-size:var(--texto-etiqueta);line-height:1.45;cursor:pointer; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .legal-check:has(input:checked) { box-shadow:inset 0 0 0 2px var(--claro-verde);background:rgba(47,106,72,.06); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .legal-check input { accent-color:var(--claro-verde);flex:0 0 20px;width:20px;height:20px;margin:1px 0 0; }
+
+/* Caso activo: el folio en una cápsula y las acciones de peligro en tinte rojo pálido (la confirmación final sigue en rojo). */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .folio { padding:2px var(--esp-2);border-radius:var(--radio-insignia);background:rgba(47,106,72,.1);color:var(--claro-verde);font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .button[data-danger=true] { color:var(--insignia-rojo-texto)!important;background:var(--insignia-rojo-fondo)!important;border:1px solid var(--insignia-rojo-borde)!important;box-shadow:none!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .button[data-danger=true]:hover:not(:disabled) { background:rgba(163,50,31,.18)!important; }
+
+/* Mi cuenta: la pestaña abierta es la pastilla clara del control segmentado; los datos con etiqueta pequeña y valor firme. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button[aria-current=page] { color:var(--claro-titulo)!important;background:var(--segmento-activo)!important;border:0!important;box-shadow:var(--segmento-sombra)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .profile-facts { gap:var(--esp-3); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .profile-facts>div { padding-bottom:var(--esp-3);box-shadow:inset 0 -1px 0 var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .profile-facts>div:last-child { padding-bottom:0;box-shadow:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .profile-facts dt { margin-bottom:2px;color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .profile-facts dd { color:var(--claro-titulo);font-size:16px;font-weight:600;overflow-wrap:anywhere; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card { display:flex;flex-direction:column;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card>.app-actions:last-child { margin-top:auto; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .my-garden>h2 { font-size:22px!important;font-weight:650;letter-spacing:-.02em; }
+
+/* ── Pulido del panel del usuario: títulos, etiquetas, insignias, estado del equipo y avisos ── */
+/* Títulos de pantalla y de tarjeta con el mismo trazo del saludo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome-name { color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .bento-panel>h2 { font-size:var(--texto-titulo-tarjeta)!important;font-weight:650;letter-spacing:-.02em;color:var(--claro-titulo); }
+/* Etiquetas de formulario legibles y con aire sobre su campo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.garden-form,.care-filters,.maint-date-control,.key-form) label:not(.legal-check) { margin:0 0 var(--separacion-etiqueta)!important;color:var(--claro-tinta);font-size:var(--texto-etiqueta)!important;font-weight:600; }
+/* Sin gap en el formulario: la etiqueta queda a 6 px de su campo y cada campo a 16 px del siguiente; el contador sigue pegado al texto. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form form { gap:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form form>:not(label:not(.legal-check)):not(.button):not(:has(+.user-small-copy)) { margin-bottom:var(--esp-4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form form>.user-small-copy { margin-top:var(--separacion-etiqueta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.maint-date-control,.care-filters>div:not(.app-actions)) { gap:0; }
+@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-filters>.maint-date-control { flex-basis:100%; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .maint-date-control>.user-small-copy { margin-top:var(--separacion-etiqueta); }
+
+/* Insignias: cápsula de 30 px, texto de 14 px y punto con halo del mismo tono. El verde late despacio para leerse como «vivo». */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .badge {
+  display:inline-flex;align-items:center;gap:var(--esp-2);height:var(--insignia-alto);padding:0 var(--esp-3);font-size:var(--texto-meta);font-weight:600;letter-spacing:0;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .badge::before { flex:0 0 auto;width:var(--insignia-punto);height:var(--insignia-punto);margin:0;box-shadow:0 0 0 3px var(--insignia-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .badge.tone-verde::before { animation:insignia-latido 2.4s ease-in-out infinite; }
+@keyframes insignia-latido { 50% { box-shadow:0 0 0 5px transparent; } }
+
+/* Estado del equipo en Mi huerto y Panel técnico: ficha con ícono y fondo del tono; se entiende de un vistazo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line {
+  --insignia-fondo:var(--insignia-gris-fondo);--insignia-texto:var(--insignia-gris-texto);--insignia-borde:var(--insignia-gris-borde);
+  display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:var(--esp-3);width:fit-content;max-width:100%;margin:0 0 var(--esp-5);
+  padding:var(--esp-2) var(--esp-5) var(--esp-2) var(--esp-2);box-sizing:border-box;border:1px solid var(--insignia-borde);border-radius:var(--radio-boton);background:var(--insignia-fondo);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line.tone-verde { --insignia-fondo:var(--insignia-verde-fondo);--insignia-texto:var(--insignia-verde-texto);--insignia-borde:var(--insignia-verde-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line.tone-ambar { --insignia-fondo:var(--insignia-ambar-fondo);--insignia-texto:var(--insignia-ambar-texto);--insignia-borde:var(--insignia-ambar-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line.tone-rojo { --insignia-fondo:var(--insignia-rojo-fondo);--insignia-texto:var(--insignia-rojo-texto);--insignia-borde:var(--insignia-rojo-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-mark { position:relative;display:grid;place-items:center;flex:0 0 var(--medallon);width:var(--medallon);height:var(--medallon);border-radius:50%;color:var(--insignia-texto);background:var(--vidrio-opaco);box-shadow:0 0 0 1px var(--insignia-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-mark .icon { width:20px;height:20px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line.tone-verde .user-status-mark::after { content:"";position:absolute;inset:-1px;border-radius:50%;box-shadow:0 0 0 0 var(--insignia-verde-borde);animation:estado-onda 2.4s ease-out infinite; }
+@keyframes estado-onda { to { box-shadow:0 0 0 8px transparent; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line p { margin:0;min-width:0;color:var(--insignia-texto)!important;font-size:var(--texto-cuerpo)!important;font-weight:600;line-height:1.35; }
+@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line { width:100%;border-radius:var(--radio-campo); } }
+@media (prefers-reduced-motion:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .badge.tone-verde::before,
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-mark::after { animation:none; }
+}
+
+/* Avisos: filtros y «Marcar todo como leído» en una barra; filas con aire y las no leídas resaltadas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-toolbar { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--esp-4);margin:0 0 var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-toolbar>.notice-filters { flex:0 1 auto;min-width:0;margin:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-toolbar>.button { flex:0 0 auto; }
+@media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-toolbar>.button { width:100%; } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-list { padding:var(--esp-2)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-list>li+li { border-top:1px solid var(--claro-linea); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row { grid-template-columns:auto var(--aviso-insignia-ancho) minmax(0,1fr);align-items:center;gap:var(--esp-4);padding:var(--esp-4);border:0;border-radius:var(--radio-campo);transition:background-color var(--duracion-corta) ease; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row:hover { background:var(--fila-hover); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row.is-unread { background:var(--fila-no-leida); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row.is-unread:hover { background:var(--fila-no-leida-hover); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row>:is(.notice-dot,.badge) { margin:0;justify-self:start; }
+@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row { grid-template-columns:auto minmax(0,1fr); } }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-title { color:var(--claro-titulo);font-size:var(--texto-cuerpo);font-weight:500; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-row.is-unread .notice-title { font-weight:650; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .notice-meta-line { font-size:var(--texto-meta); }
+
+/* Textos pequeños que quedaban en 12–13 px. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-safety-copy,.user-chart-legend,.notice-meta,.user-metric h2,.user-metric p) { font-size:var(--texto-meta)!important; }
+
+/* ── Huerto sin equipo, crear huerto y vinculación ── */
+/* Títulos de página del usuario con el trazo del saludo (Avisos, Mi cuenta, Mis huertos, Crear huerto…). La ficha de planta conserva su blanco. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading h1 { margin:0!important;font-size:var(--saludo-tam)!important;font-weight:650!important;line-height:1.06!important;letter-spacing:-.035em;overflow-wrap:break-word; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading p:not(.eyebrow) { margin-top:var(--esp-3);font-size:var(--texto-cuerpo)!important; }
+
+/* Pasos numerados: marca verde con el número (como en Soporte), título firme y nota debajo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-steps { counter-reset:paso;display:grid;gap:var(--esp-3);margin:0;padding:0;list-style:none; }
+/* El paso es un bloque con la marca a la izquierda: el texto puede llevar <strong> en medio sin partirse. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-steps li {
+  counter-increment:paso;position:relative;min-height:var(--marca-paso);padding:5px 0 0 calc(var(--marca-paso) + var(--esp-3));box-sizing:border-box;
+  color:var(--claro-tinta);font-size:var(--texto-etiqueta);line-height:1.5;text-align:left;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-steps li strong { color:var(--claro-titulo);font-weight:650; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-steps li::before {
+  content:counter(paso);position:absolute;left:0;top:0;display:grid;place-items:center;width:var(--marca-paso);height:var(--marca-paso);border-radius:50%;
+  color:#fff;background:var(--pieza-verde);box-shadow:var(--pieza-verde-filo);font-size:var(--texto-etiqueta);font-weight:650;font-variant-numeric:tabular-nums;
+}
+
+/* «Conecta tu equipo»: ficha centrada, los tres pasos como fichas y el botón a su ancho. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect { max-width:var(--tarjeta-centrada);margin-inline:auto;padding:var(--esp-6)!important;justify-items:center;gap:var(--esp-5);text-align:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect>h2 { margin:0!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps { width:100%;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps li {
+  display:grid;justify-items:center;align-content:start;row-gap:var(--esp-2);padding:var(--esp-5) var(--esp-4);text-align:center;
+  border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);box-shadow:var(--vidrio-base-sombra);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps li::before { position:static; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps strong { font-size:var(--texto-cuerpo);font-weight:600;line-height:1.35; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps span { color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.garden-connect,.garden-empty,.link-progress~.garden-form)>.button,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form .app-actions>.button { min-width:var(--boton-ancho-min); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect>.button { justify-self:center; }
+
+/* Vincular equipo: título, progreso y tarjeta centrados en una columna. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome:has(+.link-progress) { max-width:var(--tarjeta-centrada);margin-inline:auto;text-align:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome:has(+.link-progress) h1 { justify-content:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-welcome:has(+.link-progress) .garden-welcome-garden { justify-content:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress { counter-reset:progreso;display:flex;flex-wrap:wrap;justify-content:center;gap:var(--esp-2);margin:0 auto var(--esp-5);padding:0;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress li {
+  counter-increment:progreso;display:inline-flex;align-items:center;gap:var(--esp-2);padding:var(--esp-1) var(--esp-4) var(--esp-1) var(--esp-1);
+  border-radius:var(--radio-boton);background:var(--segmento-fondo);color:var(--claro-suave);font-size:var(--texto-meta);font-weight:600;white-space:nowrap;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress li::before {
+  content:counter(progreso);display:grid;place-items:center;width:var(--marca-progreso);height:var(--marca-progreso);border-radius:50%;
+  background:var(--vidrio-opaco);color:var(--claro-suave);font-variant-numeric:tabular-nums;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress [aria-current=step] { color:var(--insignia-verde-texto);background:var(--insignia-verde-fondo);box-shadow:inset 0 0 0 1px var(--insignia-verde-borde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress [aria-current=step]::before { color:#fff;background:var(--pieza-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress .is-done { color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress .is-done::before { content:"✓";color:#fff;background:var(--claro-verde); }
+
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form { max-width:var(--tarjeta-centrada);margin-inline:auto;padding:var(--esp-6)!important;justify-items:center;gap:var(--esp-4);text-align:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form>:is(h2,p) { margin:0!important;max-width:52ch; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form>.icon-medallion { display:grid;place-items:center;width:var(--medallon-grande);height:var(--medallon-grande);border-radius:50%;color:#fff!important;background:var(--pieza-verde)!important;box-shadow:var(--pieza-verde-filo)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form>.icon-medallion .icon { width:var(--marca-progreso);height:var(--marca-progreso);color:#fff!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form .app-actions { display:flex;flex-wrap:wrap;justify-content:center;gap:var(--esp-3);margin:var(--esp-2) 0 0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form :is(.garden-steps,.link-help) { justify-self:stretch; }
+
+/* Código de vinculación: la pieza protagonista, centrada, con su vencimiento y «Copiar» debajo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-code-box {
+  display:grid;justify-items:center;gap:var(--esp-3);width:100%;box-sizing:border-box;padding:var(--esp-5) var(--esp-4);
+  border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-tarjeta);background:var(--vidrio-base-fondo);box-shadow:var(--vidrio-base-sombra);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-code {
+  max-width:100%;box-sizing:border-box;margin:0;padding:var(--esp-3) var(--esp-5);border-radius:var(--radio-campo);border:1px solid var(--campo-borde);background:var(--vidrio-opaco);
+  color:var(--claro-titulo);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--codigo-tam);font-weight:700;letter-spacing:.12em;line-height:1.2;overflow-wrap:anywhere;user-select:all;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-code.is-long { font-size:var(--texto-titulo-tarjeta);letter-spacing:.03em; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-code-box .user-small-copy { margin:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-code-box [data-countdown] { color:var(--claro-titulo);font-weight:650;font-variant-numeric:tabular-nums; }
+
+/* Esperando al equipo: cápsula ámbar con un punto que late; el código vencido, en rojo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-waiting,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form>p[role=alert] {
+  display:inline-block;margin:0;padding:var(--esp-2) var(--esp-4);border-radius:var(--radio-boton);
+  font-size:var(--texto-meta);font-weight:600;color:var(--insignia-ambar-texto);background:var(--insignia-ambar-fondo);border:1px solid var(--insignia-ambar-borde);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-waiting span { color:inherit; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-waiting::before { content:"";display:inline-block;vertical-align:middle;margin:-2px var(--esp-2) 0 0;width:var(--insignia-punto);height:var(--insignia-punto);border-radius:50%;background:currentColor;animation:orden-pulso 1.4s ease-in-out infinite; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-progress~.garden-form>p[role=alert] { color:var(--insignia-rojo-texto);background:var(--insignia-rojo-fondo);border-color:var(--insignia-rojo-borde); }
+@media (prefers-reduced-motion:reduce) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-waiting::before { animation:none; } }
+
+/* ¿Problemas para conectar?: fila desplegable clara. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-help { box-sizing:border-box;padding:var(--esp-3) var(--esp-4);border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);text-align:left; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-help summary { color:var(--claro-verde);font-size:var(--texto-etiqueta);font-weight:600;cursor:pointer; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .link-help>:not(summary) { margin-top:var(--esp-2); }
+
+/* Crear huerto: mismo formato centrado que la vinculación. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .page-heading:has(+.garden-form [data-garden-form=create]) { max-width:var(--tarjeta-centrada);margin-inline:auto;text-align:center;justify-content:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has([data-garden-form=create]) { max-width:var(--tarjeta-centrada);margin-inline:auto;padding:var(--esp-6)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-form=create] .app-actions { justify-content:flex-end; }
+
+@media (max-width:480px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.garden-connect,.link-progress~.garden-form,.garden-form:has([data-garden-form=create])) { padding:var(--esp-5) var(--esp-4)!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.garden-connect,.garden-empty,.link-progress~.garden-form)>.button { justify-self:stretch;min-width:0; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps li { display:block;padding:var(--esp-4) var(--esp-4) var(--esp-4) calc(var(--esp-4) + var(--marca-paso) + var(--esp-3));text-align:left; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps li::before { position:absolute;left:var(--esp-4);top:var(--esp-4); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-connect .garden-steps :is(strong,span) { display:block; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.link-waiting,.link-progress~.garden-form>p[role=alert]) { border-radius:var(--radio-campo); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.link-progress~.garden-form,[data-garden-form=create]) .app-actions { flex-direction:column;align-items:stretch;width:100%; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.link-progress~.garden-form,[data-garden-form=create]) .app-actions>.button { width:100%;min-width:0; }
+}
+/* Enlace externo de la tarjeta vacía: el ícono acompaña a la última palabra aunque el texto se parta. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-empty-link { display:inline;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-empty-link .icon { width:16px;height:16px;margin-left:var(--esp-1);vertical-align:-2px; }
+/* Paginación en teléfono: anterior, página y siguiente en una sola fila. */
+@media (max-width:480px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-pager { display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--esp-2); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-pager .button { min-height:var(--boton-alto-compacto)!important;padding:0 var(--esp-4)!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-pager span { text-align:center;white-space:normal; }
+}
+
+/* ── Panel de administración: la misma base del usuario aplicada a sus piezas propias ── */
+/* Etiquetas y ritmo de formularios también en diálogos, consola y guías. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) :is(dialog form,.console-pump,[data-admin-form],.care-admin-field) label:not(.legal-check):not(.sr-only) {
+  display:block;margin:0 0 var(--separacion-etiqueta)!important;color:var(--claro-tinta);font-size:var(--texto-etiqueta)!important;font-weight:600;line-height:1.3;
+}
+html body[data-private=true][data-role=admin] dialog.app-dialog { width:min(var(--dialogo-ancho),calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto; }
+html body[data-private=true][data-role=admin] :is(.admin-dialog form,[data-admin-form=resolve]) { display:grid;gap:0; }
+html body[data-private=true][data-role=admin] :is(.admin-dialog form,[data-admin-form=resolve])>:not(label:not(.legal-check)):not(.button):not(h2):not(h3):not(.app-dialog-actions):not(:has(+.user-small-copy)) { margin-bottom:var(--esp-4); }
+html body[data-private=true][data-role=admin] :is(.admin-dialog form,[data-admin-form=resolve])>.user-small-copy { margin:calc(var(--esp-2) - var(--esp-4)) 0 var(--esp-4); }
+html body[data-private=true][data-role=admin] :is(.admin-dialog form,[data-admin-form=resolve])>h3 { margin:0 0 var(--esp-3);color:var(--claro-titulo);font-size:17px;font-weight:650; }
+html body[data-private=true][data-role=admin] :is(.admin-dialog form,[data-admin-form=resolve])>.button[type=submit] { justify-self:end;min-width:160px; }
+html body[data-private=true][data-role=admin] .admin-dialog :is(.user-facts,form)+form { margin-top:var(--esp-5);padding-top:var(--esp-5);border-top:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=admin] .admin-dialog .app-dialog-actions { justify-content:flex-end;margin-top:var(--esp-5); }
+html body[data-private=true][data-role=admin] .admin-dialog .app-dialog-actions .button { flex:0 0 auto;min-width:140px; }
+html body[data-private=true][data-role=admin] .admin-dialog .app-dialog-actions .button[data-danger=true] { margin-right:auto; }
+html body[data-private=true][data-role=admin] .admin-dialog>div>p:not([class]) { margin:var(--esp-3) 0 0;text-align:center; }
+
+/* Datos «etiqueta / valor» como fichas en rejilla: se leen de un vistazo en la ficha del equipo, la consola y los diálogos. */
+html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts { display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--dato-ancho-min)),1fr));gap:var(--esp-2);margin:0 0 var(--esp-4); }
+html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts>div {
+  display:grid;align-content:start;gap:2px;min-width:0;padding:var(--esp-3) var(--esp-4);
+  border:1px solid var(--vidrio-base-borde)!important;border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);
+}
+html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts dt { color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts dd { margin:0;text-align:left;color:var(--claro-titulo);font-size:var(--texto-etiqueta);font-weight:600;line-height:1.4;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts dd .badge { margin-top:2px; }
+
+/* Cifras: un bloque dividido como el resumen de «Mi huerto». */
+html body[data-private=true][data-role=admin] #app-page .user-summary-metrics {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:0;margin:0 0 var(--esp-5);overflow:hidden;
+  border:1px solid var(--vidrio-tarjeta-borde);border-radius:var(--radio-tarjeta);background:var(--vidrio-tarjeta-fondo);box-shadow:var(--vidrio-tarjeta-sombra);
+}
+/* El separador es una sombra hacia fuera: en los bordes del bloque queda recortada y solo se ve entre fichas. */
+html body[data-private=true][data-role=admin] #app-page .user-metric { min-height:0;padding:var(--esp-5)!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:-1px 0 0 var(--claro-linea),0 -1px 0 var(--claro-linea)!important; }
+html body[data-private=true][data-role=admin] #app-page .user-metric h2 { margin:0 0 var(--esp-1)!important;color:var(--claro-suave);font-size:var(--texto-meta)!important;font-weight:500; }
+html body[data-private=true][data-role=admin] #app-page .user-metric strong { font-size:var(--kpi-cifra)!important;font-weight:650;letter-spacing:-.02em; }
+html body[data-private=true][data-role=admin] #app-page .user-metric strong.consent-figure { font-size:var(--texto-cuerpo)!important;font-weight:600;line-height:1.4;white-space:normal; }
+@media (max-width:640px) { html body[data-private=true][data-role=admin] #app-page .user-summary-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } html body[data-private=true][data-role=admin] #app-page .user-metric { padding:var(--esp-4)!important; } html body[data-private=true][data-role=admin] #app-page .user-metric strong { font-size:var(--texto-titulo-tarjeta)!important; } }
+@media (max-width:330px) { html body[data-private=true][data-role=admin] #app-page .user-summary-metrics { grid-template-columns:minmax(0,1fr); } }
+
+/* Separación entre bloques de la página (Ventas → Resumen: el periodo ya no queda pegado a las cifras). */
+html body[data-private=true][data-role=admin] #app-page>:is(.bento-panel,.user-summary-metrics,.user-chart-grid-layout,.legal-editor,.console-layout) { margin-top:0;margin-bottom:var(--esp-5); }
+html body[data-private=true][data-role=admin] #app-page>.bento-panel>.care-filters:only-child { margin:0; }
+
+/* Filtros: rejilla ordenada, botones al final y una línea antes de la tabla. */
+html body[data-private=true][data-role=admin] #app-page .care-filters { padding-bottom:var(--esp-4);border-bottom:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=admin] #app-page .bento-panel>.care-filters:only-child { padding-bottom:0;border-bottom:0; }
+
+/* Tablas: filas con aire, cabecera suave y la columna de acción fija a la derecha cuando la tabla se desplaza. */
+html body[data-private=true][data-role=admin] #app-page .admin-table td { padding-block:var(--esp-3);font-size:var(--texto-etiqueta); }
+html body[data-private=true][data-role=admin] #app-page .admin-table td:first-child { color:var(--claro-titulo);font-weight:600; }
+html body[data-private=true][data-role=admin] #app-page .admin-table td small { display:block;color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true][data-role=admin] #app-page .admin-table tbody tr:hover { background:var(--fila-hover); }
+@media (min-width:1025px) {
+  html body[data-private=true][data-role=admin] #app-page .admin-table :is(th,td):last-child:has(.button) { position:sticky;right:0;width:var(--accion-columna);text-align:right;background:linear-gradient(90deg,transparent,var(--vidrio-opaco) 18px); }
+  html body[data-private=true][data-role=admin] #app-page .admin-table th:last-child:empty { position:sticky;right:0;width:var(--accion-columna);background:linear-gradient(90deg,transparent,var(--vidrio-opaco) 18px); }
+}
+@media (max-width:1024px) {
+  html body[data-private=true][data-role=admin] #app-page .admin-table td { grid-template-columns:minmax(0,38%) minmax(0,1fr);min-height:0;padding:var(--esp-1) 0!important;align-items:baseline; }
+  html body[data-private=true][data-role=admin] #app-page .admin-table td:first-child { white-space:normal;overflow-wrap:anywhere; }
+  html body[data-private=true][data-role=admin] #app-page .admin-table td::before { font-size:var(--texto-meta)!important;white-space:normal;overflow-wrap:anywhere; }
+  html body[data-private=true][data-role=admin] #app-page .admin-table tr { padding:var(--esp-4);border-color:var(--vidrio-base-borde); }
+  html body[data-private=true][data-role=admin] #app-page .admin-table td:last-child:has(.button) { grid-template-columns:minmax(0,1fr);padding-top:var(--esp-3); }
+  html body[data-private=true][data-role=admin] #app-page .admin-table td:last-child:has(.button)::before { display:none; }
+  html body[data-private=true][data-role=admin] #app-page .admin-table td:last-child .button { width:100%; }
+  html body[data-private=true][data-role=admin] #app-page .admin-table td small { grid-column:2; }
+}
+@media (max-width:640px) {
+  html body[data-private=true][data-role=admin] #app-page .page-heading { flex-direction:column;align-items:stretch; }
+  html body[data-private=true][data-role=admin] #app-page .page-heading>.button { align-self:flex-start;margin-top:var(--esp-2); }
+  html body[data-private=true][data-role=admin] #app-page .page-heading>div { flex:0 0 auto; }
+  html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html body[data-private=true][data-role=admin] :is(#app-page,dialog) .user-facts>div { padding:var(--esp-2) var(--esp-3); }
+}
+
+/* Consola remota: casos como fichas legibles; la seleccionada en verde. */
+html body[data-private=true][data-role=admin] .console-list .console-item { gap:var(--esp-1)!important;padding:var(--esp-3) var(--esp-4)!important;border-radius:var(--radio-campo)!important;background:var(--vidrio-base-fondo)!important;border:1px solid var(--vidrio-base-borde)!important; }
+html body[data-private=true][data-role=admin] .console-list .console-item:hover { background:var(--fila-hover)!important; }
+html body[data-private=true][data-role=admin] .console-list .console-item.is-selected { background:var(--fila-no-leida)!important;border-color:var(--insignia-verde-borde)!important;box-shadow:inset 3px 0 0 var(--claro-verde)!important; }
+html body[data-private=true][data-role=admin] .console-item-title { color:var(--claro-titulo);font-size:var(--texto-etiqueta);line-height:1.35; }
+html body[data-private=true][data-role=admin] .console-item small { color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.4;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=admin] .console-inbox .user-pager { display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--esp-2); }
+html body[data-private=true][data-role=admin] .console-inbox .user-pager span { text-align:center;white-space:normal; }
+html body[data-private=true][data-role=admin] #app-page .console-detail>h2 { display:flex;flex-wrap:wrap;align-items:center;gap:var(--esp-2); }
+html body[data-private=true][data-role=admin] #app-page .console-session-head { padding-bottom:var(--esp-4);margin-bottom:var(--esp-4);border-bottom:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=admin] #app-page .console-session-head>h2 { flex:1 1 auto;margin:0!important; }
+html body[data-private=true][data-role=admin] #app-page .console-session h3 { margin:var(--esp-5) 0 var(--esp-3);color:var(--claro-titulo);font-size:17px;font-weight:650; }
+html body[data-private=true][data-role=admin] #app-page .console-actions { display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:var(--esp-2); }
+html body[data-private=true][data-role=admin] #app-page .console-pump { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) auto;align-items:end;gap:var(--esp-3);padding:var(--esp-4);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo); }
+@media (max-width:480px) { html body[data-private=true][data-role=admin] #app-page .console-pump { grid-template-columns:repeat(2,minmax(0,1fr)); } html body[data-private=true][data-role=admin] #app-page .console-pump>.button { grid-column:1/-1; } }
+
+/* Solicitudes del producto. */
+html body[data-private=true][data-role=admin] #app-page .inquiry-head { gap:var(--esp-2) var(--esp-3);margin-bottom:var(--esp-3); }
+html body[data-private=true][data-role=admin] #app-page .inquiry-folio { color:var(--claro-titulo);font-size:var(--texto-cuerpo); }
+html body[data-private=true][data-role=admin] #app-page .inquiry-state { display:inline-flex;align-items:center;height:var(--insignia-alto);padding:0 var(--esp-3);border-radius:var(--radio-insignia);font-size:var(--texto-meta);font-weight:600;color:var(--insignia-texto,var(--insignia-ambar-texto));background:var(--insignia-fondo,var(--insignia-ambar-fondo));border:1px solid var(--insignia-borde,var(--insignia-ambar-borde)); }
+html body[data-private=true][data-role=admin] #app-page .inquiry-state.is-archivada { --insignia-fondo:var(--insignia-gris-fondo);--insignia-texto:var(--insignia-gris-texto);--insignia-borde:var(--insignia-gris-borde); }
+html body[data-private=true][data-role=admin] #app-page :is(.inquiry-date,.inquiry-meta,.inquiry-status) { font-size:var(--texto-meta)!important; }
+html body[data-private=true][data-role=admin] #app-page .inquiry-who { font-size:var(--texto-etiqueta); }
+html body[data-private=true][data-role=admin] #app-page .inquiry-message { font-size:var(--texto-cuerpo);line-height:1.55;color:var(--claro-tinta); }
+html body[data-private=true][data-role=admin] #app-page .inquiry-item .app-actions { margin-top:var(--esp-4);padding-top:var(--esp-4);border-top:1px solid var(--claro-linea); }
+
+/* Ficha del equipo y autodiagnósticos. */
+html body[data-private=true][data-role=admin] #app-page .bento-panel>.user-facts:first-child { margin-top:0; }
+html body[data-private=true][data-role=admin] #app-page .bento-panel>.user-facts+.app-actions { padding-top:var(--esp-4);border-top:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=admin] #app-page .bento-panel>.diagnostic-list { display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:var(--esp-2); }
+html body[data-private=true][data-role=admin] #app-page .bento-panel>.diagnostic-list li { flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:var(--esp-3) var(--esp-4); }
+
+/* Credencial del equipo: el código centrado. */
+html body[data-private=true][data-role=admin] .admin-dialog .link-code-box { margin-top:var(--esp-2); }
+
+/* Administradores: grupos de capacidades como fichas con casillas en dos columnas. */
+html body[data-private=true][data-role=admin] .admin-dialog .legal-card { display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:var(--esp-2);margin:0 0 var(--esp-4);padding:var(--esp-4);border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo); }
+html body[data-private=true][data-role=admin] .admin-dialog .legal-card legend { float:left;grid-column:1/-1;width:100%;margin:0 0 var(--esp-1);padding:0;color:var(--claro-titulo);font-size:var(--texto-etiqueta);font-weight:650; }
+html body[data-private=true][data-role=admin] .admin-dialog .legal-card .legal-check { margin:0; }
+
+/* Textos legales: filas de versión con acciones a la derecha; editor en dos columnas. */
+html body[data-private=true][data-role=admin] #app-page .legal-list { gap:var(--esp-2); }
+html body[data-private=true][data-role=admin] #app-page .legal-list li { padding:var(--esp-3) var(--esp-4);border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);font-size:var(--texto-etiqueta); }
+html body[data-private=true][data-role=admin] #app-page .legal-list li>div:first-child { min-width:0; }
+html body[data-private=true][data-role=admin] #app-page .legal-list li small { display:block;color:var(--claro-suave);font-size:var(--texto-meta); }
+html body[data-private=true][data-role=admin] #app-page .legal-list .app-actions { gap:var(--esp-2); }
+html body[data-private=true][data-role=admin] #app-page .legal-list a:not(.button) { font-weight:600; }
+html body[data-private=true][data-role=admin] #app-page .legal-toolbar { justify-self:start;display:inline-flex;flex-wrap:wrap;gap:var(--esp-1);margin:0 0 var(--esp-2);padding:var(--esp-1);border-radius:var(--radio-boton);background:var(--segmento-fondo); }
+html body[data-private=true][data-role=admin] #app-page .legal-toolbar .button { min-height:var(--boton-alto-compacto)!important;padding:0 var(--esp-4)!important;background:transparent!important;border:0!important;box-shadow:none!important; }
+html body[data-private=true][data-role=admin] #app-page .legal-toolbar .button:hover { background:var(--segmento-activo)!important; }
+html body[data-private=true][data-role=admin] #app-page .legal-preview { font-size:var(--texto-cuerpo);line-height:1.65;color:var(--claro-tinta); }
+html body[data-private=true][data-role=admin] #app-page .legal-preview :is(h2,h3) { margin:var(--esp-5) 0 var(--esp-2);color:var(--claro-titulo); }
+html body[data-private=true][data-role=admin] #app-page .legal-editor textarea { font-size:var(--texto-meta);line-height:1.6; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .app-actions:empty { display:none; }
+@media (max-width:640px) {
+  html body[data-private=true][data-role=admin] #app-page .legal-list li>.app-actions { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%; }
+  html body[data-private=true][data-role=admin] .admin-dialog .app-dialog-actions .button { flex:1 1 100%;margin-right:0; }
+}
+/* Guías: el estado de cada ficha como insignia; el editor legal con el ritmo de formulario común. */
+html body[data-private=true][data-role=admin] #app-page .care-admin-state {
+  --insignia-fondo:var(--insignia-ambar-fondo);--insignia-texto:var(--insignia-ambar-texto);--insignia-borde:var(--insignia-ambar-borde);
+  display:inline-flex;align-items:center;height:var(--insignia-alto);padding:0 var(--esp-3);border-radius:var(--radio-insignia);font-size:var(--texto-meta);font-weight:600;
+  color:var(--insignia-texto);background:var(--insignia-fondo);border:1px solid var(--insignia-borde);
+}
+html body[data-private=true][data-role=admin] #app-page .care-admin-meta { font-size:var(--texto-meta); }
+html body[data-private=true][data-role=admin] #app-page :is([data-admin-form=legal],.care-admin-form) { display:grid;gap:0; }
+html body[data-private=true][data-role=admin] #app-page [data-admin-form=legal]>:is(input,textarea) { margin-bottom:var(--esp-4); }
+html body[data-private=true][data-role=admin] #app-page .care-admin-form>.care-admin-field { margin-bottom:var(--esp-4); }

@@ -43,8 +43,7 @@ body[data-private=true] :is(h1,h2,h3,p,dd,a,button,time) { overflow-wrap:anywher
 body[data-private=true] .metric { display:block; }
 body[data-private=true] .metric h3 { margin:0 0 12px; }
 body[data-private=true] .metric strong { display:block; }
-body[data-private=true] .metric strong small,.plant-reading strong small { font-size:.48em; margin-left:5px; }
-.sensor-track span { display:block; height:100%; border-radius:inherit; background:#526d59; }
+body[data-private=true] .metric strong small { font-size:.48em; margin-left:5px; }
 .bento-panel { padding:28px; border:1px solid #d4dfd6; border-radius:var(--radio-tarjeta); background:#fff; box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 8px 26px -12px rgba(20,42,27,.12); }
 .bento-panel h2 { font-size:22px; margin:20px 0 12px; line-height:1.3; }
 .bento-panel h3 { font-size:17px; margin:0 0 8px; }
@@ -240,16 +239,7 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
 .user-chart-grid-layout{ grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:28px; }
 .user-status-line { display:flex;gap:16px 28px;align-items:center;justify-content:space-between;margin:-12px 0 26px;flex-wrap:wrap; }
 .user-status-line p { margin:0;color:var(--garden-muted);font-size:14px; }
-.user-status-line p:first-child { color:var(--garden-green);font-weight:500; }
 
-.user-diagnosis { display:grid;gap:var(--esp-3);margin-bottom:var(--esp-6);padding:var(--esp-5); }
-.user-diagnosis-head { display:flex;align-items:center;gap:var(--esp-3); }
-.user-diagnosis-mark { width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border-radius:18px;background:var(--garden-tint);color:var(--garden-green); }
-.user-diagnosis-mark .icon { width:22px;height:22px; }
-.user-diagnosis-copy { flex:1;min-width:0; }
-.user-diagnosis h2 { margin:0;font-size:16px;font-weight:500;color:var(--garden-muted); }
-.user-diagnosis h3 { font-size:clamp(21px,2.4vw,28px);font-weight:500;letter-spacing:-.035em;line-height:1.3;margin:0 0 14px; }
-.user-diagnosis p { margin:0;max-width:72ch;font-size:15px; }
 
 .user-section-heading,.user-chart-toolbar { display:flex;align-items:center;justify-content:space-between;gap:16px;margin:32px 0 18px;flex-wrap:wrap; }
 .user-section-heading h2,.user-chart-toolbar h2 { font-size:22px;font-weight:500;line-height:1.3;letter-spacing:-.035em;margin:0; }
@@ -311,7 +301,7 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
 @media (max-width:480px) {
   
   
-  .user-diagnosis { padding:var(--esp-4); }
+
   .user-chart { padding:20px 14px; }
   .user-operating>.button{ width:100%; }
   
@@ -345,10 +335,6 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
 @media (forced-colors:active) { .skeleton-line { background:CanvasText;opacity:.3; } }
 
 /* Saludo de Mi huerto: nombre, bienvenida y frase, con pasos claros de tamaño y peso. */
-.garden-welcome { margin-bottom:30px;min-width:0; }
-.garden-welcome h1 { margin:0;color:#142419;font-size:clamp(34px,4vw,48px);font-weight:600;line-height:1.12;letter-spacing:-.03em;overflow-wrap:anywhere;text-wrap:balance; }
-.garden-welcome-lead { margin:12px 0 0;color:#264d32;font-size:clamp(19px,2vw,22px);font-weight:500;line-height:1.35; }
-.garden-welcome-phrase { margin:6px 0 0;color:#2f4436;font-size:17px;font-weight:400;line-height:1.5; }
 
 .user-diagnosis-meta { margin-top:12px!important;font-size:13px!important;color:var(--garden-muted); }
 
@@ -425,14 +411,7 @@ body[data-role=admin] .app-actions .button { white-space:normal; }
 .garden-empty-link { display:inline-flex;align-items:center;gap:6px;color:var(--claro-verde); }
 .garden-form { max-width:640px; }
 .garden-form form { display:grid;gap:10px; }
-.garden-steps { display:grid;gap:12px;margin:0;padding-left:1.2em; }
-.garden-steps li span { display:block;color:var(--garden-muted);font-size:14px; }
 .garden-back { display:inline-block;margin-bottom:12px;color:var(--claro-verde);font-weight:600; }
-.link-progress { display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 20px;padding:0;list-style:none;color:var(--garden-muted); }
-.link-progress [aria-current=step] { color:var(--claro-titulo);font-weight:700; }
-.link-code-box { display:grid;gap:8px;justify-items:start; }
-.link-code { margin:0;padding:14px 20px;border-radius:var(--radio-campo);border:1px solid var(--garden-line);background:var(--campo-fondo);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:.12em;user-select:all; }
-.link-help { margin-top:8px; }
 .order-card { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }
 .order-card h3,.order-card p { margin:0; }
 .order-card.is-sending .badge { animation:orden-pulso 1.4s ease-in-out infinite; }
@@ -481,7 +460,6 @@ body[data-role=admin] .app-actions .button { white-space:normal; }
 .legal-editor textarea { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-height:320px; }
 .legal-preview { overflow-wrap:anywhere; }
 .consent-figure { font-size:20px; }
-.link-code.is-long { font-size:18px;letter-spacing:.03em;overflow-wrap:anywhere; }
 
 /* ── Componentes del panel (usuario y administración) ─────────────────────────────────────────
    Una sola definición por componente. Los valores salen de tokens.css; sin !important. */
@@ -491,7 +469,7 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.be
   padding:var(--esp-5);color:var(--claro-tinta);border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-tarjeta);
   background:var(--vidrio-base-fondo);box-shadow:var(--vidrio-base-sombra);
 }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-metric,.app-state,.plant-card) {
+body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-metric,.app-state) {
   border-color:var(--vidrio-tarjeta-borde);background:var(--vidrio-tarjeta-fondo);box-shadow:var(--vidrio-tarjeta-sombra);
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .bento-panel h2 { margin:0 0 var(--esp-3);font-size:20px; }
@@ -502,15 +480,12 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) .page-heading { f
 body[data-private=true]:is([data-role=admin],[data-role=user]) .page-heading > div { min-width:0;flex:1 1 280px; }
 
 /* KPI compacto: una sola estructura. Ícono y etiqueta en una línea, valor en una línea (tamaño fluido) y dato secundario en máximo dos líneas. */
-.user-summary-metrics,.user-technical-metrics { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--esp-4);min-width:0;margin:0 0 var(--esp-5); }
+.user-summary-metrics { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--esp-4);min-width:0;margin:0 0 var(--esp-5); }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric {
   container-type:inline-size;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto 1fr;align-content:start;column-gap:var(--esp-2);row-gap:var(--esp-1);
   min-width:0;min-height:var(--kpi-alto);padding:var(--esp-3) var(--esp-4);
 }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon { grid-column:1;grid-row:1;display:flex;color:var(--claro-verde); }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:20px;height:20px; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { grid-column:1/-1;grid-row:1;margin:0;font-size:13px;font-weight:500;line-height:1.3;color:var(--claro-suave); }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric:has(.user-metric-icon) h2 { grid-column:2; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong {
   grid-column:1/-1;grid-row:2;margin:0;overflow:hidden;font-size:clamp(18px,15cqi,28px);font-weight:700;line-height:1.15;letter-spacing:-.02em;
   white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:var(--claro-titulo);
@@ -521,12 +496,10 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-m
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
 }
 @media (max-width:640px) {
-  .user-summary-metrics,.user-technical-metrics { grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-2); }
+  .user-summary-metrics { grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-2); }
   body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric { padding:var(--esp-3); }
   body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { font-size:clamp(18px,15cqi,24px); }
   body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { font-size:12px; }
-  body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:18px;height:18px; }
-  body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric:has(.user-metric-icon) { column-gap:var(--esp-2); }
   body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric p { font-size:12px; }
 }
 
@@ -643,11 +616,6 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .app-st
 }
 
 /* Fichas de planta: la misma rejilla, espacios y radios que el resto del panel. */
-.plant-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:var(--esp-4);margin-bottom:var(--esp-6); }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card { display:grid;align-content:start;gap:var(--esp-3);min-width:0;padding:var(--esp-5);border-radius:var(--radio-tarjeta); }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card > * { min-width:0; }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-reading strong { margin:0;font-size:30px;line-height:1.15; }
-@media (max-width:640px) { body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-card { padding:var(--esp-4); } }
 
 /* Control segmentado único (pestañas de cuenta, filtros de avisos, rangos): una línea que se desplaza si no cabe. */
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.account-tabs,.notice-filters,.user-range-control) {
@@ -695,10 +663,9 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form,
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form form,dialog form) { gap:var(--esp-3); }
 
-/* Accesos rápidos del mismo alto; el de revisión técnica ocupa la fila completa. */
+/* Accesos rápidos del mismo alto. */
 .user-quick-actions { grid-auto-rows:1fr; }
 .user-quick-actions .button { height:100%;min-height:var(--boton-alto);margin:0; }
-.user-quick-actions .user-quick-wide { grid-column:1/-1; }
 
 /* Título de sección con el botón de actualizar a su lado. */
 .toolbar-title { display:flex;align-items:center;gap:var(--esp-2);min-width:0; }

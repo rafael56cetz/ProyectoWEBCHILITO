@@ -56,7 +56,6 @@
   --vidrio-flotante-sombra:inset 0 1px 0 rgba(255,255,255,.9),0 18px 44px -18px rgba(60,45,25,.4),0 0 0 1px rgba(47,106,72,.1);
   --vidrio-flotante-desenfoque:blur(22px) saturate(140%);
   --vidrio-opaco:#fffaf4;
-  --vidrio-barra-fondo:rgba(255,250,244,.78);--vidrio-barra-sombra:0 8px 24px -20px rgba(60,45,25,.5);
 
   /* Escala única de espacios y de radios del panel. */
   --esp-1:4px;--esp-2:8px;--esp-3:12px;--esp-4:16px;--esp-5:24px;--esp-6:32px;
@@ -112,6 +111,65 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) {
   /* Campos del panel: vidrio claro */
   --campo-fondo:rgba(255,250,244,.72);--campo-borde:rgba(70,40,20,.18);--campo-filo:inset 0 1px 0 rgba(255,255,255,.7);
   --campo-placeholder:rgba(75,66,58,.62);--campo-lista:rgba(255,250,244,.9);
+}
+/* Menú lateral (administración y usuario): filas sin cápsula; solo el apartado activo lleva el vidrio de los botones de la portada. */
+body[data-private=true]:is([data-role=admin],[data-role=user]) {
+  --menu-fila-alto:38px;--menu-fuente:13.5px;--menu-pad-x:12px;--menu-gap-icono:10px;--menu-gap:2px;--menu-gap-grupo:20px;
+  --menu-fondo:radial-gradient(90% 40% at 0% 0%,rgba(255,255,255,.1),transparent 70%),linear-gradient(170deg,rgba(38,94,60,.92) 0%,rgba(22,62,42,.95) 100%);
+  --menu-borde:rgba(255,255,255,.18);
+  --menu-filo:inset 0 1px 0 rgba(255,255,255,.24);--menu-sombra:0 24px 50px -24px rgba(20,50,30,.55);--menu-desenfoque:blur(18px) saturate(140%);
+  --menu-texto:rgba(255,255,255,.86);--menu-texto-suave:rgba(255,255,255,.72);--menu-icono-reposo:.75;
+  --menu-fila-hover:rgba(255,255,255,.08);--menu-fila-pulsada:rgba(0,0,0,.14);
+  --menu-activo-fondo:linear-gradient(180deg,rgba(255,255,255,.16) 0%,rgba(15,28,19,.32) 100%);
+  --menu-activo-borde:rgba(255,255,255,.26);
+  --menu-activo-filo:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(255,255,255,.08),0 8px 18px -8px rgba(0,0,0,.4);
+  --menu-acento:var(--coral);
+}
+@media (max-width:1024px) {
+  body[data-private=true]:is([data-role=admin],[data-role=user]) {
+    --menu-fila-alto:44px;--menu-fuente:15px;--menu-gap-icono:12px;
+    --menu-fondo:linear-gradient(170deg,rgba(38,94,60,.97) 0%,rgba(22,62,42,.98) 100%);
+  }
+}
+/* Barra superior de ambos paneles: sin franja; las acciones flotan en una cápsula de vidrio claro. */
+body[data-private=true]:is([data-role=admin],[data-role=user]) {
+  --capsula-fondo:rgba(255,250,244,.74);--capsula-borde:rgba(255,255,255,.85);
+  --capsula-sombra:inset 0 1px 0 #fff,0 10px 26px -14px rgba(60,45,25,.42),0 0 0 1px rgba(70,40,20,.06);
+  --capsula-boton-hover:rgba(47,106,72,.1);
+}
+/* Piezas, foco, tipografía y componentes de ambos paneles; la foto del habanero solo la usan las plantas del usuario. */
+body[data-private=true]:is([data-role=admin],[data-role=user]) {
+  --pieza-verde:radial-gradient(80% 60% at 0% 0%,rgba(255,255,255,.12),transparent 70%),linear-gradient(165deg,rgba(40,98,62,.95) 0%,rgba(22,62,42,.97) 100%);
+  --pieza-verde-borde:rgba(255,255,255,.2);
+  --pieza-verde-filo:inset 0 1px 0 rgba(255,255,255,.26),0 18px 38px -20px rgba(20,50,30,.6);
+  --pieza-verde-suave:rgba(255,255,255,.78);
+  --vidrio-sobre-verde:rgba(255,255,255,.14);--vidrio-sobre-verde-hover:rgba(255,255,255,.22);--vidrio-sobre-verde-borde:rgba(255,255,255,.26);
+  --foto-habanero:url('../imagenes/habanero-fondo.webp');
+  --foto-velo:linear-gradient(180deg,rgba(12,34,21,.82) 0%,rgba(12,34,21,.5) 46%,rgba(12,34,21,.86) 100%);
+  --foto-velo-banda:linear-gradient(90deg,rgba(12,34,21,.9) 0%,rgba(12,34,21,.7) 50%,rgba(12,34,21,.35) 100%);
+  --lectura-fondo:rgba(255,250,244,.92);--lectura-borde:rgba(255,255,255,.9);
+  --medidor-fondo:rgba(70,40,20,.1);--medidor-verde:#2f6a48;--medidor-ambar:#b8741e;
+  --ia-luz:radial-gradient(70% 90% at 100% 0%,rgba(255,138,66,.18),transparent 70%),radial-gradient(60% 80% at 0% 100%,rgba(47,106,72,.12),transparent 70%);
+  --foco-borde:rgba(47,106,72,.6);--foco-halo:0 0 0 3px rgba(47,106,72,.18);--foco-anillo:rgba(47,106,72,.7);
+  --segmento-fondo:rgba(70,40,20,.07);--segmento-activo:#fffdf9;
+  --segmento-sombra:0 1px 2px rgba(60,45,25,.14),0 4px 10px -4px rgba(60,45,25,.22);
+  --linea-tiempo:rgba(47,106,72,.24);--nodo-tiempo:#2f6a48;--nodo-tiempo-ultimo:var(--coral);
+  --serie-relleno:.16;
+  --saludo-tam:clamp(34px,3.6vw,46px);--saludo-huerto-tam:clamp(18px,1.6vw,21px);
+  --cifra-tam:28px;--etiqueta-tam:14px;--radio-ficha:20px;--radio-dialogo:26px;
+  --dialogo-sombra:0 0 0 1px rgba(31,25,21,.06),0 32px 72px -24px rgba(60,30,10,.5);
+  --dialogo-velo:rgba(24,30,22,.32);
+
+  /* El café de --claro-suave se ensuciaba sobre la crema con brillo naranja; aquí la tinta secundaria es verde grisácea (≈ 7.8:1). */
+  --claro-suave:#3f4f45;
+  /* Escala de texto: nada por debajo de --texto-meta en el panel del usuario. */
+  --texto-meta:14px;--texto-etiqueta:15px;--texto-cuerpo:16px;--texto-titulo-tarjeta:20px;
+  --insignia-alto:30px;--insignia-punto:8px;
+  --medallon:40px;--separacion-etiqueta:6px;--aviso-insignia-ancho:124px;
+  --tarjeta-centrada:760px;--boton-ancho-min:220px;--marca-paso:34px;--marca-progreso:26px;--medallon-grande:56px;
+  --dialogo-ancho:640px;--dato-ancho-min:220px;--kpi-cifra:32px;--accion-columna:96px;
+  --codigo-tam:clamp(26px,7vw,40px);
+  --fila-hover:rgba(255,255,255,.55);--fila-no-leida:rgba(47,106,72,.07);--fila-no-leida-hover:rgba(47,106,72,.11);--fila-anulada:rgba(255,250,244,.4);
 }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .auth-flow { --text:var(--claro-tinta);--muted:var(--claro-suave);--sage:var(--claro-verde); }
 body[data-private=true] .brand { --focus:#264d32; }

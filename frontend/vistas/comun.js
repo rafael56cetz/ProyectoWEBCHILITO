@@ -12,7 +12,14 @@ Object.assign(icons, {
  logout:'<path d="M10 4H4v16h6M10 12h11m-4-4 4 4-4 4"/>',
  activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
  tool:'<path d="m14.5 6.5 3 3M21 4a6 6 0 0 1-8 7.5L5.5 19a2 2 0 0 1-3-3l7.5-7.5A6 6 0 0 1 17.5 1L14 4.5l2.5 2.5L20 3.5Z"/>',
- support:'<path d="M4 14v-3a8 8 0 0 1 16 0v3M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3ZM20 18v1a3 3 0 0 1-3 3h-4"/>'
+ support:'<path d="M4 14v-3a8 8 0 0 1 16 0v3M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3ZM20 18v1a3 3 0 0 1-3 3h-4"/>',
+ terminal:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>',
+ chip:'<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx=".5"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
+ tag:'<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+ book:'<path d="M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2Z"/><path d="M12 6v14"/>',
+ document:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+ clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1Z"/><path d="m9 13 2 2 4-4"/>',
+ users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a6.5 6.5 0 0 1 13 0v1M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 5.8V20"/>'
 });
 const icon=name=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.leaf}</svg>`;
 const iconEye=`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
@@ -164,7 +171,7 @@ const AppViews = (() => {
     else if(data.status === 'error') body = state('No pudimos cargar tus avisos','Inténtalo de nuevo.',false,true);
     else if(!data.items.length) body = state(filter === 'todos' ? 'No tienes avisos' : 'No hay avisos en este filtro','Los avisos de tu equipo, de soporte y de tu cuenta aparecerán aquí.');
     else body = `<ul class="notice-list bento-panel">${data.items.map(noticeRow).join('')}</ul>${data.items.length < data.total ? '<button class="button btn-liquid-light" type="button" data-app-action="more">Cargar más</button>' : ''}`;
-    return heading('Avisos',AppModel.addressed(name,'Revisa lo que necesita atención.'))+`<div class="app-actions"><button class="button btn-liquid-light" type="button" data-app-action="mark-all-read">Marcar todo como leído</button></div>`+filters+body;
+    return heading('Avisos',AppModel.addressed(name,'Revisa lo que necesita atención.'))+`<div class="notice-toolbar">${filters}<button class="button btn-liquid-light" type="button" data-app-action="mark-all-read">Marcar todo como leído</button></div>`+body;
   }
   // Salida al pie de Mi cuenta. Sigue disponible aunque el perfil no haya podido cargarse.
   const signOut = () => `<section class="bento-panel account-session" aria-labelledby="session-title"><div><h2 id="session-title">Tu sesión</h2><p>Saldrás de tu cuenta en este navegador.</p></div><button class="button btn-liquid-light account-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></section>`;

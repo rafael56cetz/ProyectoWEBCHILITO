@@ -375,7 +375,7 @@ const AdminAccessViews = (() => {
 
   function adminsTab(state) {
     const rows = state.admins.items.map(item => `<tr><td>${escaparHTML(item.email)}${item.superAdmin ? ' ★' : ''}</td><td>${item.name ? escaparHTML(item.name) : '—'}</td><td>${chips(item.capabilities, item.superAdmin)}</td>
-      <td>${item.secondFactor ? '✔' : '✖'}</td><td>${item.lastAccess ? T.merida(item.lastAccess) : '—'}</td><td>${item.email === state.ownEmail ? '<span class="cell-note">Tu cuenta</span>' : T.button('edit', 'Editar', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`);
+      <td>${item.secondFactor ? tag('Activado', 'verde') : tag('Sin activar', 'rojo')}</td><td>${item.lastAccess ? T.merida(item.lastAccess) : '—'}</td><td>${item.email === state.ownEmail ? '<span class="cell-note">Tu cuenta</span>' : T.button('edit', 'Editar', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`);
     return `<section class="bento-panel">${rows.length ? T.table('Administradores', ['Correo', 'Nombre', 'Capacidades', 'Segundo factor', 'Último acceso', ''], rows) : '<p>No hay administradores.</p>'}${T.pager(state.admins)}</section>`;
   }
 
