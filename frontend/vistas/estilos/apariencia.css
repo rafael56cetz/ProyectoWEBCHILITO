@@ -163,7 +163,6 @@ html:has(.auth-layout) { background:#0e1c14; }
 
 @media (min-width:1025px) { html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { width:100%; } }
 
-body[data-private=true][data-role=admin] #app-page > .bento-panel + .bento-panel { margin-top:24px; }
 
 /* Dashboard claro (administración y usuario): dirección visual aprobada (2026-11-07).
    Fondo crema con luz de naranja y durazno, panel lateral de vidrio verde flotante y tarjetas translúcidas.
@@ -507,7 +506,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .c
 .care-guide-answer p { margin:0!important;font-size:16px;line-height:1.6;white-space:pre-line; }
 html body[data-private=true] #app-page .care-guide-answer .care-guide-source { font-size:13px; }
 .care-guide-source a { overflow-wrap:anywhere; }
-.user-care-guide-link { margin-bottom:10px; }
 .care-admin-toolbar { display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:0 0 18px; }
 .care-admin-filters,.care-admin-actions,.care-admin-row-actions { display:flex;flex-wrap:wrap;gap:8px; }
 .care-admin-filters .button.active { font-weight:700;box-shadow:inset 0 0 0 2px #2f6a48; }

@@ -96,7 +96,7 @@ const GardenViews = (() => {
     return '';
   }
 
-  const summaryCard = summary => `<section class="bento-panel user-diagnosis" aria-labelledby="diagnosis-title"><div class="user-diagnosis-mark">${icon('sparkle')}</div><div class="user-diagnosis-copy"><h2 id="diagnosis-title">Resumen de tu huerto</h2>
+  const summaryCard = summary => `<section class="bento-panel user-diagnosis" aria-labelledby="diagnosis-title"><div class="user-diagnosis-head"><span class="user-diagnosis-mark">${icon('sparkle')}</span><h2 id="diagnosis-title">Resumen de tu huerto</h2></div><div class="user-diagnosis-copy">
     ${summary ? `<p>${escaparHTML(summary.content)}</p><p class="user-diagnosis-meta">Generado con IA · no sustituye tu revisión · ${AppViews.date(summary.generatedAt)}</p>${button('summaries', 'Ver anteriores')}`
       : '<p>El resumen aparecerá cuando tu equipo haya enviado lecturas.</p>'}<div data-summaries></div></div></section>`;
 
@@ -113,7 +113,7 @@ const GardenViews = (() => {
         <a class="button btn-liquid-light" href="#mantenimiento">Registrar un cuidado</a>
         ${button('order', 'Revisar mi equipo', 'light', 'data-type="autodiagnostico"')}
         ${button('order-confirm', off ? 'Restaurar automático' : 'Apagar lámpara', 'light', `data-type="${off ? 'lampara_automatico' : 'lampara_apagar'}"`)}
-        <a class="button btn-liquid-brand" href="#soporte">Solicitar revisión técnica</a></section>
+        <a class="button btn-liquid-brand user-quick-wide" href="#soporte">Solicitar revisión técnica</a></section>
       <div data-order-card></div>
       <p class="user-safety-copy">Ante una emergencia, utiliza el paro físico del equipo.</p>`;
   }
@@ -246,7 +246,7 @@ const GardenViews = (() => {
     const careLabels = {rellenar_deposito:'Recarga del depósito', sustrato:'Sustrato y perlita', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
     const watering = lastWatering ? `Último riego: ${{automatico:'automático', usuario:'tuyo', soporte:'de soporte'}[lastWatering.origin] || escaparHTML(lastWatering.origin)}, ${lastWatering.duration ?? '—'} s, ${GardenModel.ago(lastWatering.at)}` : 'Sin riegos registrados';
     return `<a class="garden-back" href="${withGarden('huerto', garden.id)}">← Mi huerto</a>
-      <div class="page-heading"><div><h1>Planta ${plant.number} · «${escaparHTML(plant.name)}»</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${escaparHTML(since)} · ${escaparHTML(sown)}</p></div>${button('edit', 'Editar')}</div>
+      <div class="page-heading"><div><h1>Planta ${plant.number}${plant.name === `Planta ${plant.number}` ? '' : ` · «${escaparHTML(plant.name)}»`}</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${escaparHTML(since)} · ${escaparHTML(sown)}</p></div>${button('edit', 'Editar')}</div>
       <div class="user-chart-toolbar"><h2>Humedad del sustrato</h2><div class="user-range-control" role="group" aria-label="Periodo">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>
       ${chart('Humedad del sustrato', series, '%', range, 'plant')}
       <section class="bento-panel"><h2>Línea de vida</h2>${stages.length ? `<ol class="user-history-list">${stages.map(item => `<li><span>${icon('leaf')}</span><div><h3>${STAGES[item.stage] || item.stage}</h3><p>${AppViews.date(item.since)}</p></div></li>`).join('')}</ol>` : '<p>Aún no hay etapas registradas.</p>'}</section>
@@ -366,7 +366,7 @@ const TechnicalViews = (() => {
     if(!state.gardens.length) return noGarden('Panel técnico');
     const {garden, data, range, log} = state;
     if(!garden.device) return noDevice(state.gardens, garden, 'Panel técnico', 'telemetria');
-    const toolbar = `<div class="user-chart-toolbar"><h2>Histórico de lecturas</h2><div class="toolbar-controls"><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div>${button('reload', `${icon('refresh')}<span class="sr-only">Actualizar</span>`, 'light', 'aria-label="Actualizar" title="Actualizar"')}</div></div>`;
+    const toolbar = `<div class="user-chart-toolbar"><div class="toolbar-title"><h2>Histórico de lecturas</h2>${button('reload', `${icon('refresh')}<span class="sr-only">Actualizar</span>`, 'light', 'aria-label="Actualizar" title="Actualizar"')}</div><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>`;
     return `${selector(state.gardens, garden, 'telemetria')}${AppViews.heading(`Panel técnico · ${garden.name}`)}${statusLine(garden.device)}${cards(data)}${toolbar}${charts(data)}${plantTable(data.plants)}${waterCard(data.plants)}<div data-log-panel>${logPanel(log)}</div>`;
   }
 
@@ -504,7 +504,7 @@ const SupportViews = (() => {
     const authorization = caso.revokedAt ? 'Acceso revocado. Soporte ya no puede ver ni controlar tu equipo.'
       : Date.parse(caso.authorizedUntil) > Date.now() ? `Autorización vigente · vence en ${GardenModel.lapse(caso.authorizedUntil)}` : 'La autorización venció.';
     const orders = data.orders.length ? `<ul class="user-history-list">${data.orders.map(order => `<li><span>${icon('tool')}</span><div><p>${when(order.createdAt)} · ${escaparHTML(orderTitle(order))}</p>${orderStateTag(order.state)}${order.error ? `<small>${escaparHTML(order.error)}</small>` : ''}</div></li>`).join('')}</ul>` : '<p>Soporte todavía no ha hecho nada en tu equipo.</p>';
-    return `<section class="bento-panel garden-form" aria-labelledby="support-case-title"><h2 id="support-case-title">Caso ${escaparHTML(caso.folio)} · ${GardenModel.INCIDENTS[caso.incident] || escaparHTML(caso.incident)}</h2>
+    return `<section class="bento-panel garden-form" aria-labelledby="support-case-title"><h2 id="support-case-title">Caso <span class="folio">${escaparHTML(caso.folio)}</span> · ${GardenModel.INCIDENTS[caso.incident] || escaparHTML(caso.incident)}</h2>
       <p>${tag(label, tone)}</p><p>${authorization}</p>${caso.state === 'en_atencion' ? `<p>Soporte está revisando tu equipo.</p>` : ''}
       <h3>Lo que soporte ha hecho</h3>${orders}
       <div class="app-actions">${button('revoke', 'Revocar acceso', 'light', `data-danger="true" data-case="${escaparHTML(caso.id)}"${caso.revokedAt ? ' disabled' : ''}`)}${button('cancel-case', 'Cancelar solicitud', 'light', `data-case="${escaparHTML(caso.id)}"`)}</div></section>`;

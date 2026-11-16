@@ -113,6 +113,8 @@ const AppViews = (() => {
   const state = (title,text,loading=false,retry=false) => `<div class="app-state bento-panel" role="${retry?'alert':'status'}"${loading?' aria-busy="true"':''}><span class="icon-medallion">${icon(loading?'clock':'info')}</span><h2>${escaparHTML(title)}</h2><p>${escaparHTML(text)}</p>${retry?'<button class="button btn-liquid-brand" type="button" data-app-action="reload">Reintentar</button>':''}</div>`;
   // Estado vacío dentro de una tarjeta: ícono, frase y, si aplica, la acción (HTML ya armado por la vista).
   const empty = (title,text='',action='') => `<div class="app-empty" role="status"><span class="icon-medallion">${icon('info')}</span><div><p class="app-empty-title">${escaparHTML(title)}</p>${text?`<p>${escaparHTML(text)}</p>`:''}${action}</div></div>`;
+  // Escapa el texto y evita que un folio de caso (CS-XXXXXXXX) se parta al final de la línea.
+  const conFolio = text => escaparHTML(text).replace(/\bCS-[0-9A-Z]{8}\b/g,'<span class="folio">$&</span>');
   const accountTabs = active => `<nav class="account-tabs" aria-label="Apartados de mi cuenta">${[['perfil','','Perfil'],['huertos','/huertos','Mis huertos'],['seguridad','/seguridad','Seguridad'],['privacidad','/privacidad','Privacidad']].map(([key,path,label])=>`<a class="button ${key===active?'btn-liquid-brand active':'btn-liquid-light'}" href="#cuenta${path}"${key===active?' aria-current="page"':''}>${label}</a>`).join('')}</nav>`;
   const accountGreeting = greeting => greeting?(greeting==='Bienvenido'?greeting:'Hola, '+greeting):'Tu información de acceso.';
   // `nav` lo prepara AppController según la sesión y sus capacidades; la vista solo pinta los enlaces.
@@ -141,14 +143,14 @@ const AppViews = (() => {
   function noticeRow(item) {
     return `<li><a class="notice-row${item.read ? '' : ' is-unread'}" href="#avisos/${item.id}" data-notice-open="${item.id}"${item.link ? ` data-notice-link="${escaparHTML(item.link)}"` : ''}>
       <span class="notice-dot" aria-hidden="true"></span><span class="sr-only">${item.read ? 'Leído' : 'No leído'}</span>${severity(item)}
-      <span class="notice-main"><strong class="notice-title">${escaparHTML(item.title)}</strong><span class="notice-meta-line">${escaparHTML([item.garden, GardenModel.ago(item.createdAt)].filter(Boolean).join(' · '))}</span></span></a></li>`;
+      <span class="notice-main"><strong class="notice-title">${conFolio(item.title)}</strong><span class="notice-meta-line">${escaparHTML([item.garden, GardenModel.ago(item.createdAt)].filter(Boolean).join(' · '))}</span></span></a></li>`;
   }
   function noticeDetail(data) {
     if(data.status === 'loading') return heading('Avisos')+state('Cargando aviso','Consultando su información.',true);
     if(data.status === 'error') return heading('Avisos')+state('No pudimos cargar el aviso','Inténtalo de nuevo.',false,true);
     if(data.status === 'not-found' || !data.item) return heading('Aviso no disponible')+'<div class="bento-panel"><p>Este aviso no está disponible.</p><a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div>';
     const item = data.item;
-    return heading('Detalle del aviso')+`<article class="bento-panel notice-detail"><div class="notice-meta">${severity(item)}${item.resolvedAt ? '<span class="badge tone-verde">Resuelto</span>' : ''}</div><h2>${escaparHTML(item.title)}</h2>${item.text ? `<p>${escaparHTML(item.text)}</p>` : ''}
+    return heading('Detalle del aviso')+`<article class="bento-panel notice-detail"><div class="notice-meta">${severity(item)}${item.resolvedAt ? '<span class="badge tone-verde">Resuelto</span>' : ''}</div><h2>${conFolio(item.title)}</h2>${item.text ? `<p>${conFolio(item.text)}</p>` : ''}
       <dl class="notice-facts"><div><dt>Fecha</dt><dd>${date(item.createdAt)}</dd></div>${item.garden ? `<div><dt>Huerto</dt><dd>${escaparHTML(item.garden)}</dd></div>` : ''}${item.resolvedAt ? `<div><dt>Resolución</dt><dd>${date(item.resolvedAt)}</dd></div>` : ''}</dl>
       <div class="app-actions">${item.link ? `<a class="button btn-liquid-brand" href="${escaparHTML(item.link)}">Ir</a>` : ''}${item.resolvable ? '<button class="button btn-liquid-light" type="button" data-app-action="mark-resolved">Marcar como resuelto</button>' : ''}<a class="button btn-liquid-light" href="#avisos">Todos los avisos</a></div></article>`;
   }
@@ -224,7 +226,7 @@ const AppViews = (() => {
   }
   const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},
     cancelarEliminacion:{titulo:'¿Cancelar la eliminación de tu cuenta?',texto:'Tu cuenta y tus datos se conservarán.',accion:'Cancelar eliminación'}};
-  return {shell,frame,heading,state,empty,date,notices,account,accountGreeting,accountTabs,confirmaciones
+  return {shell,frame,heading,state,empty,conFolio,date,notices,account,accountGreeting,accountTabs,confirmaciones
   };
 })();
 

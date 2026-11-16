@@ -174,10 +174,9 @@ body:is([data-screen=terminos],[data-screen=privacidad],[data-screen=cookies]) .
   .legal-prose p { color:CanvasText; }
 }
 .maint-form { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-block:12px; }
-.maint-form label { display:grid; gap:4px; flex:1 1 180px; font-size:14px; }
+.maint-form label { flex:1 1 180px; }
 .maint-form input,.maint-form select { min-height:44px; padding-inline:10px; font:inherit; }
 [data-maint-revise] { display:grid; gap:12px; margin-top:12px; }
-[data-maint-revise] label { display:grid; gap:4px; font-size:14px; }
 [data-maint-revise] select,[data-maint-revise] textarea { width:100%; box-sizing:border-box; padding:10px; font:inherit; }
 
 /* Mi privacidad */
@@ -243,11 +242,12 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
 .user-status-line p { margin:0;color:var(--garden-muted);font-size:14px; }
 .user-status-line p:first-child { color:var(--garden-green);font-weight:500; }
 
-.user-diagnosis { display:flex;align-items:flex-start;gap:24px;margin-bottom:32px;padding:32px; }
-.user-diagnosis-mark { width:54px;height:54px;flex:0 0 54px;display:grid;place-items:center;border-radius:18px;background:var(--garden-tint);color:var(--garden-green); }
-.user-diagnosis-mark .icon { width:27px;height:27px; }
+.user-diagnosis { display:grid;gap:var(--esp-3);margin-bottom:var(--esp-6);padding:var(--esp-5); }
+.user-diagnosis-head { display:flex;align-items:center;gap:var(--esp-3); }
+.user-diagnosis-mark { width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border-radius:18px;background:var(--garden-tint);color:var(--garden-green); }
+.user-diagnosis-mark .icon { width:22px;height:22px; }
 .user-diagnosis-copy { flex:1;min-width:0; }
-.user-diagnosis h2 { margin:0 0 18px;font-size:16px;font-weight:500;color:var(--garden-muted); }
+.user-diagnosis h2 { margin:0;font-size:16px;font-weight:500;color:var(--garden-muted); }
 .user-diagnosis h3 { font-size:clamp(21px,2.4vw,28px);font-weight:500;letter-spacing:-.035em;line-height:1.3;margin:0 0 14px; }
 .user-diagnosis p { margin:0;max-width:72ch;font-size:15px; }
 
@@ -304,18 +304,14 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
   body[data-private=true] .private-nav { grid-template-columns:repeat(3,minmax(0,1fr));gap:4px!important; }
   body[data-private=true] .private-nav .button { min-height:54px!important;padding:6px 4px!important;font-size:12px; }
   .user-status-line { margin-top:-4px;gap:10px; }
-  .user-diagnosis { padding:24px;gap:16px; }
-  .user-diagnosis-mark { width:42px;height:42px;flex-basis:42px;border-radius:14px; }
   .user-operating { align-items:flex-start;flex-direction:column;gap:20px; }
-  .user-diagnosis-copy { flex-basis:0; }
   
   
 }
 @media (max-width:480px) {
   
   
-  .user-diagnosis { display:block;padding:22px; }
-  .user-diagnosis-mark { margin-bottom:20px; }
+  .user-diagnosis { padding:var(--esp-4); }
   .user-chart { padding:20px 14px; }
   .user-operating>.button{ width:100%; }
   
@@ -398,7 +394,6 @@ body[data-private=true] .private-nav .button:focus-visible { outline:3px solid #
 body[data-role=admin] :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { display:block;width:100%;min-height:46px;box-sizing:border-box;border:1px solid #b4c5b9;border-radius:14px;padding:12px 14px;color:var(--garden-ink);background:#fff;font:inherit;font-size:16px; }
 body[data-role=admin] textarea { resize:vertical;line-height:1.6; }
 body[data-role=admin] :is(input:not([type=checkbox]):not([type=radio]),select,textarea):focus-visible { outline:3px solid #355a44;outline-offset:3px; }
-body[data-role=admin] label { display:block;font-size:14px;line-height:1.5;margin:20px 0 8px; }
 body[data-role=admin] .app-actions { flex-wrap:wrap; }
 body[data-role=admin] .app-actions .button { white-space:normal; }
 @media (max-width:1024px) {
@@ -516,20 +511,24 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-m
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon { grid-column:1;grid-row:1;display:flex;color:var(--claro-verde); }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:20px;height:20px; }
-body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { grid-column:1/-1;grid-row:1;margin:0;overflow:hidden;font-size:13px;font-weight:500;line-height:1.3;white-space:nowrap;text-overflow:ellipsis;color:var(--claro-suave); }
+body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { grid-column:1/-1;grid-row:1;margin:0;font-size:13px;font-weight:500;line-height:1.3;color:var(--claro-suave); }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric:has(.user-metric-icon) h2 { grid-column:2; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong {
-  grid-column:1/-1;grid-row:2;margin:0;overflow:hidden;font-size:clamp(15px,11cqi,30px);font-weight:700;line-height:1.15;letter-spacing:-.02em;
+  grid-column:1/-1;grid-row:2;margin:0;overflow:hidden;font-size:clamp(18px,15cqi,28px);font-weight:700;line-height:1.15;letter-spacing:-.02em;
   white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:var(--claro-titulo);
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong small { margin-left:var(--esp-1);font-size:.55em;font-weight:500;letter-spacing:0;white-space:nowrap; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric p {
   grid-column:1/-1;grid-row:3;margin:0;overflow:hidden;font-size:13px;line-height:1.35;
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
 }
 @media (max-width:640px) {
   .user-summary-metrics,.user-technical-metrics { grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-2); }
   body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric { padding:var(--esp-3); }
+  body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { font-size:clamp(18px,15cqi,24px); }
+  body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { font-size:12px; }
+  body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:18px;height:18px; }
+  body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric:has(.user-metric-icon) { column-gap:var(--esp-2); }
   body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric p { font-size:12px; }
 }
 
@@ -666,8 +665,6 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.ac
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.account-tabs,.notice-filters,.user-range-control) .btn-liquid-light:hover { color:var(--claro-tinta)!important;background:rgba(255,255,255,.6)!important; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tabs-bar .user-range-control { margin:0; }
-.user-chart-toolbar .toolbar-controls { display:flex;align-items:center;gap:var(--esp-2);max-width:100%; }
-.toolbar-controls > .button { flex:none;width:var(--boton-alto-compacto);padding:0; }
 
 /* Fila de avisos: una sola estructura. Punto, insignia, título (máximo 2 líneas) y debajo la meta «huerto · hace X». */
 .notice-list { display:grid;gap:0;margin:0 0 var(--esp-4);padding:0;list-style:none; }
@@ -675,7 +672,7 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tabs-b
 .notice-row > .notice-dot { margin-top:6px; }
 .notice-row > .badge { margin-top:1px; }
 .notice-main { display:grid;gap:var(--esp-1);min-width:0; }
-.notice-title { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;line-height:1.35; }
+.notice-title { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.35; }
 .notice-meta-line { font-size:13px;color:var(--claro-suave); }
 .notice-meta-line:empty { display:none; }
 @media (max-width:480px) { .notice-row { grid-template-columns:auto minmax(0,1fr); } .notice-row > .badge { grid-column:2;grid-row:1;justify-self:start; } .notice-main { grid-column:2; } .notice-row > .notice-dot { grid-row:1/span 2; } }
@@ -694,3 +691,24 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tabs-b
 body[data-private=true]:is([data-role=admin],[data-role=user]) .console-list .console-item { display:grid;justify-content:stretch;justify-items:start;align-items:start;gap:var(--esp-1);min-height:0;padding:var(--esp-3) var(--esp-4);border-radius:var(--radio-campo)!important;white-space:normal;text-align:left; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) .console-item-title { overflow-wrap:anywhere; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) .console-inbox .user-pager .button { min-height:var(--boton-alto-compacto);padding:0 var(--esp-3); }
+
+/* Etiqueta única de los formularios del panel. */
+body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form,.maint-form,[data-maint-revise],dialog form,.care-admin-field,.key-form) label:not(.cookie-option):not(.terms-label) {
+  display:block;margin:0 0 var(--esp-1);font-size:13px;font-weight:600;line-height:1.3;
+}
+body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form form,dialog form) { gap:var(--esp-3); }
+
+/* Accesos rápidos del mismo alto; el de revisión técnica ocupa la fila completa. */
+.user-quick-actions { grid-auto-rows:1fr; }
+.user-quick-actions .button { height:100%;min-height:var(--boton-alto);margin:0; }
+.user-quick-actions .user-quick-wide { grid-column:1/-1; }
+
+/* Título de sección con el botón de actualizar a su lado. */
+.toolbar-title { display:flex;align-items:center;gap:var(--esp-2);min-width:0; }
+.toolbar-title > .button { flex:none;width:var(--boton-alto-compacto);padding:0; }
+.toolbar-title h2 { margin:0; }
+
+.folio,.inquiry-folio { white-space:nowrap; }
+
+/* Mismo espacio entre tarjetas apiladas en usuario y administración. */
+body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page > :is(.bento-panel,.user-chart,.user-operating) + :is(.bento-panel,.user-chart,.user-operating) { margin-top:var(--esp-5); }

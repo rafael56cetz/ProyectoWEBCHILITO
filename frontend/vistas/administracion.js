@@ -157,7 +157,7 @@ const ConsoleViews = (() => {
       : caso.state === 'en_atencion' && !caso.mine ? `<p>Lo atiende ${escaparHTML(caso.attendedBy)}.</p>`
       : caso.state === 'en_atencion' && !session ? act('connect', 'Conectar', 'brand', caso.authorization === 'vigente' ? '' : 'disabled') : '';
     const mine = caso.state === 'en_atencion' && caso.mine;
-    return `<section class="bento-panel console-detail" id="console-detail" tabindex="-1"><h2>Caso ${escaparHTML(caso.folio)} ${tag(label, tone)}</h2>
+    return `<section class="bento-panel console-detail" id="console-detail" tabindex="-1"><h2>Caso <span class="folio">${escaparHTML(caso.folio)}</span> ${tag(label, tone)}</h2>
         <dl class="user-facts">${facts.map(([name, value]) => `<div><dt>${name}</dt><dd>${value}</dd></div>`).join('')}</dl>${closed}
         ${diagnostic ? `<h3>Autodiagnóstico adjunto</h3>${SupportViews.diagnosticCard(diagnostic)}` : ''}<div class="app-actions">${action}</div></section>
       ${mine && session ? sessionFrame(caso, session) : ''}${mine ? resolution(caso) : ''}`;

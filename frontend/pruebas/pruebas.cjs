@@ -62,6 +62,9 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   const sale = {id:'3', device:{id:'5', identifier:'ESP32-1'}, buyer:context.bad, email:'x@y.test', accountLinked:true, municipality:'Mérida', price:'3500.00', received:'1000.00', reference:context.bad, payment:'parcial', delivery:'por_entregar',
     method:'domicilio', plannedDelivery:null, deliveredAt:null, soldAt:'2026-11-08', state:'vigente', cancelledAt:null, note:context.bad};
   context.salesState = {status:'ready', tab:'ventas', list:{items:[sale], page:1, total:1}, catalog:{municipalities:['Mérida', 'Valladolid'], sellable:[{id:'5', identifier:'ESP32-1'}]}, filters:{busqueda:context.bad}, summary:null, preset:'month'};
+  // El folio de un caso no se parte y el resto del texto se escapa.
+  const folio = run("AppViews.conFolio('Caso CS-F36275A2 <b>x</b>')");
+  assert.equal(folio, 'Caso <span class="folio">CS-F36275A2</span> &lt;b&gt;x&lt;/b&gt;');
   const salesScreen = run('SalesViews.screen(salesState)');
   assert.ok(!salesScreen.includes('<img src=x') && salesScreen.includes('Página 1 de 1') && salesScreen.includes('+ Registrar venta') && salesScreen.includes('Parcial'));
   context.sale = sale;
@@ -394,6 +397,8 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(wizard({step:3, device:{identifier:'<b>CHI</b>'}}).includes('¡Tu equipo quedó vinculado!') && !wizard({step:3, device:{identifier:'<b>CHI</b>'}}).includes('<b>CHI</b>'));
   const page = V.plantPage({garden, plant:{...plants[0], name:'<i>x</i>'}, stages:[{stage:'germinacion', since:'2026-11-01'}], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
   assert.ok(page.includes('Regar esta planta') && page.includes('Línea de vida') && !page.includes('<i>x</i>'));
+  assert.ok(V.plantPage({garden, plant:plants[0], stages:[], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true}).includes('<h1>Planta 1</h1>'), 'el nombre de fábrica no se repite en el título');
+  assert.ok(page.includes('<h1>Planta 1 · «&lt;i&gt;x&lt;/i&gt;»</h1>'), 'un nombre propio sí se muestra, escapado');
   const hostil = V.plantPage({garden, plant:{...plants[0], stage:'<u>etapa</u>'}, stages:[], series:[], range:'24h', care:[], lastWatering:{origin:'<u>origen</u>', duration:3, at:'2026-11-14T10:00:00Z'}, hasDevice:true});
   assert.ok(!hostil.includes('<u>') && hostil.includes('&lt;u&gt;etapa'), 'etapa y origen del riego se escapan');
   assert.ok(V.plantDialogs(plants[0], true).water.includes('Si el depósito no tiene agua, tu equipo no regará.'));

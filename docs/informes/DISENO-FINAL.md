@@ -54,3 +54,14 @@ Los nuevos son pocos e intencionales: relleno superior del contenedor (`base.css
 - Consola en móvil: el detalle sigue bajo la bandeja (recibe el foco y se desplaza hasta él); no abre una pantalla aparte.
 - Etiquetas de KPI y valores largos se cortan con elipsis sin tooltip.
 - Siguen ~844 `!important`, sobre todo en `base.css` y `apariencia.css`.
+
+## 8. Ronda de ajustes del usuario (mvc.11)
+
+- KPI: etiqueta hasta 2 líneas sin elipsis; valor fluido (hasta 28 px en escritorio, 24 px en móvil) en una línea.
+- Panel técnico: el botón de actualizar va junto al título «Histórico de lecturas»; los 4 rangos caben solos.
+- Mi huerto: «Solicitar revisión técnica» ocupa la fila completa; «Resumen de tu huerto» lleva ícono y título en la misma línea.
+- Formularios: una sola regla de etiqueta (13 px, 600) para los formularios del panel; accesos rápidos del mismo alto.
+- Folio de caso (`CS-XXXXXXXX`) sin partir: `AppViews.conFolio` en avisos y `<span class="folio">` en los encabezados de caso (usuario y consola).
+- Ficha de planta: el título no repite el nombre de fábrica; las tarjetas apiladas tienen 24 px entre sí en ambos roles.
+- Se quitó la propiedad estándar `line-clamp` (Chrome la convierte en `flow-root` y rompe el recorte a 2 líneas); queda `-webkit-line-clamp`.
+- Pruebas nuevas: folio escapado y sin partir; título de planta con y sin nombre propio.
