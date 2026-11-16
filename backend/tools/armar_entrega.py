@@ -20,12 +20,12 @@ INCLUIR = ['README.md', '.gitignore',
            'frontend/index.html', 'frontend/favicon.svg', 'frontend/controladores', 'frontend/modelos', 'frontend/vistas',
            'frontend/pruebas', 'sql/privilegios.sql', 'sql/instalacion',
            'backend/tools/README.md',
-           *[f'backend/tools/{n}.py' for n in ('__init__', 'servir_local', 'entorno_local', 'pruebas_local', 'destino_temporal', 'comprobar_frontend_local', 'probar_seguridad', 'probar_mfa',
-                                                'probar_privacidad', 'probar_correo', 'probar_cuota_contacto', 'configurar_correo', 'correo_config',
-                                                'soporte_local', 'generar_sql_instalacion')]]
+           *[f'backend/tools/{n}.py' for n in ('__init__', 'servir_local', 'entorno_local', 'destino_temporal', 'comprobar_frontend_local',
+                                                'configurar_correo', 'correo_config', 'soporte_local', 'generar_sql_instalacion')]]
 EXCLUIR = ['*/__pycache__/*', '*.pyc']
 PROHIBIDOS = ['.env', 'CLAUDE.md', 'REGISTRO-DE-CAMBIOS.md', 'CONTEXTO-COMPARTIDO-EL-CHILITO.md', 'flujo actual a 7 de noviembre del 2026.md',
-              'operador.py', 'local.py', 'entorno.py', 'verificar_integracion.py', 'seed_runtime.py', 'probar_runtime.py', 'armar_entrega.py', 'simular_equipo.py']
+              'operador.py', 'local.py', 'entorno.py', 'verificar_integracion.py', 'seed_runtime.py', 'probar_runtime.py', 'armar_entrega.py', 'simular_equipo.py', 'pruebas_local.py', 'probar_seguridad.py', 'probar_mfa.py',
+              'probar_privacidad.py', 'probar_correo.py', 'probar_cuota_contacto.py']
 PATRONES = {'clave privada': rb'-----BEGIN [A-Z ]*PRIVATE KEY', 'token Google': rb'AIza[0-9A-Za-z_-]{30,}', 'token GitHub': rb'gh[pousr]_[A-Za-z0-9]{30,}',
             'clave AWS': rb'AKIA[0-9A-Z]{16}', 'cadena de conexión': rb'postgres(?:ql)?://[^\s\'"]+:[^\s\'"@]+@'}
 

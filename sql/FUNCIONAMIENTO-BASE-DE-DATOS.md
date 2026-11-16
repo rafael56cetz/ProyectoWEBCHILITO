@@ -243,8 +243,8 @@ La portada tiene cinco secciones, accesibles desde el menú:
 
 Desde el pie de página puede abrir el **Aviso de privacidad** (`#privacidad`), los **Términos** (`#terminos`) y la **Política de cookies** (`#cookies`).
 
-- El servidor lee el HTML de `frontend/legales/` en cada petición, lo limpia (solo deja texto, títulos, listas y enlaces seguros) y lo devuelve.
-- Calcula la huella SHA-256 del archivo y la compara con `privacidad_documentoversion`. Si coincide, lo muestra como versión registrada (hoy 0.2, borrador). Si editaste el HTML y la huella ya no coincide, lo muestra como **borrador sin versión registrada**.
+- El servidor lee el texto vigente de cada documento de la tabla `documento_legal`, lo limpia (solo deja texto, títulos, listas y enlaces seguros) y lo devuelve.
+- Los textos legales viven en `documento_legal`; se redactan y publican desde Administración → Textos legales. No hay archivos HTML que editar.
 - **En la base:** solo se **lee** `privacidad_documentoversion`.
 
 ### 6.3 Mandar un mensaje desde «Consíguelo»

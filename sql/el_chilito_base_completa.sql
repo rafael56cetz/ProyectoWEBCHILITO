@@ -1522,7 +1522,7 @@ ORDER BY p.orden;
 
 -- 9.3 Textos legales registrados y finalidad opcional -----------------------------------------------
 -- La versión vigente de cada tipo es la más reciente (0.2 para aviso y términos; 0.1 para cookies).
--- La huella SHA-256 debe coincidir con el archivo de frontend/legales para mostrarse como registrada.
+-- Los textos legales viven en documento_legal; esta tabla solo conserva la huella de cada versión.
 INSERT INTO public.privacidad_documentoversion(id,tipo,version,contenido_ref,contenido_sha256,registrado_en) VALUES
 ('3f0c1a52-6d1e-4b7a-9c11-0a1b2c3d4e01','aviso_privacidad','0.1-borrador',
  'privacidad/documentos/aviso_privacidad-0.1-borrador.md',

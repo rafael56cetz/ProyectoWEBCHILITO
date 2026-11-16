@@ -420,7 +420,7 @@ SELECT chilito_mantenimiento_periodico();   -- devuelve un resumen en JSON
 
 ## 12. Publicar los textos legales
 
-**Primera vez (paso 4 de la instalación), desde pgAdmin.** Pega el texto vigente de cada documento, por ejemplo el que hoy está en `frontend/legales/`, y publícalo:
+**Primera vez (paso 4 de la instalación), desde pgAdmin.** Pega el texto vigente de cada documento, y publícalo:
 
 ```sql
 SELECT chilito_publicar_documento_legal('terminos', '1.0', 'Términos y condiciones', $texto$

@@ -24,7 +24,7 @@ Eliminado:
 
 Documentación: `docs/INVENTARIO-INTERFAZ-ACTUAL.md` (reescrito: 1238 → 183 líneas; rutas, pantallas y 84 endpoints salen de `urls.py`), `docs/MATRIZ-SEGURIDAD-v2.md`. `index.html`: versión de los archivos `mvc.8` → `mvc.9`.
 
-No se tocó (decisión tuya): `sql/FUNCIONAMIENTO-BASE-DE-DATOS.md` (l. 246) y un comentario de `sql/el_chilito_base_completa.sql` (l. 1525) todavía mencionan `frontend/legales`; son parte del diseño de la base.
+Las menciones a `frontend/legales` en `sql/FUNCIONAMIENTO-BASE-DE-DATOS.md`, `sql/instalacion/FUNCIONAMIENTO-BASE-DE-DATOS-v2.md` y un comentario de `sql/el_chilito_base_completa.sql` se corrigieron: los textos viven en `documento_legal`.
 
 ## 3. CSS antes y después
 
@@ -85,23 +85,21 @@ Notas: las pruebas se corrieron con `CHILITO_IDEMPOTENCIA_SECRETO` generada al v
 
 asgiref 3.12.1 · cffi 2.1.1 · cryptography 50.0.2 · Django 5.2.18 · django-allauth 65.20.0 · fido2 2.2.1 · psycopg 3.3.6 · psycopg-binary 3.3.6 · pycparser 3.11 · PyJWT 2.15.1 · qrcode 8.2 · sqlparse 0.6.0 · typing-extensions 4.16.0 (solo Python < 3.13) · tzdata 2026.5.
 
-`pip-audit` **no está instalado** y no lo instalé. Pendiente: dime si lo instalo en el entorno de desarrollo o lo corres tú.
+`pip-audit` 2.10.1 (instalado solo en el `.venv`, fuera de `requirements`): `pip_audit -r backend/requirements-lock.txt --no-deps --disable-pip` → **No known vulnerabilities found**. Cubre las versiones fijadas del lock; no analiza dependencias que el lock no liste. El lock no lleva hashes, por eso la herramienta avisa que se recomienda fijarlos.
 
 ## 8. Para el despliegue
 
 - **`chilito_pkg_owner` no debe tener `CREATEDB` en producción.** Hoy lo tiene para que las pruebas creen la base temporal.
-- **El simulador (`backend/tools/simular_equipo.py`) y `backend/tools/` de prueba no se despliegan** (`armar_entrega.py` excluye el simulador, pero **sí copia** `pruebas_local.py`, `probar_*.py`, `destino_temporal.py` y `soporte_local.py`; hay que quitarlas de la lista antes de desplegar, decisión tuya).
+- **El simulador y las herramientas de prueba no se despliegan:** `armar_entrega.py` ya no copia `pruebas_local.py`, `probar_*.py` ni `simular_equipo.py` (y los lista como prohibidos). Se comprobó armando una entrega de prueba: 0 problemas y esos archivos no aparecen.
 - **`chilito_mantenimiento_periodico()` se programa cada hora** (Cloud Scheduler o `pg_cron`).
 - Antes de arrancar: en el `.env` real, **renombrar `CHILITO_SUPPORT_KEY` a `CHILITO_IDEMPOTENCIA_SECRETO`** (mismo valor; al arrancar con el nombre viejo, Django falla con «Suministra CHILITO_IDEMPOTENCIA_SECRETO…»). Las respuestas guardadas por idempotencia usan esa clave solo para la huella de la petición, así que cambiar el valor solo haría que un reintento viejo se trate como petición nueva.
 
 ## 9. Pendientes (RV.1)
 
-1. Reducir `!important` con comparación visual (escritorio y móvil) contra la fase 6.
-2. `pip-audit`.
+1. Reducir `!important` con comparación visual (escritorio y móvil) contra la fase 6: queda para la revisión de diseño.
 3. Recorrido manual con el servidor como `chilito_pkg_runtime` sobre consola, flota y mantenimientos (viene de la fase 6).
 4. El enlace `#admin/consola` que escribe la función de la base en el aviso de «Nueva solicitud de soporte» (la interfaz lo redirige; cambiar el texto de la función es decisión tuya).
-5. Quitar la mención a `frontend/legales` de `sql/FUNCIONAMIENTO-BASE-DE-DATOS.md` y del comentario del script SQL.
-6. `docs/EJECUCION-v2.md` l. 163 llama «Clave de tokens de soporte» a `CHILITO_VINCULACION_SECRETO`; es texto del plan, no lo cambié.
+5. `docs/EJECUCION-v2.md` l. 163 llama «Clave de tokens de soporte» a `CHILITO_VINCULACION_SECRETO`; es texto del plan, no lo cambié.
 
 ## 10. Cómo probarlo a mano
 
