@@ -33,7 +33,7 @@ const EquipmentViews = (() => {
     if(state.status !== 'ready') return AdminTableViews.status(state.status);
     const {counts, items} = state.list;
     const tiles = [['Disponibles', counts.disponible], ['Vinculados', counts.vinculado], ['Retirados', counts.retirado]]
-      .map(([label, value]) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong>${value}</strong></article>`).join('');
+      .map(([label, value]) => AppViews.kpi(label, value)).join('');
     const body = items.length ? AdminTableViews.table('Equipos', ['Identificador', 'MAC', 'Estado', 'Huerto', 'Dueño', 'Conexión', 'Venta', ''], items.map(row))
       : AppViews.empty('No hay equipos con estos filtros', 'Cambia o limpia los filtros para ver más.');
     return `<div class="page-heading"><div><h1>Inventario de equipos</h1></div><button type="button" class="button btn-liquid-brand" data-admin-action="create">+ Dar de alta equipo</button></div>

@@ -80,6 +80,15 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   context.accessState = {status:'ready', tab:'administradores', admins, history:{items:[], page:1, total:0}, activity:{items:[], page:1, total:0}, filters:{}, ownEmail:'yo@b.test'};
   const accessScreen = run('AdminAccessViews.screen(accessState)');
   assert.ok(!accessScreen.includes('<img src=x') && accessScreen.includes('Tu cuenta') && accessScreen.includes('Página 1 de 1') && accessScreen.includes('+ Dar acceso a una cuenta'));
+  // Super administrador: una sola insignia; los demás, hasta 3 y «+N» con la lista completa.
+  assert.ok(accessScreen.includes('Super administrador · todas') && !accessScreen.includes('>Ventas</span> <span'));
+  const many = {...admins, items:[{...admins.items[0], capabilities:['ver_flota', 'atender_soporte', 'gestionar_mantenimientos', 'gestionar_ventas', 'gestionar_guias']}]};
+  context.accessMany = {...context.accessState, admins:many};
+  const manyScreen = run('AdminAccessViews.screen(accessMany)');
+  assert.ok(manyScreen.includes('>+2</span>') && manyScreen.includes('title="Flota, Soporte, Mantenimientos, Ventas, Guías"') && !manyScreen.includes('>Guías</span>'));
+  // Tarjeta de resumen: las cifras llevan is-figure, el texto no,.
+  assert.ok(run("AppViews.kpi('Equipos', '1 284')").includes('user-metric is-figure'));
+  assert.ok(!run("AppViews.kpi('Cobrado', '$2,000.00')").includes('is-figure') && !run("AppViews.kpi('Estado', 'Sin lectura')").includes('is-figure'));
   const accessForm = run("AdminAccessViews.accessForm({})");
   assert.ok(!accessForm.includes('value="gestionar_administradores"') && accessForm.includes('solo se asigna desde la base de datos') && accessForm.includes('Motivo'));
   assert.equal(run("AdminAccessViews.confirmation(['gestionar_ventas'], ['ver_flota']).texto"), 'Darás: Ventas. Quitarás: Flota. ¿Continuar?');

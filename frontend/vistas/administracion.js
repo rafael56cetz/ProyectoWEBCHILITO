@@ -11,7 +11,7 @@ const FleetViews = (() => {
   const when = value => value ? AppViews.date(value) : 'Sin datos';
   const none = value => value ? escaparHTML(value) : '—';
   const options = (items, selected = '') => items.map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
-  const tile = (label, value) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong>${value}</strong></article>`;
+  const tile = AppViews.kpi;
 
   function filters(values) {
     return `<form class="care-filters" data-admin-form="fleet-filter" novalidate>
@@ -295,7 +295,7 @@ const SalesViews = (() => {
     const {summary, preset} = state;
     const periods = [['month', 'Este mes'], ['previous', 'Mes anterior'], ['all', 'Todo'], ['custom', 'Personalizado']];
     const tiles = [['Ventas', summary.sales], ['Importe vendido', T.money(summary.sold)], ['Cobrado', T.money(summary.collected)], ['Por cobrar', T.money(summary.pending)]]
-      .map(([label, value]) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong>${value}</strong></article>`).join('');
+      .map(([label, value]) => AppViews.kpi(label, value)).join('');
     const rows = summary.byMunicipality.map(item => `<tr><td>${escaparHTML(item.municipality)}</td><td>${item.sales}</td><td>${T.money(item.sold)}</td><td>${T.money(item.collected)}</td><td>${T.money(item.pending)}</td></tr>`);
     return `<section class="bento-panel"><form class="care-filters" data-admin-form="sales-period" novalidate><div><label for="sale-preset">Periodo</label><select id="sale-preset" name="preset">${options(periods, preset)}</select></div>
       ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Aplicar</button></div></form></section>
@@ -363,11 +363,19 @@ const AdminAccessViews = (() => {
   const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
   const label = code => LABELS[code] || code;
   const action = name => ACTIONS[name] || name;
-  const chips = list => list.length ? list.map(code => tag(label(code), code === 'gestionar_administradores' ? 'ambar' : 'gris')).join(' ') : '—';
+  // El super administrador tiene todas las capacidades: una sola insignia. Los demás, hasta 3 y «+N» con la lista completa como título.
+  const MAX_CHIPS = 3;
+  function chips(list, superAdmin = false) {
+    if(superAdmin) return tag('Super administrador · todas', 'ambar');
+    if(!list.length) return '—';
+    const extra = list.slice(MAX_CHIPS);
+    const more = extra.length ? `<span class="badge tone-gris" title="${escaparHTML(list.map(label).join(', '))}">+${extra.length}</span>` : '';
+    return list.slice(0, MAX_CHIPS).map(code => tag(label(code), 'gris')).join(' ') + (more && ` ${more}`);
+  }
 
   function adminsTab(state) {
-    const rows = state.admins.items.map(item => `<tr><td>${escaparHTML(item.email)}${item.superAdmin ? ' ★' : ''}</td><td>${item.name ? escaparHTML(item.name) : '—'}</td><td>${chips(item.capabilities)}</td>
-      <td>${item.secondFactor ? '✔' : '✖'}</td><td>${item.lastAccess ? T.merida(item.lastAccess) : '—'}</td><td>${item.email === state.ownEmail ? '<small>Tu cuenta</small>' : T.button('edit', 'Editar', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`);
+    const rows = state.admins.items.map(item => `<tr><td>${escaparHTML(item.email)}${item.superAdmin ? ' ★' : ''}</td><td>${item.name ? escaparHTML(item.name) : '—'}</td><td>${chips(item.capabilities, item.superAdmin)}</td>
+      <td>${item.secondFactor ? '✔' : '✖'}</td><td>${item.lastAccess ? T.merida(item.lastAccess) : '—'}</td><td>${item.email === state.ownEmail ? '<span class="cell-note">Tu cuenta</span>' : T.button('edit', 'Editar', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`);
     return `<section class="bento-panel">${rows.length ? T.table('Administradores', ['Correo', 'Nombre', 'Capacidades', 'Segundo factor', 'Último acceso', ''], rows) : '<p>No hay administradores.</p>'}${T.pager(state.admins)}</section>`;
   }
 
@@ -501,7 +509,7 @@ const ConsentViews = (() => {
     const {summary, list} = state;
     const stats = summary.statistics.percent === null ? 'Sin navegadores' : `${summary.statistics.percent}% (${summary.statistics.accepted} de ${summary.statistics.browsers})`;
     const cards = [['Términos vigentes aceptados', share(summary.terms)], ['Aviso vigente aceptado', share(summary.privacy)], ['Navegadores con estadísticas', stats]]
-      .map(([label, value]) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong class="consent-figure">${value}</strong></article>`).join('');
+      .map(([label, value]) => AppViews.kpi(label, value, ' class="consent-figure"')).join('');
     const body = list.items.length ? T.table('Bitácora de consentimientos', ['Fecha y hora (Mérida)', 'Cuenta', 'Qué', 'Versión', 'Decisión', 'IP', 'Navegador', ''], list.items.map(row)) : AppViews.empty('No hay registros con estos filtros', 'Cambia o limpia los filtros para ver más.');
     return `<div class="page-heading"><div><h1>Bitácora de consentimientos</h1><p>Quién aceptó qué, cuándo y desde dónde.</p></div>${exportAction(state)}</div>
       <section class="user-summary-metrics" aria-label="Resumen de consentimientos">${cards}</section><section class="bento-panel">${filters(state.filters)}${body}${T.pager(list)}</section>${T.dialog}`;

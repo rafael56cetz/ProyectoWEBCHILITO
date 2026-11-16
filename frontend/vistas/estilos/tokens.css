@@ -64,7 +64,7 @@
 
   /* Medidas de componentes del panel */
   --kpi-alto:96px;--fila-alto:48px;--campo-alto:46px;--filtro-ancho-min:160px;
-  --barra-alto:64px;--menu-ancho:268px;--menu-ancho-total:300px;
+  --barra-alto:64px;--contenido-max:1280px;--menu-ancho:268px;--menu-ancho-total:300px;
 }
 
 .hero,.auth-visual,.functions-section {

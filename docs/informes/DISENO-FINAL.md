@@ -65,3 +65,15 @@ Los nuevos son pocos e intencionales: relleno superior del contenedor (`base.css
 - Ficha de planta: el título no repite el nombre de fábrica; las tarjetas apiladas tienen 24 px entre sí en ambos roles.
 - Se quitó la propiedad estándar `line-clamp` (Chrome la convierte en `flow-root` y rompe el recorte a 2 líneas); queda `-webkit-line-clamp`.
 - Pruebas nuevas: folio escapado y sin partir; título de planta con y sin nombre propio.
+
+## 9. Ronda de ajustes de administración (mvc.12)
+
+- Contenido: desde 1025 px empieza junto al menú (margen de 24 px) y crece hasta `--contenido-max` (1280 px); ya no se centra.
+- Barra superior: transparente con la página arriba; el vidrio aparece con el desplazamiento (animación ligada al scroll, solo CSS, primeros 48 px). Donde el navegador no soporta `animation-timeline` se conserva el vidrio fijo.
+- KPI: la rejilla siempre llena la fila (`auto-fit`); nuevo `AppViews.kpi` sustituye 4 copias del mismo HTML y marca las cifras con `is-figure` (28 px, 24 px en móvil); los textos siguen fluidos.
+- Gráficas: altura máxima de 190 px (igual en usuario y administración), de modo que los ejes no crecen con el ancho ni una gráfica con un punto es altísima.
+- Filtros: pasan a `flex-wrap`; los filtros se estiran para llenar cada fila (ninguno queda solo) y las acciones van a la derecha de la última fila.
+- Administradores: super administrador con una sola insignia «Super administrador · todas»; los demás, hasta 3 insignias y «+N» con la lista completa como título; «Tu cuenta» pasa de `<small>` a 14 px.
+- Menú lateral: botones de 36 px, separaciones de 2 a 8 px y relleno de 12 px; con las 10 capacidades (super administrador) cabe completo en 768 px de alto. Queda barra de desplazamiento fina por si el alto es menor.
+- Pruebas nuevas: `AppViews.kpi` (cifras y texto) y las insignias de capacidades (super administrador y «+N»).
+- Sin comprobar en navegador con sesión real; las capturas son de páginas armadas con los CSS y las vistas reales a 948/1366/1568 px.

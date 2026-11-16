@@ -115,6 +115,8 @@ const AppViews = (() => {
   const empty = (title,text='',action='') => `<div class="app-empty" role="status"><span class="icon-medallion">${icon('info')}</span><div><p class="app-empty-title">${escaparHTML(title)}</p>${text?`<p>${escaparHTML(text)}</p>`:''}${action}</div></div>`;
   // Escapa el texto y evita que un folio de caso (CS-XXXXXXXX) se parta al final de la línea.
   const conFolio = text => escaparHTML(text).replace(/\bCS-[0-9A-Z]{8}\b/g,'<span class="folio">$&</span>');
+  // Tarjeta de resumen compacta; las cifras puras llevan `is-figure` (tamaño dominante fijo) y el texto se ajusta solo.
+  const kpi = (label,value,extra='') => `<article class="bento-panel user-metric${/^[\d\s.,]+$/.test(String(value))?' is-figure':''}"><h2>${label}</h2><strong${extra}>${value}</strong></article>`;
   const accountTabs = active => `<nav class="account-tabs" aria-label="Apartados de mi cuenta">${[['perfil','','Perfil'],['huertos','/huertos','Mis huertos'],['seguridad','/seguridad','Seguridad'],['privacidad','/privacidad','Privacidad']].map(([key,path,label])=>`<a class="button ${key===active?'btn-liquid-brand active':'btn-liquid-light'}" href="#cuenta${path}"${key===active?' aria-current="page"':''}>${label}</a>`).join('')}</nav>`;
   const accountGreeting = greeting => greeting?(greeting==='Bienvenido'?greeting:'Hola, '+greeting):'Tu información de acceso.';
   // `nav` lo prepara AppController según la sesión y sus capacidades; la vista solo pinta los enlaces.
@@ -226,7 +228,7 @@ const AppViews = (() => {
   }
   const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},
     cancelarEliminacion:{titulo:'¿Cancelar la eliminación de tu cuenta?',texto:'Tu cuenta y tus datos se conservarán.',accion:'Cancelar eliminación'}};
-  return {shell,frame,heading,state,empty,conFolio,date,notices,account,accountGreeting,accountTabs,confirmaciones
+  return {shell,frame,heading,state,empty,conFolio,kpi,date,notices,account,accountGreeting,accountTabs,confirmaciones
   };
 })();
 

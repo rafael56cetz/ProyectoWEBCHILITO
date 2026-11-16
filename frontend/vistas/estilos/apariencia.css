@@ -122,11 +122,11 @@ html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
 .sidebar-top { display:none; }
 .private-topbar { display:none; }
 @media (min-width:1025px) {
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:0!important;padding:20px 16px!important;gap:16px; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:0!important;padding:20px 16px!important;gap:var(--esp-2); }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar-top { display:flex;flex-direction:column;align-items:flex-start;gap:12px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar-brand { color:#fff!important; }
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav { gap:10px; }
-  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { min-height:44px!important;padding:0 16px!important;gap:12px;font-size:15px; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav { gap:2px; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { min-height:36px!important;padding:0 12px!important;gap:10px;font-size:13.5px;line-height:1.2; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .icon { width:20px;height:20px; }
 }
 
@@ -185,8 +185,8 @@ body[data-private=true]:is([data-role=admin],[data-role=user])::before {
 /* Panel lateral de vidrio verde: flota con margen, esquinas redondeadas y un reflejo discreto. */
 @media (min-width:1025px) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
-    top:16px!important;left:16px!important;bottom:16px!important;width:268px!important;padding:24px 16px!important;border-radius:var(--radio-menu)!important;
-    border:1px solid rgba(255,255,255,.2)!important;overflow:hidden auto;
+    top:16px!important;left:16px!important;bottom:16px!important;width:268px!important;padding:12px 16px!important;border-radius:var(--radio-menu)!important;
+    border:1px solid rgba(255,255,255,.2)!important;overflow:hidden auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.45) transparent;
     background:
       radial-gradient(120% 60% at 0% 0%,rgba(255,255,255,.16),transparent 55%),
       radial-gradient(90% 50% at 100% 100%,rgba(140,190,120,.18),transparent 60%),
@@ -208,7 +208,7 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-lab
   width:fit-content;margin:0 var(--esp-2);padding:var(--esp-1) var(--esp-3);border:1px solid rgba(255,255,255,.22);border-radius:var(--radio-insignia);
   background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
 }
-body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group-label { margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18); }
+body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group-label { margin-top:var(--esp-1);padding-top:var(--esp-2);border-top:1px solid rgba(255,255,255,.18); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button:not([aria-current]) {
   background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;color:#fff!important;font-weight:600;
 }
@@ -217,10 +217,9 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav
   background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.2))!important;border:1px solid rgba(255,255,255,.4)!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 16px -8px rgba(0,0,0,.35)!important;color:#fff!important;font-weight:600;
 }
-@media (min-width:1025px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button { padding:0 14px!important;gap:12px; } }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a,button):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
 /* Elemento pendiente: se ve, pero no es un enlace ni un botón. */
-.private-group { display:grid;gap:10px; }
+.private-group { display:grid;gap:2px; }
 
 /* Botón de perfil flotante: el verde del panel. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .button { background:#28623e!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 18px -8px rgba(20,50,30,.5)!important; }
@@ -343,7 +342,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.passwor
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading { margin-top:8px; }
 
 /* Acceso a la página principal bajo el logotipo (sustituye al botón de ocultar). */
-.sidebar-home { display:flex;align-items:center;gap:10px;min-height:40px;margin:2px 0 4px;padding:0 14px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
+.sidebar-home { display:flex;align-items:center;gap:10px;min-height:36px;margin:0;padding:0 14px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
 .sidebar-home:hover { background:rgba(255,255,255,.16); }
 .sidebar-home .icon { width:18px;height:18px; }
 .sidebar-home:focus-visible { outline:3px solid #fff;outline-offset:3px; }
@@ -531,3 +530,15 @@ html body[data-private=true] #app-page .care-guide-answer .care-guide-source { f
   .care-admin-row-actions .button { flex:1 1 auto; }
 }
 @media (prefers-reduced-motion:reduce) { .care-guide summary::before { transition:none; } }
+
+/* Barra superior: transparente con la página arriba; el vidrio aparece al desplazarse (solo con animaciones ligadas al scroll). */
+@supports (animation-timeline:scroll()) {
+  @media (prefers-reduced-motion:no-preference) {
+    body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar {
+      animation:barra-vidrio linear both;animation-timeline:scroll(root block);animation-range:0 48px;
+    }
+    @keyframes barra-vidrio {
+      from { background:transparent;border-bottom-color:transparent;box-shadow:none;-webkit-backdrop-filter:blur(0);backdrop-filter:blur(0); }
+    }
+  }
+}
