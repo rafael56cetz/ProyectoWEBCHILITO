@@ -115,8 +115,7 @@ const GardenViews = (() => {
         ${button('order-confirm', off ? 'Restaurar automático' : 'Apagar lámpara', 'light', `data-type="${off ? 'lampara_automatico' : 'lampara_apagar'}"`)}
         <a class="button btn-liquid-brand" href="#soporte">Solicitar revisión técnica</a></section>
       <div data-order-card></div>
-      <p class="user-safety-copy">Ante una emergencia, utiliza el paro físico del equipo.</p>
-      <p class="user-small-copy">¿Algo no responde? <a href="#soporte">Solicitar revisión técnica</a></p>`;
+      <p class="user-safety-copy">Ante una emergencia, utiliza el paro físico del equipo.</p>`;
   }
 
   // Mi huerto en sus tres versiones: A sin huerto, B sin equipo, C con equipo.
@@ -178,10 +177,27 @@ const GardenViews = (() => {
   }
 
   // Una o varias series con puntos {at, value, min, max}. Con una sola serie y min/max se dibuja su banda.
+  // Lecturas crudas → un punto por intervalo (promedio; la banda conserva el mínimo y el máximo), para que la línea sea legible.
+  const CHART_BUCKET_MS = {'1h':60e3, '24h':600e3, '7d':3600e3, '30d':6 * 3600e3};
+  function aggregate(points, range) {
+    const size = CHART_BUCKET_MS[range];
+    if(!size) return points;
+    const groups = new Map();
+    points.forEach(point => {
+      const key = Math.floor(Date.parse(point.at) / size);
+      groups.set(key, [...(groups.get(key) || []), point]);
+    });
+    const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
+    return [...groups.entries()].map(([key, group]) => {
+      const bands = group.filter(point => Number.isFinite(point.min) && Number.isFinite(point.max));
+      return {at:new Date((key + .5) * size).toISOString(), value:mean(group.map(point => point.value)),
+        ...(bands.length ? {min:Math.min(...bands.map(point => point.min)), max:Math.max(...bands.map(point => point.max))} : {})};
+    });
+  }
   function lineChart({title, series, unit, range, id}) {
     const labels = CHART_LABELS[range] || CHART_LABELS['7d'];
-    const drawn = series.map(item => ({name:item.name, points:(Array.isArray(item.points) ? item.points : [])
-      .filter(point => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.at))).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))}));
+    const drawn = series.map(item => ({name:item.name, points:aggregate((Array.isArray(item.points) ? item.points : [])
+      .filter(point => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.at))), range).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))}));
     const all = drawn.flatMap(item => item.points);
     if(!all.length) return emptyChart(title, unit, labels);
     const times = all.map(point => Date.parse(point.at)), first = Math.min(...times), last = Math.max(...times);
@@ -326,7 +342,7 @@ const TechnicalViews = (() => {
 
   function logTable(log) {
     if(log.status === 'error') return '<p role="alert">No pudimos cargar la bitácora.</p>';
-    if(!log.items.length) return '<div class="user-empty-inline"><p>Aún no hay registros.</p></div>';
+    if(!log.items.length) return AppViews.empty('Aún no hay registros');
     const rows = {
       ordenes:item => `<tr><td>${when(item.createdAt)}</td><td>${escaparHTML(orderTitle(item))}</td><td>${ORIGINS[item.origin] || escaparHTML(item.origin)}</td><td>${orderStateTag(item.state)}</td></tr>`,
       actuaciones:item => `<tr><td>${when(item.at)}</td><td>${ACTUATORS[item.actuator] || escaparHTML(item.actuator)}${item.plant ? ` · planta ${item.plant}` : ''}</td><td>${item.action === 'encendido' ? 'Encendido' : 'Apagado'}${item.duration ? ` · ${item.duration} s` : ''}</td><td>${ORIGINS[item.origin] || escaparHTML(item.origin)}</td></tr>`,
@@ -350,7 +366,7 @@ const TechnicalViews = (() => {
     if(!state.gardens.length) return noGarden('Panel técnico');
     const {garden, data, range, log} = state;
     if(!garden.device) return noDevice(state.gardens, garden, 'Panel técnico', 'telemetria');
-    const toolbar = `<div class="user-chart-toolbar"><h2>Histórico de lecturas</h2><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}${button('reload', 'Actualizar')}</div></div>`;
+    const toolbar = `<div class="user-chart-toolbar"><h2>Histórico de lecturas</h2><div class="toolbar-controls"><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div>${button('reload', `${icon('refresh')}<span class="sr-only">Actualizar</span>`, 'light', 'aria-label="Actualizar" title="Actualizar"')}</div></div>`;
     return `${selector(state.gardens, garden, 'telemetria')}${AppViews.heading(`Panel técnico · ${garden.name}`)}${statusLine(garden.device)}${cards(data)}${toolbar}${charts(data)}${plantTable(data.plants)}${waterCard(data.plants)}<div data-log-panel>${logPanel(log)}</div>`;
   }
 
@@ -405,7 +421,7 @@ const CareViews = (() => {
 
   function list(cares) {
     if(cares.status === 'error') return '<p role="alert">No pudimos cargar el historial.</p>';
-    if(!cares.items.length) return '<div class="user-empty-inline"><p>No hay cuidados registrados con estos filtros.</p><p>Al completar un cuidado, regístralo para conservar su fecha.</p></div>';
+    if(!cares.items.length) return AppViews.empty('No hay cuidados con estos filtros', 'Al completar un cuidado, regístralo para conservar su fecha.');
     const pages = Math.max(1, Math.ceil(cares.total / PAGE_SIZE));
     const pager = pages < 2 ? '' : `<nav class="user-pager" aria-label="Páginas del historial">${button('care-page', 'Anterior', 'light', `data-page="${cares.page - 1}"${cares.page <= 1 ? ' disabled' : ''}`)}<span>Página ${cares.page} de ${pages}</span>${button('care-page', 'Siguiente', 'light', `data-page="${cares.page + 1}"${cares.page >= pages ? ' disabled' : ''}`)}</nav>`;
     return `<ol class="user-history-list">${cares.items.map(row).join('')}</ol>${pager}`;
@@ -774,7 +790,7 @@ const MaintenanceViews = (() => {
     if(state.status !== 'ready') return T.status(state.status);
     const {items} = state.list;
     const body = items.length ? T.table('Registros de mantenimiento', ['Fecha', 'Huerto', 'Dueño', 'Cuidado', 'Estado', ''], items.map(row))
-      : '<div class="user-empty-inline"><p>No hay registros con estos filtros.</p></div>';
+      : AppViews.empty('No hay registros con estos filtros');
     return `<div class="page-heading"><div><h1>Mantenimientos</h1><p>Registra, corrige y anula intervenciones de todos los huertos. Cada cambio pide un motivo.</p></div>${act('create', '+ Registrar intervención', 'brand')}</div>
       <section class="bento-panel">${filters(state.filters)}${body}${T.pager(state.list)}</section>${T.dialog}`;
   }

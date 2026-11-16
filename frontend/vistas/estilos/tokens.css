@@ -40,6 +40,31 @@
   /* Aviso flotante */
   --aviso-solido:#142b24;--aviso-vidrio:rgba(16,36,29,.82);--aviso-texto:#fff;--aviso-filo:var(--cookies-filo);
   --aviso-exito:#d6e8a7;--aviso-error:#ffc4ba;
+
+  /* Estados del panel: cuatro tonos desaturados; siempre llevan texto. Contraste del texto ≥ 7:1 sobre la tarjeta. */
+  --insignia-verde-fondo:rgba(47,106,72,.14);--insignia-verde-texto:#1d4a31;--insignia-verde-borde:rgba(47,106,72,.26);
+  --insignia-ambar-fondo:rgba(184,116,30,.16);--insignia-ambar-texto:#5e4210;--insignia-ambar-borde:rgba(184,116,30,.32);
+  --insignia-rojo-fondo:rgba(163,50,31,.12);--insignia-rojo-texto:#7a2e20;--insignia-rojo-borde:rgba(163,50,31,.28);
+  --insignia-gris-fondo:rgba(70,40,31,.08);--insignia-gris-texto:#4b423a;--insignia-gris-borde:rgba(70,40,31,.16);
+
+  /* Vidrio en tres niveles. Base: listas y tablas largas, sin desenfoque. Tarjeta: piezas del contenido, también sin desenfoque. Flotante: diálogos, calendario, listas, avisos. */
+  --vidrio-base-fondo:rgba(255,250,244,.62);--vidrio-base-borde:rgba(255,255,255,.7);
+  --vidrio-base-sombra:inset 0 1px 0 rgba(255,255,255,.85),0 10px 26px -18px rgba(150,70,20,.3);
+  --vidrio-tarjeta-fondo:rgba(255,250,244,.72);--vidrio-tarjeta-borde:rgba(255,255,255,.75);
+  --vidrio-tarjeta-sombra:inset 0 1px 0 rgba(255,255,255,.85),0 14px 30px -22px rgba(150,70,20,.36),0 2px 6px -2px rgba(150,70,20,.08);
+  --vidrio-flotante-fondo:rgba(255,250,244,.9);--vidrio-flotante-borde:rgba(255,255,255,.85);
+  --vidrio-flotante-sombra:inset 0 1px 0 rgba(255,255,255,.9),0 18px 44px -18px rgba(60,45,25,.4),0 0 0 1px rgba(47,106,72,.1);
+  --vidrio-flotante-desenfoque:blur(22px) saturate(140%);
+  --vidrio-opaco:#fffaf4;
+  --vidrio-barra-fondo:rgba(255,250,244,.78);--vidrio-barra-sombra:0 8px 24px -20px rgba(60,45,25,.5);
+
+  /* Escala única de espacios y de radios del panel. */
+  --esp-1:4px;--esp-2:8px;--esp-3:12px;--esp-4:16px;--esp-5:24px;--esp-6:32px;
+  --radio-sm:10px;
+
+  /* Medidas de componentes del panel */
+  --kpi-alto:96px;--fila-alto:48px;--campo-alto:46px;--filtro-ancho-min:160px;
+  --barra-alto:64px;--menu-ancho:268px;--menu-ancho-total:300px;
 }
 
 .hero,.auth-visual,.functions-section {
@@ -67,11 +92,8 @@ body[data-private=true] .btn-liquid-light { --liquid-fill:#f6f9f6; }
 html:has(body[data-private=true]:is([data-role=admin],[data-role=user])) { --claro-fondo:#fdf3e8; }
 body[data-private=true]:is([data-role=admin],[data-role=user]) {
   --claro-tinta:#1b231d;--claro-titulo:#13261b;--claro-suave:#4b423a;--claro-linea:rgba(70,40,20,.12);
-  --claro-tarjeta:rgba(255,250,244,.52);--claro-tarjeta-solida:rgba(255,250,244,.94);--claro-verde:#2f6a48;--claro-peligro:#a3321f;
-  --claro-borde:rgba(255,255,255,.72);
-  --claro-filo:inset 0 1px 0 rgba(255,255,255,.85),0 18px 40px -26px rgba(150,70,20,.42),0 2px 6px -2px rgba(150,70,20,.08);
-  --claro-desenfoque:blur(22px) saturate(150%);
-  --text:var(--claro-tinta);--muted:var(--claro-suave);--focus:var(--claro-verde);--sage:var(--claro-verde);
+  --claro-verde:#2f6a48;--claro-peligro:#a3321f;
+        --text:var(--claro-tinta);--muted:var(--claro-suave);--focus:var(--claro-verde);--sage:var(--claro-verde);
   --garden-ink:var(--claro-tinta);--garden-muted:var(--claro-suave);--garden-line:var(--claro-linea);
   --garden-green:var(--claro-verde);--garden-tint:rgba(255,255,255,.1);
 
@@ -83,12 +105,6 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) {
   --boton-secundaria-filo:inset 0 1px 0 #fff,0 6px 16px -10px rgba(150,70,20,.4),0 0 0 1px rgba(70,40,20,.06);
   --boton-peligro:linear-gradient(180deg,rgba(196,85,58,.92) 0%,rgba(156,50,32,.92) 100%);
   --boton-peligro-hover:linear-gradient(180deg,rgba(207,97,70,.94) 0%,rgba(168,56,38,.94) 100%);
-
-  /* Insignias del panel: cuatro tonos */
-  --insignia-verde-fondo:rgba(47,106,72,.16);--insignia-verde-texto:#1d4a31;--insignia-verde-borde:rgba(47,106,72,.28);
-  --insignia-ambar-fondo:rgba(240,150,60,.22);--insignia-ambar-texto:#6b4a12;--insignia-ambar-borde:rgba(184,116,30,.38);
-  --insignia-rojo-fondo:rgba(163,50,31,.12);--insignia-rojo-texto:#7a2e20;--insignia-rojo-borde:rgba(163,50,31,.3);
-  --insignia-gris-fondo:rgba(70,40,20,.08);--insignia-gris-texto:#4b423a;--insignia-gris-borde:rgba(70,40,20,.14);
 
   /* Series de las gráficas con varias líneas (se distinguen también por el trazo) */
   --serie-1:#2f6a48;--serie-2:#b8741e;--serie-3:#3f6f9a;

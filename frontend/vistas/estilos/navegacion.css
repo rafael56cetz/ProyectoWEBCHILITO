@@ -1,7 +1,7 @@
 /* User navigation: original desktop sidebar, top disclosure on phones. */
 .private-menu-toggle,.private-menu-footer,.private-menu-shade,.private-menu-close-icon { display:none; }
 .private-menu-toggle { display:none!important; }
-@media (max-width:768px) {
+@media (max-width:1024px) {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-layout { min-height:100svh!important;min-height:100dvh!important;box-sizing:border-box; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-toggle { display:inline-flex!important;align-items:center;gap:9px; }
   .private-menu-toggle .icon { width:20px;height:20px; }
@@ -48,14 +48,15 @@
   body[data-private=true]:is([data-role=user],[data-role=admin]).private-menu-open { overflow:hidden; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.container { padding-bottom:32px!important; }
 }
+/* Tablet: el desplegable se ancla bajo el botón Menú, con ancho de menú y no de página. */
+@media (min-width:641px) and (max-width:1024px) {
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { left:auto!important;width:min(360px,calc(100vw - 24px))!important; }
+}
 @media (forced-colors:active) {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar,
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-logout { background:Canvas!important;color:CanvasText!important;border-color:CanvasText!important;box-shadow:none!important; }
   .private-menu-footer { border-color:CanvasText; }
   .private-menu-shade { background:transparent!important; }
-}
-@media (max-width:480px) {
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .notice-filters .button { flex:0 0 auto!important;min-width:0;padding-inline:14px!important;font-size:13px;white-space:nowrap!important; }
 }
 
 
@@ -69,14 +70,14 @@ body[data-private=true] .site-header .account-icon-link[aria-current] { backgrou
   body[data-private=true] .site-header .header-inner { flex-wrap:nowrap;width:calc(100% - 32px); }
   body[data-private=true][data-role=admin] .site-header .brand-name { display:none; }
 }
-@media (max-width:768px) {
+@media (max-width:1024px) {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { overflow-y:auto!important;overscroll-behavior:contain; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav { flex:0 0 auto!important;overflow:visible; }
   
 }
 
 /* Menú lateral del usuario en escritorio: Mi cuenta abajo, y se puede ocultar. */
-@media (min-width:769px) {
+@media (min-width:1025px) {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { display:flex;flex-direction:column; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav { display:flex;flex-direction:column;flex:1 1 auto;min-height:0; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { justify-content:flex-start; }

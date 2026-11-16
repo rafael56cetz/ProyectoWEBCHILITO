@@ -38,12 +38,12 @@ const FleetViews = (() => {
     if(state.status !== 'ready') return T.status(state.status);
     const {totals, trends, problems, items, page, total} = state.data;
     const body = items.length ? T.table('Equipos de la flota', ['Identificador', 'Huerto', 'Dueño', 'Conexión', 'Última lectura', 'Firmware', 'Última revisión', ''], items.map(item => row(item, access)))
-      : '<div class="user-empty-inline"><p>No hay equipos con estos filtros.</p></div>';
+      : AppViews.empty('No hay equipos con estos filtros', 'Cambia o limpia los filtros para ver más.');
     return `<div class="page-heading"><div><h1>Telemetría de flota</h1><p>Equipos vinculados, su conexión y los problemas de las últimas 24 horas.</p></div>${T.button('refresh', `${icon('refresh')}<span>Actualizar</span>`)}</div>
       <section class="user-summary-metrics" aria-label="Estado de la flota">${tile('Equipos vinculados', totals.linked)}${tile('En línea', totals.online)}${tile('Desconectados', totals.offline)}${tile('Problemas (24 h)', totals.problems)}</section>
       <section class="user-chart-grid-layout" aria-label="Tendencias de 7 días">${chart('Humedad media del sustrato · 7 días', trends.moisture, '%', '7d', 'fleet-soil')}${chart('Temperatura media · 7 días', trends.temperature, '°C', '7d', 'fleet-temp')}</section>
       <section class="bento-panel"><h2>Equipos</h2>${filters(state.filters)}${body}${T.pager({page, total})}</section>
-      <section class="bento-panel"><h2>Problemas recientes</h2>${problems.length ? `<ol class="user-history-list">${problems.map(problem).join('')}</ol>` : '<p>No hay problemas en las últimas 24 horas.</p>'}</section>${T.dialog}`;
+      <section class="bento-panel"><h2>Problemas recientes</h2>${problems.length ? `<ol class="user-history-list">${problems.map(problem).join('')}</ol>` : AppViews.empty('No hay problemas', 'Ningún equipo reportó fallas en las últimas 24 horas.')}</section>${T.dialog}`;
   }
 
   function peek(item) {
@@ -88,13 +88,13 @@ const ConsoleViews = (() => {
   function item(caso, selected) {
     const remaining = caso.state === 'resuelto' ? (ConsoleService.results[caso.result] || '—') : caso.authorization === 'vigente' ? `${GardenModel.lapse(caso.authorizedUntil)} restantes` : AUTHORIZATION[caso.authorization][0];
     return `<li><button type="button" class="console-item${selected ? ' is-selected' : ''}" data-admin-action="open-case" data-case="${escaparHTML(caso.id)}" aria-pressed="${selected}">
-      <strong>${escaparHTML(caso.folio)}</strong> · ${incident(caso.incident)} <small>${when(caso.createdAt)}</small>
+      <span class="console-item-title"><strong>${escaparHTML(caso.folio)}</strong> · ${incident(caso.incident)}</span><small>${when(caso.createdAt)}</small>
       <small>${escaparHTML(caso.email)} · ${escaparHTML(caso.device)} · ${escaparHTML(remaining)}</small></button></li>`;
   }
 
   function inbox(state) {
     const {items, page, total} = state.inbox;
-    return `<section class="bento-panel console-inbox" aria-label="Bandeja">${items.length ? `<ul class="console-list">${items.map(caso => item(caso, caso.id === state.selectedId)).join('')}</ul>` : '<p>No hay casos en esta pestaña.</p>'}${T.pager({page, total})}</section>`;
+    return `<section class="bento-panel console-inbox" aria-label="Bandeja">${items.length ? `<ul class="console-list">${items.map(caso => item(caso, caso.id === state.selectedId)).join('')}</ul>` : AppViews.empty('No hay casos en esta pestaña', 'Cuando llegue uno aparecerá aquí.')}${T.pager({page, total})}</section>`;
   }
 
   const confirmations = {
@@ -147,7 +147,7 @@ const ConsoleViews = (() => {
   }
 
   function detail(state) {
-    if(!state.detail) return '<section class="bento-panel console-detail" id="console-detail" tabindex="-1"><h2>Selecciona un caso</h2><p>Abre uno de la bandeja para ver su detalle.</p></section>';
+    if(!state.detail) return '<section class="bento-panel console-detail console-placeholder" id="console-detail" tabindex="-1">'+AppViews.empty('Selecciona un caso', 'Abre uno de la bandeja para ver su detalle.')+'</section>';
     const {case: caso, diagnostic, session} = state.detail;
     const [label, tone] = CASE_STATES[caso.state];
     const facts = [['Persona', none(caso.person)], ['Correo', escaparHTML(caso.email)], ['Huerto', escaparHTML(caso.garden)], ['Equipo', escaparHTML(caso.device)],
@@ -287,8 +287,8 @@ const SalesViews = (() => {
   function salesTab(state) {
     const {list, catalog} = state;
     const body = list.items.length ? T.table('Ventas', ['Equipo', 'Comprador', 'Municipio', 'Fecha', 'Precio', 'Pago', 'Entrega', 'Estado', ''], list.items.map(row))
-      : '<div class="user-empty-inline"><p>No hay ventas con estos filtros.</p></div>';
-    return `<div class="app-actions">${T.button('create', '+ Registrar venta', 'brand')}</div><section class="bento-panel">${filters(state.filters, catalog.municipalities)}${body}${T.pager(list)}</section>`;
+      : AppViews.empty('No hay ventas con estos filtros', 'Cambia o limpia los filtros para ver más.');
+    return `<section class="bento-panel">${filters(state.filters, catalog.municipalities)}${body}${T.pager(list)}</section>`;
   }
 
   function summaryTab(state) {
@@ -300,12 +300,12 @@ const SalesViews = (() => {
     return `<section class="bento-panel"><form class="care-filters" data-admin-form="sales-period" novalidate><div><label for="sale-preset">Periodo</label><select id="sale-preset" name="preset">${options(periods, preset)}</select></div>
       ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Aplicar</button></div></form></section>
       <section class="user-summary-metrics" aria-label="Resumen de ventas">${tiles}</section>
-      <section class="bento-panel"><h2>Por municipio</h2>${rows.length ? T.table('Ventas por municipio', ['Municipio', 'Ventas', 'Vendido', 'Cobrado', 'Por cobrar'], rows) : '<p>No hay ventas en este periodo.</p>'}</section>`;
+      <section class="bento-panel"><h2>Por municipio</h2>${rows.length ? T.table('Ventas por municipio', ['Municipio', 'Ventas', 'Vendido', 'Cobrado', 'Por cobrar'], rows) : AppViews.empty('No hay ventas en este periodo')}</section>`;
   }
 
   function screen(state) {
     if(state.status !== 'ready') return T.status(state.status);
-    return `${AppViews.heading('Ventas', 'Registra ventas, pagos y entregas de equipos.')}${T.tabs([['ventas', 'Ventas'], ['resumen', 'Resumen']], state.tab)}${state.tab === 'resumen' ? summaryTab(state) : salesTab(state)}${T.dialog}`;
+    return `${AppViews.heading('Ventas', 'Registra ventas, pagos y entregas de equipos.')}${T.tabs([['ventas', 'Ventas'], ['resumen', 'Resumen']], state.tab, state.tab === 'ventas' ? T.button('create', '+ Registrar venta', 'brand') : '')}${state.tab === 'resumen' ? summaryTab(state) : salesTab(state)}${T.dialog}`;
   }
 
   function createForm(catalog) {
@@ -368,7 +368,7 @@ const AdminAccessViews = (() => {
   function adminsTab(state) {
     const rows = state.admins.items.map(item => `<tr><td>${escaparHTML(item.email)}${item.superAdmin ? ' ★' : ''}</td><td>${item.name ? escaparHTML(item.name) : '—'}</td><td>${chips(item.capabilities)}</td>
       <td>${item.secondFactor ? '✔' : '✖'}</td><td>${item.lastAccess ? T.merida(item.lastAccess) : '—'}</td><td>${item.email === state.ownEmail ? '<small>Tu cuenta</small>' : T.button('edit', 'Editar', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`);
-    return `<div class="app-actions">${T.button('grant', '+ Dar acceso a una cuenta', 'brand')}</div><section class="bento-panel">${rows.length ? T.table('Administradores', ['Correo', 'Nombre', 'Capacidades', 'Segundo factor', 'Último acceso', ''], rows) : '<p>No hay administradores.</p>'}${T.pager(state.admins)}</section>`;
+    return `<section class="bento-panel">${rows.length ? T.table('Administradores', ['Correo', 'Nombre', 'Capacidades', 'Segundo factor', 'Último acceso', ''], rows) : '<p>No hay administradores.</p>'}${T.pager(state.admins)}</section>`;
   }
 
   function historyTab(state) {
@@ -377,20 +377,20 @@ const AdminAccessViews = (() => {
     return `<section class="bento-panel"><form class="care-filters" data-admin-form="history-filter" novalidate><div><label for="ah-account">Cuenta</label><input id="ah-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(state.filters.cuenta || '')}"></div>
       <div><label for="ah-capability">Capacidad</label><select id="ah-capability" name="capacidad">${capabilities.map(([value, text]) => `<option value="${value}"${value === (state.filters.capacidad || '') ? ' selected' : ''}>${text}</option>`).join('')}</select></div>
       ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button></div></form>
-      ${rows.length ? T.table('Historial de capacidades', ['Fecha y hora', 'Cuenta', 'Capacidad', 'Acción', 'Por', 'Motivo'], rows) : '<p>No hay cambios con estos filtros.</p>'}${T.pager(state.history)}</section>`;
+      ${rows.length ? T.table('Historial de capacidades', ['Fecha y hora', 'Cuenta', 'Capacidad', 'Acción', 'Por', 'Motivo'], rows) : AppViews.empty('No hay cambios con estos filtros')}${T.pager(state.history)}</section>`;
   }
 
   function activityTab(state) {
     const rows = state.activity.items.map(item => `<tr><td>${T.merida(item.at)}</td><td>${item.actor ? escaparHTML(item.actor) : '—'}</td><td>${escaparHTML(action(item.action))}</td><td>${item.entity ? escaparHTML(item.entity) : '—'}</td><td>${item.result === 'exito' ? 'Éxito' : 'Rechazado'}</td></tr>`);
     return `<section class="bento-panel"><form class="care-filters" data-admin-form="activity-filter" novalidate><div><label for="aa-account">Administrador (correo)</label><input id="aa-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(state.filters.cuenta || '')}"></div>
       <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button></div></form>
-      ${rows.length ? T.table('Actividad de administradores', ['Fecha y hora', 'Administrador', 'Acción', 'Sobre qué', 'Resultado'], rows) : '<p>No hay actividad registrada.</p>'}${T.pager(state.activity)}</section>`;
+      ${rows.length ? T.table('Actividad de administradores', ['Fecha y hora', 'Administrador', 'Acción', 'Sobre qué', 'Resultado'], rows) : AppViews.empty('No hay actividad registrada')}${T.pager(state.activity)}</section>`;
   }
 
   function screen(state) {
     if(state.status !== 'ready') return T.status(state.status);
     const tab = {administradores:adminsTab, historial:historyTab, actividad:activityTab}[state.tab](state);
-    return `${AppViews.heading('Administradores', 'Quién puede qué en el panel.')}${T.tabs([['administradores', 'Administradores'], ['historial', 'Historial'], ['actividad', 'Actividad']], state.tab)}${tab}${T.dialog}`;
+    return `${AppViews.heading('Administradores', 'Quién puede qué en el panel.')}${T.tabs([['administradores', 'Administradores'], ['historial', 'Historial'], ['actividad', 'Actividad']], state.tab, state.tab === 'administradores' ? T.button('grant', '+ Dar acceso a una cuenta', 'brand') : '')}${tab}${T.dialog}`;
   }
 
   function accessForm({email = '', capabilities = [], editing = false}) {
@@ -502,7 +502,7 @@ const ConsentViews = (() => {
     const stats = summary.statistics.percent === null ? 'Sin navegadores' : `${summary.statistics.percent}% (${summary.statistics.accepted} de ${summary.statistics.browsers})`;
     const cards = [['Términos vigentes aceptados', share(summary.terms)], ['Aviso vigente aceptado', share(summary.privacy)], ['Navegadores con estadísticas', stats]]
       .map(([label, value]) => `<article class="bento-panel user-metric"><h2>${label}</h2><strong class="consent-figure">${value}</strong></article>`).join('');
-    const body = list.items.length ? T.table('Bitácora de consentimientos', ['Fecha y hora (Mérida)', 'Cuenta', 'Qué', 'Versión', 'Decisión', 'IP', 'Navegador', ''], list.items.map(row)) : '<div class="user-empty-inline"><p>No hay registros con estos filtros.</p></div>';
+    const body = list.items.length ? T.table('Bitácora de consentimientos', ['Fecha y hora (Mérida)', 'Cuenta', 'Qué', 'Versión', 'Decisión', 'IP', 'Navegador', ''], list.items.map(row)) : AppViews.empty('No hay registros con estos filtros', 'Cambia o limpia los filtros para ver más.');
     return `<div class="page-heading"><div><h1>Bitácora de consentimientos</h1><p>Quién aceptó qué, cuándo y desde dónde.</p></div>${exportAction(state)}</div>
       <section class="user-summary-metrics" aria-label="Resumen de consentimientos">${cards}</section><section class="bento-panel">${filters(state.filters)}${body}${T.pager(list)}</section>${T.dialog}`;
   }

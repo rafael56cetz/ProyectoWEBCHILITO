@@ -111,6 +111,8 @@ const AppViews = (() => {
   const date = value => `<time${value && Number.isFinite(new Date(value).getTime()) ? ` datetime="${escaparHTML(new Date(value).toISOString())}"` : ''}>${escaparHTML(AppModel.date(value))}</time>`;
   const heading = (title,intro='') => `<div class="page-heading"><div><h1>${escaparHTML(title)}</h1>${intro?`<p>${escaparHTML(intro)}</p>`:''}</div></div>`;
   const state = (title,text,loading=false,retry=false) => `<div class="app-state bento-panel" role="${retry?'alert':'status'}"${loading?' aria-busy="true"':''}><span class="icon-medallion">${icon(loading?'clock':'info')}</span><h2>${escaparHTML(title)}</h2><p>${escaparHTML(text)}</p>${retry?'<button class="button btn-liquid-brand" type="button" data-app-action="reload">Reintentar</button>':''}</div>`;
+  // Estado vacío dentro de una tarjeta: ícono, frase y, si aplica, la acción (HTML ya armado por la vista).
+  const empty = (title,text='',action='') => `<div class="app-empty" role="status"><span class="icon-medallion">${icon('info')}</span><div><p class="app-empty-title">${escaparHTML(title)}</p>${text?`<p>${escaparHTML(text)}</p>`:''}${action}</div></div>`;
   const accountTabs = active => `<nav class="account-tabs" aria-label="Apartados de mi cuenta">${[['perfil','','Perfil'],['huertos','/huertos','Mis huertos'],['seguridad','/seguridad','Seguridad'],['privacidad','/privacidad','Privacidad']].map(([key,path,label])=>`<a class="button ${key===active?'btn-liquid-brand active':'btn-liquid-light'}" href="#cuenta${path}"${key===active?' aria-current="page"':''}>${label}</a>`).join('')}</nav>`;
   const accountGreeting = greeting => greeting?(greeting==='Bienvenido'?greeting:'Hola, '+greeting):'Tu información de acceso.';
   // `nav` lo prepara AppController según la sesión y sus capacidades; la vista solo pinta los enlaces.
@@ -139,7 +141,7 @@ const AppViews = (() => {
   function noticeRow(item) {
     return `<li><a class="notice-row${item.read ? '' : ' is-unread'}" href="#avisos/${item.id}" data-notice-open="${item.id}"${item.link ? ` data-notice-link="${escaparHTML(item.link)}"` : ''}>
       <span class="notice-dot" aria-hidden="true"></span><span class="sr-only">${item.read ? 'Leído' : 'No leído'}</span>${severity(item)}
-      <strong>${escaparHTML(item.title)}</strong>${item.garden ? `<span class="notice-garden">${escaparHTML(item.garden)}</span>` : ''}<span class="notice-when">${escaparHTML(GardenModel.ago(item.createdAt) || '')}</span></a></li>`;
+      <span class="notice-main"><strong class="notice-title">${escaparHTML(item.title)}</strong><span class="notice-meta-line">${escaparHTML([item.garden, GardenModel.ago(item.createdAt)].filter(Boolean).join(' · '))}</span></span></a></li>`;
   }
   function noticeDetail(data) {
     if(data.status === 'loading') return heading('Avisos')+state('Cargando aviso','Consultando su información.',true);
@@ -166,7 +168,7 @@ const AppViews = (() => {
     const privacyLink = accountTabs('perfil');
     if(data.status==='loading')return heading('Mi cuenta')+privacyLink+state('Cargando cuenta','Consultando la información de tu cuenta.',true)+signOut();
     if(data.status==='error')return heading('Mi cuenta')+privacyLink+state('No se pudo consultar tu cuenta','Inténtalo de nuevo.',false,true)+signOut();
-    return heading('Mi cuenta',accountGreeting(data.greeting))+privacyLink+`<section class="bento-panel account-profile" aria-labelledby="profile-title"><span class="icon-medallion">${icon('user')}</span><h2 id="profile-title">Datos de la cuenta</h2><dl class="profile-facts"><div><dt>Correo electrónico</dt><dd>${data.email?escaparHTML(data.email):'Esperando información de la cuenta'}</dd></div><div><dt>Verificación del correo</dt><dd>${data.verified===true?'Correo verificado':data.verified===false?'Correo sin verificar':'Sin información disponible'}</dd></div></dl><div class="app-actions"><a class="button btn-liquid-brand" href="#cuenta/contrasena">Cambiar contraseña</a></div></section><div data-profile-form></div>${signOut()}`;
+    return heading('Mi cuenta',accountGreeting(data.greeting))+privacyLink+`<section class="bento-panel account-profile" aria-labelledby="profile-title"><h2 id="profile-title">Datos de la cuenta</h2><dl class="profile-facts"><div><dt>Correo electrónico</dt><dd>${data.email?escaparHTML(data.email):'Esperando información de la cuenta'}</dd></div><div><dt>Verificación del correo</dt><dd>${data.verified===true?'Correo verificado':data.verified===false?'Correo sin verificar':'Sin información disponible'}</dd></div></dl><div class="app-actions"><a class="button btn-liquid-brand" href="#cuenta/contrasena">Cambiar contraseña</a></div></section><div data-profile-form></div>${signOut()}`;
   }
   // Marco privado ya pintado: operaciones de presentación que coordina AppController.
   function frame(root,route,nav) {
@@ -222,7 +224,7 @@ const AppViews = (() => {
   }
   const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},
     cancelarEliminacion:{titulo:'¿Cancelar la eliminación de tu cuenta?',texto:'Tu cuenta y tus datos se conservarán.',accion:'Cancelar eliminación'}};
-  return {shell,frame,heading,state,date,notices,account,accountGreeting,accountTabs,confirmaciones
+  return {shell,frame,heading,state,empty,date,notices,account,accountGreeting,accountTabs,confirmaciones
   };
 })();
 
@@ -389,13 +391,24 @@ const DateFilterViews = (() => {
 const AdminTableViews = (() => {
   const PAGE_SIZE = 25;
   const button = (action, label, kind = 'light', attrs = '') => `<button type="button" class="button btn-liquid-${kind}" data-admin-action="${action}" ${attrs}>${label}</button>`;
-  const table = (label, heads, rows) => `<div class="user-table-scroll" tabindex="0" role="region" aria-label="${label}"><table class="user-table admin-table"><thead><tr>${heads.map(head => `<th scope="col">${head}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
-  // La paginación siempre se ve, también con una sola página.
+  // Cada celda lleva el nombre de su columna (la vista en tarjetas del móvil lo muestra) y la primera, su texto completo como título.
+  function cells(row, heads) {
+    let column = -1;
+    return row.replace(/<td(?=[\s>])([^>]*)>(.*?)<\/td>/gs, (_, attributes, content) => {
+      column += 1;
+      const title = column === 0 ? ` title="${content.replace(/<[^>]*>/g, '').trim().replaceAll('"', '&quot;')}"` : '';
+      return `<td data-label="${heads[column] ?? ''}"${title}${attributes}>${content}</td>`;
+    });
+  }
+  const table = (label, heads, rows) => `<div class="user-table-scroll" tabindex="0" role="region" aria-label="${label}"><table class="user-table admin-table"><thead><tr>${heads.map(head => `<th scope="col">${head}</th>`).join('')}</tr></thead><tbody>${rows.map(row => cells(row, heads)).join('')}</tbody></table></div>`;
+  // Sin resultados no hay nada que paginar: la pantalla muestra su estado vacío.
   function pager({page, total}, action = 'page') {
+    if (!total) return '';
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     return `<nav class="user-pager" aria-label="Páginas">${button(action, 'Anterior', 'light', `data-page="${page - 1}"${page <= 1 ? ' disabled' : ''}`)}<span>Página ${page} de ${pages} · ${total} en total</span>${button(action, 'Siguiente', 'light', `data-page="${page + 1}"${page >= pages ? ' disabled' : ''}`)}</nav>`;
   }
-  const tabs = (items, active) => `<div class="user-range-control" role="group" aria-label="Apartados">${items.map(([id, label]) => button('tab', label, id === active ? 'brand' : 'light', `data-tab="${id}" aria-pressed="${id === active}"`)).join('')}</div>`;
+  // Pestañas del ancho de su contenido; la acción principal de la pantalla, si hay, queda a la derecha en la misma fila.
+  const tabs = (items, active, action = '') => `<div class="tabs-bar"><div class="user-range-control" role="group" aria-label="Apartados">${items.map(([id, label]) => button('tab', label, id === active ? 'brand' : 'light', `data-tab="${id}" aria-pressed="${id === active}"`)).join('')}</div>${action}</div>`;
   const status = state => state === 'loading' ? AppViews.state('Cargando', 'Consultando la información.', true) : AppViews.state('No pudimos cargar esta pantalla', 'Inténtalo de nuevo.', false, true);
   const dialog = '<dialog class="bento-panel app-dialog admin-dialog" aria-labelledby="admin-dialog-title"><div data-admin-dialog-content></div></dialog>';
   const dateField = (name, label, value = '') => `<div class="maint-date-control"><label for="admin-${name}">${label}</label>

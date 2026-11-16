@@ -89,7 +89,6 @@ html body .auth-layout .password-eye-btn { color:#fff!important;background:rgba(
 .auth-layout .password-meter { background:rgba(255,255,255,.2); }
 .auth-layout .password-meter>span,.auth-layout .password-length.is-met .password-meter>span { background:#fff; }
 .auth-layout .password-check [data-password-check-icon] { border-color:rgba(255,255,255,.55);color:#fff; }
-.auth-layout .auth-feedback { color:#142419; }
 /* En acceso todos los botones son vidrio puro. */
 html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand) { background:rgba(255,255,255,.08)!important;color:#fff!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important; }
 html body .auth-layout .auth-bento :is(.btn-liquid-light,.btn-liquid-brand):not(:disabled):hover { background:rgba(255,255,255,.15)!important; }
@@ -122,7 +121,7 @@ html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
 }
 .sidebar-top { display:none; }
 .private-topbar { display:none; }
-@media (min-width:769px) {
+@media (min-width:1025px) {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:0!important;padding:20px 16px!important;gap:16px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar-top { display:flex;flex-direction:column;align-items:flex-start;gap:12px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar-brand { color:#fff!important; }
@@ -131,27 +130,29 @@ html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar {
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .icon { width:20px;height:20px; }
 }
 
-/* Perfil, avisos y menú: sin barra, flotan sobre el contenido. */
+/* Barra superior de vidrio: cuenta, avisos y menú. El contenido nunca pasa por debajo sin una superficie detrás. */
 body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar {
-  display:flex;align-items:center;justify-content:space-between;gap:8px;position:fixed;top:0;left:0;right:0;z-index:var(--z-encabezado);
-  padding:14px clamp(16px,3vw,36px) 0;pointer-events:none;
+  display:flex;align-items:center;justify-content:space-between;gap:var(--esp-2);position:fixed;top:0;left:0;right:0;z-index:var(--z-encabezado);
+  height:var(--barra-alto);box-sizing:border-box;padding:0 clamp(16px,3vw,36px);
+  background:var(--vidrio-flotante-fondo);border-bottom:1px solid var(--vidrio-flotante-borde);box-shadow:var(--vidrio-barra-sombra);
 }
-.private-topbar :is(a,button) { pointer-events:auto; }
-.topbar-start,.topbar-actions { display:flex;align-items:center;gap:8px; }
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar { background:var(--vidrio-barra-fondo);-webkit-backdrop-filter:var(--vidrio-flotante-desenfoque);backdrop-filter:var(--vidrio-flotante-desenfoque); }
+}
+.topbar-start,.topbar-actions { display:flex;align-items:center;gap:var(--esp-2); }
 .topbar-actions { margin-left:auto; }
 .topbar-brand { display:none!important; }
-body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.container { padding-top:76px!important; }
-@media (min-width:769px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar { left:260px; } }
+@media (min-width:1025px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .private-topbar { left:var(--menu-ancho-total); } }
 
-@media (max-width:768px) {
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { display:inline-flex!important;color:#fff!important;padding:4px 12px 4px 6px;border-radius:999px; }
-  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { flex:0 0 auto;white-space:nowrap; }
+@media (max-width:1024px) {
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { display:inline-flex!important;align-items:center;gap:var(--esp-1);flex:0 1 auto;min-width:0;min-height:44px;padding:0 var(--esp-4) 0 var(--esp-1)!important;border-radius:var(--radio-boton)!important;color:#fff!important;background:#28623e!important;white-space:nowrap; }
+  body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand .brand-name { font-size:1rem;overflow:visible; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-actions { flex:0 0 auto;gap:6px; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-toggle { flex:0 0 auto;white-space:nowrap;padding-inline:12px!important; }
-  html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:72px!important;background:#1b4042!important; }
+  html body[data-private=true]:is([data-role=user],[data-role=admin]) .sidebar { top:calc(var(--barra-alto) + var(--esp-2))!important;background:#1b4042!important; }
   html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-menu-logout { min-height:44px!important;background:rgba(255,255,255,.06)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;color:#fff!important; }
 }
-@media (max-width:360px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand .brand-name { display:none; } }
+@media (max-width:420px) { body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand { padding-inline-end:var(--esp-1)!important; } body[data-private=true]:is([data-role=user],[data-role=admin]) .topbar-brand .brand-name { display:none; } }
 @media (forced-colors:active) {
   body[data-private=true]:is([data-role=user],[data-role=admin])::before { display:none; }
   body[data-private=true]:is([data-role=user],[data-role=admin]) :is(.bento-panel,.plant-card,.sidebar,.button) { background:Canvas!important;color:CanvasText!important;border:1px solid CanvasText!important; }
@@ -160,7 +161,7 @@ body[data-private=true]:is([data-role=user],[data-role=admin]) .dashboard.contai
 /* Ajustes tras revisar cada pantalla */
 html:has(.auth-layout) { background:#0e1c14; }
 
-@media (min-width:769px) { html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { width:100%; } }
+@media (min-width:1025px) { html body[data-private=true]:is([data-role=user],[data-role=admin]) .private-nav .button { width:100%; } }
 
 body[data-private=true][data-role=admin] #app-page > .bento-panel + .bento-panel { margin-top:24px; }
 
@@ -172,21 +173,18 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) {
 }
 /* El color base va en html: un fondo opaco en body taparía la capa de luz (z-index:-1). */
 html:has(body[data-private=true]:is([data-role=admin],[data-role=user])) { background:var(--claro-fondo); }
-/* Luz fija: naranja arriba a la derecha y abajo, durazno al centro y un rastro de hoja tras el panel. Sin animación. */
+/* Luz fija y tranquila: cuatro manchas suaves y sin animación, para que el desplazamiento no repinte capas pesadas. */
 body[data-private=true]:is([data-role=admin],[data-role=user])::before {
   background:
-    radial-gradient(44% 40% at 90% 4%,rgba(255,132,60,.68),transparent 70%),
-    radial-gradient(30% 34% at 98% 58%,rgba(255,150,84,.46),transparent 72%),
-    radial-gradient(38% 32% at 56% 106%,rgba(255,138,66,.62),transparent 72%),
-    radial-gradient(30% 30% at 46% 62%,rgba(255,178,128,.34),transparent 74%),
-    radial-gradient(36% 40% at 72% 46%,rgba(255,206,168,.36),transparent 76%),
-    radial-gradient(26% 40% at 2% 92%,rgba(120,150,92,.26),transparent 72%),
-    radial-gradient(30% 30% at 20% 8%,rgba(255,226,196,.6),transparent 74%),
-    linear-gradient(160deg,#fdf6ee 0%,#fbeee1 52%,#fdf1e4 100%)!important;
+    radial-gradient(44% 40% at 90% 4%,rgba(255,132,60,.40),transparent 70%),
+    radial-gradient(38% 32% at 56% 106%,rgba(255,138,66,.36),transparent 72%),
+    radial-gradient(36% 40% at 72% 46%,rgba(255,206,168,.22),transparent 76%),
+    radial-gradient(26% 40% at 2% 92%,rgba(120,150,92,.16),transparent 72%),
+    linear-gradient(160deg,#fdf6ee 0%,#fbeee1 52%,#fdf1e4 100%);
 }
 
 /* Panel lateral de vidrio verde: flota con margen, esquinas redondeadas y un reflejo discreto. */
-@media (min-width:769px) {
+@media (min-width:1025px) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar {
     top:16px!important;left:16px!important;bottom:16px!important;width:268px!important;padding:24px 16px!important;border-radius:var(--radio-menu)!important;
     border:1px solid rgba(255,255,255,.2)!important;overflow:hidden auto;
@@ -202,11 +200,15 @@ body[data-private=true]:is([data-role=admin],[data-role=user])::before {
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%); }
 }
-@media (max-width:768px) {
+@media (max-width:1024px) {
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { background:linear-gradient(170deg,#28623e 0%,#1b4a30 100%)!important; }
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar-brand { font-size:20px; }
-body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-label { margin:6px 6px 2px;color:rgba(255,255,255,.88);font-size:15px;font-weight:600;letter-spacing:0; }
+body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-label { margin:var(--esp-2) var(--esp-2) var(--esp-1);color:rgba(255,255,255,.88);font-size:13px;font-weight:600;letter-spacing:.02em; }
+body[data-private=true]:is([data-role=admin],[data-role=user]) .private-role-label:not(.private-group-label) {
+  width:fit-content;margin:0 var(--esp-2);padding:var(--esp-1) var(--esp-3);border:1px solid rgba(255,255,255,.22);border-radius:var(--radio-insignia);
+  background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+}
 body[data-private=true]:is([data-role=admin],[data-role=user]) .private-group-label { margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button:not([aria-current]) {
   background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;color:#fff!important;font-weight:600;
@@ -216,7 +218,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav
   background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.2))!important;border:1px solid rgba(255,255,255,.4)!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 16px -8px rgba(0,0,0,.35)!important;color:#fff!important;font-weight:600;
 }
-@media (min-width:769px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button { padding:0 14px!important;gap:12px; } }
+@media (min-width:1025px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-nav .button { padding:0 14px!important;gap:12px; } }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is(a,button):focus-visible { outline:3px solid #fff!important;outline-offset:3px; }
 /* Elemento pendiente: se ve, pero no es un enlace ni un botón. */
 .private-group { display:grid;gap:10px; }
@@ -224,17 +226,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar :is
 /* Botón de perfil flotante: el verde del panel. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .button { background:#28623e!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 18px -8px rgba(20,50,30,.5)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .private-topbar .account-icon-link[aria-current] { background:#2f6a48!important;box-shadow:0 0 0 3px rgba(47,106,72,.25)!important; }
-@media (max-width:768px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .topbar-brand { border-radius:999px!important;background:#28623e!important; } }
 
-/* Tarjetas translúcidas: desenfocan el fondo, filo claro y sombra cálida. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel) {
-  background:var(--claro-tarjeta-solida)!important;border:1px solid var(--claro-borde)!important;border-radius:var(--radio-tarjeta)!important;box-shadow:var(--claro-filo)!important;color:var(--claro-tinta);
-}
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart,.user-log-panel) {
-    background:var(--claro-tarjeta)!important;-webkit-backdrop-filter:var(--claro-desenfoque)!important;backdrop-filter:var(--claro-desenfoque)!important;
-  }
-}
 /* Iconos de trazo, sin cuadro de fondo. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon { background:transparent!important;border:0!important;box-shadow:none!important;color:var(--claro-titulo)!important;margin-bottom:14px; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric-icon .icon { width:30px;height:30px; }
@@ -247,42 +239,20 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .p
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-status-line p:first-child { font-weight:600;color:var(--claro-tinta)!important;font-size:16px; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading h2 { font-size:clamp(21px,1.8vw,25px);font-weight:700;letter-spacing:-.015em;color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading p { font-size:15px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { font-size:17px;font-weight:700; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { color:var(--claro-titulo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-chart h2 { font-size:17px;font-weight:700; }
-@media (min-width:1100px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-summary-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 
 /* Gestión administrativa */
 
 /* Texto */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(h1,h2,h3,h4,strong,dd,th,legend,label,summary) { color:var(--claro-tinta)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(p,dt,small,time,td,li,span:not(.skeleton-line):not(.icon-medallion)) { color:var(--claro-suave)!important; }
+:where(body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page) :is(h1,h2,h3,h4,strong,dd,th,legend,label,summary) { color:var(--claro-tinta); }
+:where(body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page) :is(p,dt,small,time,td,li,span:not(.skeleton-line):not(.icon-medallion)) { color:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page a:not(.button) { color:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .admin-table th[scope=row] { color:var(--claro-tinta);border-color:var(--claro-linea); }
 
-/* Mensajes */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback,.user-data-warning,.privacy-saved) {
-  background:rgba(47,106,72,.1)!important;border:1px solid rgba(47,106,72,.28)!important;color:#1d4a31!important;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback)[role=alert],
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is([data-maint-error],.privacy-panel>[data-privacy-state]) { color:var(--claro-peligro)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-feedback,.user-feedback)[role=alert] { background:rgba(163,50,31,.08)!important;border-color:rgba(163,50,31,.3)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .privacy-unsaved { color:var(--claro-tinta)!important; }
 
-/* Insignias del panel (C4): cápsula de vidrio con cuatro tonos (verde, ámbar, rojo y gris) y siempre con texto.
-   Sin desenfoque propio: son elementos internos de una tarjeta. */
-
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.inquiry-state.is-atendida,.care-admin-state.is-publicada,.badge.tone-verde):not(#_) {
-  --insignia-fondo:var(--insignia-verde-fondo);--insignia-texto:var(--insignia-verde-texto);--insignia-borde:var(--insignia-verde-borde);
-}
-
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.care-admin-state.is-retirada,.badge.error,.badge.tone-rojo):not(#_) {
-  --insignia-fondo:var(--insignia-rojo-fondo);--insignia-texto:var(--insignia-rojo-texto);--insignia-borde:var(--insignia-rojo-borde);
-}
-
 /* Tablas y gráficas */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table :is(th,td) { border-color:var(--claro-linea); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-table thead th { color:var(--claro-suave);font-weight:600; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.user-chart-grid text,.user-chart-labels text,.user-history-chart text) { fill:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-chart line { stroke:var(--claro-linea); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page pre { color:var(--claro-tinta);background:#f6f0e7;border:1px solid var(--claro-linea); }
@@ -311,8 +281,8 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-pag
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select:open::picker-icon { rotate:180deg; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select::picker(select) {
     appearance:base-select;margin-block:6px;padding:6px;border:1px solid var(--campo-borde);border-radius:16px;color:var(--claro-tinta);
-    background:var(--campo-lista);-webkit-backdrop-filter:var(--claro-desenfoque);backdrop-filter:var(--claro-desenfoque);
-    box-shadow:var(--claro-filo);
+    background:var(--campo-lista);-webkit-backdrop-filter:var(--vidrio-flotante-desenfoque);backdrop-filter:var(--vidrio-flotante-desenfoque);
+    box-shadow:var(--vidrio-flotante-sombra);
   }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option { min-height:40px;padding:8px 12px;border-radius:10px;color:var(--claro-tinta);background:transparent;cursor:pointer; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) select option:is(:hover,:focus-visible) { background:rgba(47,106,72,.1);outline:none; }
@@ -345,18 +315,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-pag
 }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(#app-page,dialog) .button[data-danger=true]:hover:not(:disabled) { background:var(--boton-peligro-hover)!important; }
 
-/* Mi cuenta: selector de apartados tipo pestañas segmentadas. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs {
-  display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(31,25,21,.06)!important;border:0!important;box-shadow:inset 0 1px 2px rgba(31,25,21,.08)!important;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button {
-  min-height:40px!important;padding:0 22px!important;background:transparent!important;border:0!important;color:var(--claro-suave)!important;box-shadow:none!important;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button:hover { color:var(--claro-tinta)!important;background:rgba(255,255,255,.5)!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button.active {
-  background:#fff!important;color:var(--claro-tinta)!important;box-shadow:0 1px 2px rgba(31,25,21,.1),0 0 0 1px rgba(31,25,21,.06)!important;
-}
-
 /* Privacidad: opciones legibles y alineadas. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .privacy-choice .cookie-option { display:flex;align-items:center;gap:12px;min-height:44px;margin:0;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--claro-linea);color:var(--claro-tinta);cursor:pointer; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .privacy-choice .cookie-option:has(input:checked) { box-shadow:inset 0 0 0 2px var(--claro-verde); }
@@ -369,10 +327,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog p { c
 html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog::backdrop { background:rgba(31,25,21,.38); }
 
 /* Formularios de mantenimiento: cuadrícula estable en vez de filas que se parten. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-create] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) auto;gap:16px;align-items:end; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-filter] { display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;align-items:end; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .maint-form label { display:flex;flex-direction:column;gap:6px;margin:0;font-size:13px;font-weight:600; }
-@media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-create] { grid-template-columns:1fr; } }
 
 /* Contraseña */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-input-group { background:var(--campo-fondo);border-color:var(--campo-borde); }
@@ -381,20 +335,13 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) .password-me
 html body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.password-meter>span,.password-length.is-met .password-meter>span) { background:var(--claro-verde); }
 
 @media (prefers-reduced-transparency:reduce) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel:not(dialog),.user-metric,.user-chart) { background:var(--claro-tarjeta-solida)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) .sidebar { -webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:#1f5236!important; }
 }
 @media (forced-colors:active) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.bento-panel,.user-metric) { border:1px solid CanvasText!important; }
 }
 
 /* Ritmo vertical cercano a la referencia: menos aire arriba y tarjetas más compactas. */
-@media (min-width:769px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) .dashboard.container { padding-top:28px!important; } }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric { padding:20px 24px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric h2 { margin:0 0 6px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-metric strong { margin:6px 0 8px;line-height:1; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-section-heading { margin-top:8px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button::before,html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button::after { display:none!important; }
 
 /* Acceso a la página principal bajo el logotipo (sustituye al botón de ocultar). */
 .sidebar-home { display:flex;align-items:center;gap:10px;min-height:40px;margin:2px 0 4px;padding:0 14px;border-radius:999px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
@@ -412,10 +359,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 
 /* Componentes del usuario sobre el fondo claro */
 
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-pedestal { background:rgba(255,255,255,.6)!important;border:1px solid var(--claro-borde)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-pedestal { background:rgba(255,255,255,.6)!important;border:1px solid var(--vidrio-tarjeta-borde)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track { background:rgba(70,40,20,.12); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .sensor-track span { background:var(--claro-verde); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .skeleton-line { background:rgba(70,40,20,.12); }
@@ -437,7 +381,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .d
 /* Llaves de acceso */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-keys { display:grid;gap:10px;margin:16px 0 0;padding:0;list-style:none; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-keys:empty::before { content:"Aún no has agregado ninguna llave.";font-size:14px;color:var(--claro-suave); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item { display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 8px 8px 12px;border-radius:16px;background:rgba(255,255,255,.62);border:1px solid var(--claro-borde);box-shadow:0 6px 16px -12px rgba(150,70,20,.4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item { display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 8px 8px 12px;border-radius:16px;background:rgba(255,255,255,.62);border:1px solid var(--vidrio-tarjeta-borde);box-shadow:0 6px 16px -12px rgba(150,70,20,.4); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item-icon { display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:12px;color:#fff;background:linear-gradient(180deg,#3f7a55,#285a3c);box-shadow:var(--lg-solid); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item-icon .icon { width:18px;height:18px;color:#fff; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .key-item-name { flex:1;min-width:0;font-weight:600;color:var(--claro-tinta)!important;overflow-wrap:anywhere; }
@@ -478,23 +422,9 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .i
 .inquiry-pager { display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px 18px;margin-top:32px;padding-top:20px;border-top:1px solid rgba(70,40,20,.1); }
 .inquiry-pager[hidden] { display:none; }
 .inquiry-page { min-width:9ch;text-align:center;font-size:14px;font-variant-numeric:tabular-nums; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-tabs .button.active { background:#fff!important;color:var(--claro-tinta)!important; }
 
 /* Soporte: resolución del caso y pasos del token */
 
-/* Solo las fechas Desde/Hasta de Registros. El icono SVG sustituye al indicador nativo. */
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-control { display:flex;flex-direction:column;gap:6px;min-width:0; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-control > label { flex:none; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field { position:relative;min-width:0; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field input { width:100%;min-height:46px;padding-inline:10px 46px!important;font-variant-numeric:tabular-nums; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button {
-  position:absolute;inset:1px 1px 1px auto;display:grid;place-items:center;width:44px;min-height:44px;padding:0;
-  color:var(--claro-tinta);background:transparent;border:0;border-radius:12px!important;box-shadow:none;
-}
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:hover { background:rgba(47,106,72,.1); }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field button:focus-visible { outline:2px solid var(--claro-verde)!important;outline-offset:-4px; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field .icon { width:21px;height:21px;color:var(--claro-tinta)!important; }
-html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .maint-date-field input[aria-invalid=true] { outline:2px solid var(--claro-peligro);outline-offset:2px; }
 
 /* Se monta fuera de la tarjeta para evitar sus recortes y su contexto de desenfoque. */
 .maint-calendar {
@@ -539,7 +469,7 @@ html body[data-private=true][data-role=admin] #app-page [data-maint-filter] .mai
 .maint-calendar .maint-calendar-grid [aria-selected=true] [aria-current=date] { box-shadow:inset 0 0 0 2px #f4b47e; }
 .maint-calendar .maint-calendar-footer { display:flex;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(47,106,72,.15); }
 .maint-calendar .maint-calendar-footer button { min-height:38px;padding:8px 14px;background:rgba(47,106,72,.07);border-color:rgba(47,106,72,.15); }
-html body[data-private=true][data-role=admin] .maint-calendar :is(button,input,select):focus-visible { outline:3px solid #c4672e!important;outline-offset:2px; }
+body[data-private=true] .maint-calendar :is(button,input,select):focus-visible { outline:3px solid #c4672e!important;outline-offset:2px; }
 @media (max-width:360px) {
   .maint-calendar .maint-calendar-navigation { grid-template-columns:36px minmax(0,1fr) 36px;gap:6px; }
   .maint-calendar [data-date-month] { grid-column:2;grid-row:1; }
@@ -559,7 +489,6 @@ html body[data-private=true][data-role=admin] .maint-calendar :is(button,input,s
 
 .binding-status { margin:4px 0 0!important;font-size:14px;font-weight:600; }
 .binding-status[hidden] { display:none; }
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(17px,2.2vw,24px);font-weight:700;letter-spacing:.08em;overflow-wrap:anywhere;user-select:all; }
 
 /* Guías de cuidado (persona usuaria y administración) */
 .care-guides { margin-top:32px; }

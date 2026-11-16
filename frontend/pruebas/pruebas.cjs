@@ -430,6 +430,11 @@ suite('Mi huerto y retirada de despliegues', async () => {
   const log = {type:'eventos', status:'ready', page:1, total:60, items:[{type:'reinicio', detail:'simulador', at:'2026-11-08T11:00:00Z'}]};
   const technical = T.screen({status:'ready', gardens:[garden], garden, data, range:'24h', log});
   assert.ok(technical.includes('ADC (0–4095)') && technical.includes('Regar una planta') && technical.includes('Página 1 de 3') && technical.includes('simulador'));
+  // Rango de 24 h: miles de lecturas crudas se agrupan en un punto cada 10 min (máximo 144 por línea).
+  const raw = Array.from({length:5000}, (_, i) => point(new Date(Date.parse('2026-11-08T00:00:00Z') + i * 17000).toISOString(), 30 + (i % 7)));
+  const dense = T.screen({status:'ready', gardens:[garden], garden, data:{...data, series:{...series, temperature:raw}}, range:'24h', log});
+  const drawn = (dense.match(/<polyline class="user-chart-line is-0" points="([^"]+)"/g) || []).map(line => line.split(' ').length - 3);
+  assert.ok(drawn.length && drawn.every(count => count > 1 && count <= 145), 'la gráfica de 24 h agrupa las lecturas');
   assert.ok(!technical.includes('Luz · BH1750'), 'sin lecturas de luz no se muestra la tarjeta');
   assert.ok(technical.includes('Sin lectura') && !technical.includes('<img src=x'), 'sin lectura es «Sin lectura» y el texto del servidor va escapado');
   assert.ok(T.screen({status:'ready', gardens:[garden], garden, data:{...data, hasLight:true, latest:{...data.latest, light:1200}}, range:'24h', log}).includes('Luz · BH1750'));

@@ -48,10 +48,12 @@
 }
 .auth-flow .auth-resend{margin-top:12px}
 .auth-flow .auth-feedback{
-  margin:0 0 20px;padding:16px;border-radius:16px;border:1px solid #91aa98;
-  background:#edf5ef;color:#264d32;line-height:1.6;font-size:15px;overflow-wrap:anywhere;
+  --aviso-fondo:var(--insignia-verde-fondo);--aviso-texto:var(--insignia-verde-texto);--aviso-borde:var(--insignia-verde-borde);
+  margin:0 0 var(--esp-5);padding:var(--esp-3) var(--esp-4);border-radius:var(--radio-campo);border:1px solid var(--aviso-borde);
+  background:linear-gradient(var(--aviso-fondo),var(--aviso-fondo)),var(--vidrio-flotante-fondo);color:var(--aviso-texto);
+  line-height:1.5;font-size:15px;overflow-wrap:anywhere;box-shadow:var(--vidrio-base-sombra);
 }
-.auth-flow .auth-feedback.is-error{color:#8b291f;background:#fff3f0;border-color:#c59288}
+.auth-flow .auth-feedback.is-error{--aviso-fondo:var(--insignia-rojo-fondo);--aviso-texto:var(--insignia-rojo-texto);--aviso-borde:var(--insignia-rojo-borde)}
 .auth-flow .auth-feedback:focus,.auth-flow .auth-result:focus{outline:none!important}
 .auth-flow #auth-wait{margin:-4px 0 16px}
 .auth-flow .verification-code{font-variant-numeric:tabular-nums;letter-spacing:.16em}

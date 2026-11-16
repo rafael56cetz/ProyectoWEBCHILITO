@@ -800,7 +800,7 @@ const AppController = (() => {
       if(action === 'mark-resolved') await resolveNotice();
     }, {signal:lifetime.signal});
     const nav = view.sidebar, toggle = view.toggle;
-    const mobileScreen=matchMedia('(max-width:768px)');
+    const mobileScreen=matchMedia('(max-width:1024px)');
     let menuOpen=false;
     const isUserMobile=()=>Boolean(toggle)&&mobileScreen.matches;
     // El panel está siempre visible en escritorio; en móvil manda el menú desplegable.
