@@ -4,10 +4,14 @@ Se conecta como chilito_pkg_iot (el mismo rol del servicio IoT real) y usa sus p
 aplicación: CHILITO_SIM_DB, CHILITO_SIM_HOST, CHILITO_SIM_PUERTO y CHILITO_SIM_CLAVE_IOT. Se niega a correr fuera de desarrollo
 (CHILITO_ENV=local o testing y CHILITO_DEBUG=1) y solo escribe en las bases de desarrollo o de pruebas.
 
+«vincular» no toca la base: hace lo mismo que el ESP32 y llama al servicio de vinculación (CHILITO_SIM_URL o, si no está,
+http://localhost:8780/api/dispositivos/vincular) con la credencial del equipo y el código que muestra «Vincular equipo».
+
 Cada ejecución deja un evento «reinicio» con detalle «simulador» en la bitácora del equipo: así lo simulado no se confunde con
 la operación real. Los eventos «conectado» y «desconectado» los escribe la propia base al cambiar la conexión.
 
-Uso (el equipo debe estar vinculado a un huerto):
+Uso (salvo «vincular», el equipo debe estar vinculado a un huerto):
+  python backend/tools/simular_equipo.py CHI-PRUEBA-0001 vincular
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 conectar
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 medir --n 12 --intervalo 300
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 atender --falla bomba_2
@@ -15,10 +19,16 @@ Uso (el equipo debe estar vinculado a un huerto):
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 desconectar
 """
 import argparse
+import getpass
+import json
 import os
 import random
+import re
 import sys
 import time
+import urllib.error
+import urllib.request
+from urllib.parse import urlsplit
 
 import psycopg
 
@@ -28,15 +38,22 @@ FIRMWARE = '0.0.0-simulador'
 COMPONENTES = ('conexion', 'sensor_ambiente', 'sensor_luz', 'sensor_sustrato_1', 'sensor_sustrato_2', 'sensor_sustrato_3',
                'flotador', 'bomba_1', 'bomba_2', 'bomba_3', 'lampara', 'ventilador')
 SIN_INSTALAR = ('ventilador',)
+URL_VINCULAR = 'http://localhost:8780/api/dispositivos/vincular'
+FORMATO_CODIGO = re.compile(r'[0-9A-Za-z]{4}-?[0-9A-Za-z]{4}')
+EQUIPO_LOCAL = {'localhost', '127.0.0.1'}
 ACTUADOR_POR_ORDEN = {'lampara_apagar': ('lampara', 'apagado'), 'lampara_automatico': ('lampara', 'encendido'),
                       'ventilador_encender': ('ventilador', 'encendido'), 'ventilador_apagar': ('ventilador', 'apagado')}
+
+
+def exigir_desarrollo(entorno):
+    if entorno.get('CHILITO_ENV') not in ('local', 'testing') or entorno.get('CHILITO_DEBUG') != '1':
+        sys.exit('El simulador solo corre con CHILITO_ENV=local o testing y CHILITO_DEBUG=1.')
 
 
 def exigir_entorno(entorno=None):
     """Devuelve los datos de conexión o termina el programa si el entorno no es de desarrollo."""
     entorno = os.environ if entorno is None else entorno
-    if entorno.get('CHILITO_ENV') not in ('local', 'testing') or entorno.get('CHILITO_DEBUG') != '1':
-        sys.exit('El simulador solo corre con CHILITO_ENV=local o testing y CHILITO_DEBUG=1.')
+    exigir_desarrollo(entorno)
     base = entorno.get('CHILITO_SIM_DB', '')
     if base not in BASES_DE_DESARROLLO and 'prueba' not in base and 'test' not in base:
         sys.exit(f'El simulador no escribe en «{base}»: solo en bases de desarrollo o de pruebas.')
@@ -44,6 +61,35 @@ def exigir_entorno(entorno=None):
         sys.exit('Falta CHILITO_SIM_CLAVE_IOT (la contraseña de chilito_pkg_iot).')
     return {'host': entorno.get('CHILITO_SIM_HOST', 'localhost'), 'port': int(entorno.get('CHILITO_SIM_PUERTO', '5432')),
             'dbname': base, 'user': ROL, 'password': entorno['CHILITO_SIM_CLAVE_IOT'], 'autocommit': True}
+
+
+def url_vinculacion(entorno):
+    """La credencial solo viaja cifrada, salvo hacia este mismo equipo."""
+    url = entorno.get('CHILITO_SIM_URL') or URL_VINCULAR
+    partes = urlsplit(url)
+    if partes.scheme != 'https' and not (partes.scheme == 'http' and partes.hostname in EQUIPO_LOCAL):
+        sys.exit('CHILITO_SIM_URL debe usar https, o http solo hacia localhost.')
+    return url
+
+
+def vincular(identificador, entorno=None):
+    """Pide la credencial y el código, los envía como el ESP32 y devuelve el resultado del servidor."""
+    entorno = os.environ if entorno is None else entorno
+    exigir_desarrollo(entorno)
+    url = url_vinculacion(entorno)
+    credencial = getpass.getpass('Credencial del equipo: ')
+    codigo = input('Código de vinculación (XXXX-XXXX): ').strip()
+    if not credencial or not FORMATO_CODIGO.fullmatch(codigo):
+        sys.exit('Escribe la credencial del equipo y el código de 8 caracteres, por ejemplo 7K3M-Q9TX.')
+    cuerpo = json.dumps({'identifier': identificador, 'credential': credencial, 'code': codigo}).encode()
+    peticion = urllib.request.Request(url, data=cuerpo, method='POST', headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(peticion, timeout=15) as respuesta:
+            return json.load(respuesta)['result']
+    except urllib.error.HTTPError as fallo:
+        sys.exit(f'El servidor rechazó la vinculación (HTTP {fallo.code}).')
+    except urllib.error.URLError:
+        sys.exit(f'No se pudo conectar con {url}. ¿Está encendido el servidor?')
 
 
 def equipo(con, identificador):
@@ -142,7 +188,7 @@ def correr(con, dispositivo, cada=10.0, ciclos=None, **opciones):
 def leer_argumentos(argv=None):
     analizador = argparse.ArgumentParser(description='Simula un equipo El Chilito (solo desarrollo).')
     analizador.add_argument('identificador')
-    analizador.add_argument('accion', choices=('conectar', 'desconectar', 'medir', 'atender', 'correr'))
+    analizador.add_argument('accion', choices=('vincular', 'conectar', 'desconectar', 'medir', 'atender', 'correr'))
     analizador.add_argument('--n', type=int, default=1, help='mediciones a insertar (medir)')
     analizador.add_argument('--intervalo', type=int, default=60, help='segundos entre mediciones hacia atrás (medir)')
     analizador.add_argument('--luz', action='store_true', help='incluye lecturas del sensor de luz')
@@ -157,6 +203,9 @@ def leer_argumentos(argv=None):
 
 def main(argv=None):
     argumentos = leer_argumentos(argv)
+    if argumentos.accion == 'vincular':
+        print(f'Resultado: {vincular(argumentos.identificador)}')
+        return
     with psycopg.connect(**exigir_entorno()) as con:
         dispositivo = equipo(con, argumentos.identificador)
         marcar_simulado(con, dispositivo)

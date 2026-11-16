@@ -12,9 +12,8 @@ from django.test import Client, TestCase
 from django.utils import timezone
 
 from datos import ventas
-from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, Dispositivo, DispositivoEvento, ResumenHoraHuerto, ResumenHoraPlanta,
+from datos.models import (Auditoria, Comando, Cuidado, Dispositivo, DispositivoEvento, ResumenHoraHuerto, ResumenHoraPlanta,
                           SoporteCaso, SoporteSesion, Venta)
-from huerto.models import Huerto
 from huerto.services import ZONA_MERIDA
 from tests import cuenta, publicar_textos
 from web.models import Idempotencia

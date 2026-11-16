@@ -2,7 +2,6 @@
 
 No ejercitan la interfaz, el SMTP ni el hardware. Usan las guías y el buzón como escrituras de ejemplo."""
 import json
-import logging
 import uuid
 from unittest.mock import patch
 

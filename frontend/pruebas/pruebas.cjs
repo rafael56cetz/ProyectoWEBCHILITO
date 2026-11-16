@@ -27,14 +27,14 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/huerto.js', 'modelos/equipos.js', 'modelos/administracion.js',
     'vistas/comun.js', 'vistas/publico.js', 'vistas/cuenta.js', 'vistas/huerto.js', 'vistas/equipos.js', 'vistas/administracion.js');
   const run = code => vm.runInContext(code, context);
-  // Menú 2.2: cada destino con su capacidad, agrupado y filtrado; las rutas viejas se redirigen.
+  // Menú: cada destino con su capacidad, agrupado y filtrado; «consola» se redirige.
   const menu = capabilities => { context.session = {capabilities}; return JSON.parse(JSON.stringify(run('AppModel.adminMenu(session)'))).map(group => [group.label, group.items.map(item => item.id)]); };
   assert.deepEqual(menu(['gestionar_ventas', 'ver_flota']), [['Operación', ['admin/flota']], ['Gestión', ['admin/ventas']]]);
   assert.deepEqual(menu(['gestionar_administradores']), [['Super admin', ['admin/administradores']]]);
   assert.deepEqual(menu([]), []);
   assert.equal(run('AppModel.adminDestinations.length'), 10);
   assert.equal(run('new Set(AppModel.adminDestinations.map(item => item.capability)).size'), 10);
-  assert.equal(run("AppModel.adminRedirects.vinculacion"), 'equipos'); assert.equal(run("AppModel.adminRedirects.comercial"), 'ventas'); assert.equal(run("AppModel.adminRedirects.consola"), 'soporte');
+  assert.deepEqual({...run("AppModel.adminRedirects")}, {consola:'soporte'});
   assert.deepEqual(Array.from(run("AppModel.allowedAdmin({capabilities:['gestionar_dispositivos','gestionar_legales']}).map(item => item.id)")), ['admin/equipos', 'admin/legales']);
   // Validaciones previas al envío (el servidor y la base vuelven a validar).
   assert.equal(run("EquipmentModel.validate({identifier:'ESP32-A1B2', mac:'AA:BB:CC:DD:EE:FF', firmware:'1.0.0'})"), null);
@@ -117,7 +117,7 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   console.log('PASS administración: menú por grupos, validaciones, rutas seguras, texto escapado y paginación visible');
 });
 
-// ── Flota, consola remota y mantenimientos (fase 6) ──────────────────────────────────────────
+// ── Flota, consola remota y mantenimientos ───────────────────────────────────────────────────
 suite('flota, consola remota y mantenimientos', async () => {
   const context = vm.createContext({console, crypto:webcrypto, structuredClone, DOMException, AbortController, AbortSignal, Date, Map, Set, Object, Array, JSON, Number, String, RegExp, Error, Intl, encodeURIComponent, decodeURIComponent,
     URLSearchParams, document:{cookie:'csrftoken=test-csrf'}, window:{dispatchEvent() {}}, Event, fetch:async () => { throw new Error('Sin red en esta prueba'); }});
@@ -453,7 +453,7 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(V.myGardens({status:'ready', gardens:[detail(null).garden]}).includes('Archivar huerto'));
   assert.ok(V.newGarden().includes('Nombre del huerto (opcional)'));
   assert.ok(V.confirmations.desvincular('CHI-1').peligro && V.confirmations.archivar('Patio').accion === 'Archivar huerto');
-  // Fase 4 · cálculos puros: cuándo se hizo un cuidado, problemas de una revisión y tiempo de una autorización.
+  // Cálculos puros: cuándo se hizo un cuidado, problemas de una revisión y tiempo de una autorización.
   const full = vm.createContext({AppModel:{date:value => String(value)}, ChilitoHTTP:{request:async () => ({http:200, body:{}})}});
   vm.runInContext(read('modelos/huerto.js'), full);
   const model = code => vm.runInContext(code, full);
@@ -466,7 +466,7 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.equal(model("GardenModel.lapse('2026-11-09T06:42:00Z', Date.parse('2026-11-08T12:00:00Z'))"), '18 h 42 min');
   assert.equal(model("GardenModel.lapse('2026-11-08T11:00:00Z', Date.parse('2026-11-08T12:00:00Z'))"), '0 h 0 min');
   {
-  // Fase 4 · pantallas: Panel técnico, Mantenimiento y Soporte.
+  // Pantallas: Panel técnico, Mantenimiento y Soporte.
   Object.assign(views, {});
   vm.runInContext("var CareGuideService = {SUBSTRATE_KEY:'sustrato-perlita'}, CareGuideViews = {slot:() => '<section data-care-guides></section>'};", views);
   vm.runInContext(bloque('vistas/huerto.js', 'Operacion'), views);
@@ -592,7 +592,7 @@ suite('guías de cuidado', async () => {
   console.log('PASS guías de cuidado');
 });
 
-// ── Guardián MVC (CLAUDE.md §2): los controladores coordinan; escribir en el DOM es de las vistas ─
+// ── Guardián MVC: los controladores coordinan; escribir en el DOM es de las vistas ─
 // Revisión estática del código fuente; no sustituye la prueba en navegador.
 suite('MVC', () => {
   const dir = name => path.join(FRONT, name);

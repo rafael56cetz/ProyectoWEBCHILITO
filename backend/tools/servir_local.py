@@ -1,6 +1,6 @@
 """Arranca la aplicación en http://localhost:8780 con el .env del proyecto.
 
-Solo para el equipo local, sin Docker. No muestra los valores del .env.
+Solo para el equipo local. No muestra los valores del .env.
 """
 import os
 

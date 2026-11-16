@@ -1,4 +1,4 @@
-"""Lógica de la Fase 3 sin base. Los flujos reales están en tools/probar_seguridad.py."""
+"""Lógica de la sesión sin base. Los flujos reales están en tools/probar_seguridad.py."""
 import logging
 import sys
 from unittest.mock import MagicMock, patch

@@ -32,3 +32,11 @@ respaldos/
 buzon/
 correo-pruebas/
 .generado-por-armar-entrega
+
+# Solo se publican backend/, frontend/, COMO-ENCENDER-EL-SERVIDOR.md, .env.example y .gitignore.
+/CLAUDE.md
+/README.md
+/docs/
+/sql/
+/*.md
+!/COMO-ENCENDER-EL-SERVIDOR.md

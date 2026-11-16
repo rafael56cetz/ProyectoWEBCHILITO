@@ -56,9 +56,7 @@ const GardenModel = (() => {
   const RANGES = ['1h', '24h', '7d', '30d'];
   const INCIDENTS = Object.freeze({bomba:'La bomba no responde', humedad:'Lectura de humedad inconsistente', lampara:'La lámpara no enciende',
     conexion:'Conexión inestable', otro:'Otro problema'});
-  const CARE_TYPES = ['rellenar_deposito', 'sustrato', 'germinacion', 'cosecha', 'inspeccion'];
   const CARE_NEEDS_PLANT = ['sustrato', 'germinacion', 'cosecha'];
-  const LOG_TYPES = ['ordenes', 'actuaciones', 'eventos'];
   const CARE_WINDOW_DAYS = 7;
   let chosen = null;
   function ago(value, now = Date.now()) {
@@ -108,7 +106,7 @@ const GardenModel = (() => {
   }
   const remainingSeconds = (expiresAt, now = Date.now()) => Math.max(0, Math.floor((Date.parse(expiresAt) - now) / 1000));
   const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_TYPES, CARE_NEEDS_PLANT, LOG_TYPES, ago, connection, averageMoisture,
+  return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
     pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock});
 })();
 

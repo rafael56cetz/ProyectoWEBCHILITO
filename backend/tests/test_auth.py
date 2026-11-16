@@ -9,8 +9,6 @@ from django.contrib.auth.models import Permission
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from allauth.account.models import EmailAddress
-from allauth.mfa.models import Authenticator
-from allauth.mfa.models import Authenticator
 from allauth.account.internal.flows.email_verification_by_code import EMAIL_VERIFICATION_CODE_SESSION_KEY as CODE_KEY
 from cuentas.email import AuthorizedSMTPBackend, MailUnavailable
 from privacidad.models import Decision

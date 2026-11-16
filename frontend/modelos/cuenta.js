@@ -313,10 +313,6 @@ const MfaService = (() => {
     webauthnAuthenticate: credential => call(p+'auth/webauthn/authenticate','POST',{credential}),
     list: () => call(a),
     reauthenticate: password => call(p+'auth/reauthenticate','POST',{password}),
-    // Confirmación del segundo factor para operaciones sensibles del panel (TOTP o llave de acceso).
-    reauthenticateCode: code => call(p+'auth/2fa/reauthenticate','POST',{code}),
-    webauthnReauthOptions: () => call(p+'auth/webauthn/reauthenticate'),
-    webauthnReauthenticate: credential => call(p+'auth/webauthn/reauthenticate','POST',{credential}),
     totpStart: () => call(a+'/totp'),
     async totpImage() {
       try { const r = await ChilitoHTTP.request('/api/cuenta/seguridad/totp-qr'); return r.http === 200 ? r.body.image : null; }

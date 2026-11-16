@@ -1,9 +1,12 @@
-"""Fase 3 sobre PostgreSQL: huertos, plantas, órdenes, vinculación del equipo y aceptación de textos."""
+"""Sobre PostgreSQL: huertos, plantas, órdenes, vinculación del equipo y aceptación de textos."""
+import io
 import json
 import os
 import unittest
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
+from urllib.parse import urlsplit
 
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
@@ -657,6 +660,63 @@ class SimuladorDeEquipoEntorno(SimpleTestCase):
     def test_usa_solo_el_rol_iot_y_sus_variables(self):
         ajustes = simular_equipo.exigir_entorno({**self.BASE, 'CHILITO_DB_USER': 'chilito_pkg_runtime', 'CHILITO_DB_PASSWORD': 'de-la-app'})
         self.assertEqual((ajustes['user'], ajustes['password'], ajustes['dbname']), ('chilito_pkg_iot', 'x', 'test_chilito_x'))
+
+
+@unittest.skipIf(simular_equipo is None, 'Esta copia no incluye el simulador')
+class SimuladorVincula(BaseHuerto):
+    """«vincular» envía lo mismo que el ESP32; aquí la petición llega al endpoint real por el cliente de pruebas."""
+    ENTORNO = {'CHILITO_ENV': 'local', 'CHILITO_DEBUG': '1'}
+
+    def enviar(self, peticion, timeout):
+        self.enviadas.append(peticion.full_url)
+        respuesta = Client(HTTP_HOST='127.0.0.1', enforce_csrf_checks=True).post(
+            urlsplit(peticion.full_url).path, peticion.data, content_type=peticion.get_header('Content-type'))
+        return io.BytesIO(respuesta.content)
+
+    def simular(self, codigo, entorno=None, credencial=CREDENCIAL):
+        self.enviadas = []
+        with patch.object(simular_equipo.getpass, 'getpass', return_value=credencial), patch('builtins.input', return_value=codigo), \
+                patch.object(simular_equipo.urllib.request, 'urlopen', side_effect=self.enviar), patch('sys.stdout', new_callable=io.StringIO) as salida:
+            resultado = simular_equipo.vincular('CHI-0001', {**self.ENTORNO, **(entorno or {})})
+        return resultado, salida.getvalue()
+
+    def test_vincula_el_equipo_con_el_codigo_del_huerto(self):
+        huerto_id = self.crear_huerto()
+        equipo()
+        resultado, salida = self.simular(self.codigo(huerto_id))
+        self.assertEqual(resultado, 'vinculado')
+        self.assertEqual(self.enviadas, [simular_equipo.URL_VINCULAR])
+        self.assertEqual(str(Dispositivo.objects.get(identificador='CHI-0001').huerto_id), huerto_id)
+        self.assertNotIn(CREDENCIAL, salida)
+
+    def test_credencial_equivocada_no_vincula(self):
+        huerto_id = self.crear_huerto()
+        equipo()
+        self.assertEqual(self.simular(self.codigo(huerto_id), credencial='otra')[0], 'credencial_invalida')
+        self.assertIsNone(Dispositivo.objects.get(identificador='CHI-0001').huerto_id)
+
+    def test_codigo_mal_escrito_no_se_envia(self):
+        for codigo in ('', 'ABC', 'ABCD-EFGH-1', 'ABCD_EFGH'):
+            with self.subTest(codigo=codigo), self.assertRaises(SystemExit):
+                self.simular(codigo)
+            self.assertEqual(self.enviadas, [])
+
+    def test_usa_la_url_configurada_y_solo_https_fuera_del_equipo(self):
+        huerto_id = self.crear_huerto()
+        equipo()
+        url = 'http://127.0.0.1:9000/api/dispositivos/vincular'
+        self.assertEqual(self.simular(self.codigo(huerto_id), {'CHILITO_SIM_URL': url})[0], 'vinculado')
+        self.assertEqual(self.enviadas, [url])
+        for mala in ('http://ejemplo.test/api/dispositivos/vincular', 'file:///etc/passwd', 'ftp://localhost/x'):
+            with self.subTest(url=mala), self.assertRaises(SystemExit):
+                self.simular('ABCD-EFGH', {'CHILITO_SIM_URL': mala})
+            self.assertEqual(self.enviadas, [])
+        self.assertEqual(simular_equipo.url_vinculacion({'CHILITO_SIM_URL': 'https://ejemplo.test/v'}), 'https://ejemplo.test/v')
+
+    def test_se_niega_fuera_de_desarrollo(self):
+        with self.assertRaises(SystemExit):
+            self.simular('ABCD-EFGH', {'CHILITO_DEBUG': '0'})
+        self.assertEqual(self.enviadas, [])
 
 
 @unittest.skipIf(simular_equipo is None, 'Esta copia no incluye el simulador')

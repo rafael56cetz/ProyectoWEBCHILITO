@@ -40,10 +40,6 @@ body[data-private=true] .private-layout { padding-top:var(--header-height); min-
 }
 body[data-private=true] .dashboard { min-width:0; }
 body[data-private=true] :is(h1,h2,h3,p,dd,a,button,time) { overflow-wrap:anywhere; }
-body[data-private=true] .metric { display:block; }
-body[data-private=true] .metric h3 { margin:0 0 12px; }
-body[data-private=true] .metric strong { display:block; }
-body[data-private=true] .metric strong small { font-size:.48em; margin-left:5px; }
 .bento-panel { padding:28px; border:1px solid #d4dfd6; border-radius:var(--radio-tarjeta); background:#fff; box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 8px 26px -12px rgba(20,42,27,.12); }
 .bento-panel h2 { font-size:22px; margin:20px 0 12px; line-height:1.3; }
 .bento-panel h3 { font-size:17px; margin:0 0 8px; }
@@ -175,8 +171,6 @@ body:is([data-screen=terminos],[data-screen=privacidad],[data-screen=cookies]) .
 .maint-form { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-block:12px; }
 .maint-form label { flex:1 1 180px; }
 .maint-form input,.maint-form select { min-height:44px; padding-inline:10px; font:inherit; }
-[data-maint-revise] { display:grid; gap:12px; margin-top:12px; }
-[data-maint-revise] select,[data-maint-revise] textarea { width:100%; box-sizing:border-box; padding:10px; font:inherit; }
 
 /* Mi privacidad */
 .privacy-panel { margin-bottom:20px; }
@@ -293,9 +287,7 @@ html body .legal-related .legal-link { box-shadow:none!important;width:auto!impo
 .user-history-list p { margin:0;font-size:13px; }
 
 .user-feedback:focus { outline:none!important; }
-@media (max-width:1300px) {
-  
-}
+
 @media (max-width:1050px) {
   .user-chart-grid-layout{ grid-template-columns:1fr; }
   
@@ -664,7 +656,7 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) .console-item-tit
 body[data-private=true]:is([data-role=admin],[data-role=user]) .console-inbox .user-pager .button { min-height:var(--boton-alto-compacto);padding:0 var(--esp-3); }
 
 /* Etiqueta única de los formularios del panel. */
-body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form,.maint-form,[data-maint-revise],dialog form,.care-admin-field,.key-form) label:not(.cookie-option):not(.terms-label) {
+body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form,.maint-form,dialog form,.care-admin-field,.key-form) label:not(.cookie-option):not(.terms-label) {
   display:block;margin:0 0 var(--esp-1);font-size:13px;font-weight:600;line-height:1.3;
 }
 body[data-private=true]:is([data-role=admin],[data-role=user]) :is(.garden-form form,dialog form) { gap:var(--esp-3); }

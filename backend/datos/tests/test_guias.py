@@ -8,7 +8,7 @@ from allauth.account.models import EmailAddress
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, connection, connections, transaction
 from django.test import Client, TestCase, TransactionTestCase
 

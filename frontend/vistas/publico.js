@@ -471,7 +471,6 @@ const CookieViews = (() => {
         busy: on => CookieViews.busy(root,on),
         banner(visible) { banner.hidden = !visible; reserveSpace(); },
         statisticsChoice: () => form.elements.statistics.checked,
-        isOpen: () => dialog.open,
         openPreferences(statistics) {
           form.elements.statistics.checked = statistics;
           showError();

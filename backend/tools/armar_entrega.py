@@ -14,17 +14,16 @@ from entorno_local import RAIZ, leer
 
 MARCA = '.generado-por-armar-entrega'
 DESTINO = RAIZ.parent / 'el-chilito-nube'
-INCLUIR = ['README.md', '.gitignore',
+INCLUIR = ['COMO-ENCENDER-EL-SERVIDOR.md', '.env.example', '.gitignore',
            'backend/manage.py', 'backend/requirements-lock.txt', 'backend/config', 'backend/cuentas', 'backend/datos',
            'backend/huerto', 'backend/privacidad', 'backend/tests', 'backend/web',
            'frontend/index.html', 'frontend/favicon.svg', 'frontend/controladores', 'frontend/modelos', 'frontend/vistas',
-           'frontend/pruebas', 'sql/privilegios.sql', 'sql/instalacion',
+           'frontend/pruebas',
            *[f'backend/tools/{n}.py' for n in ('__init__', 'servir_local', 'entorno_local',
-                                                'configurar_correo', 'correo_config', 'soporte_local', 'generar_sql_instalacion')]]
+                                                'configurar_correo', 'correo_config', 'soporte_local')]]
 EXCLUIR = ['*/__pycache__/*', '*.pyc']
-PROHIBIDOS = ['.env', 'CLAUDE.md', 'REGISTRO-DE-CAMBIOS.md', 'CONTEXTO-COMPARTIDO-EL-CHILITO.md', 'flujo actual a 7 de noviembre del 2026.md',
-              'operador.py', 'local.py', 'entorno.py', 'verificar_integracion.py', 'seed_runtime.py', 'probar_runtime.py', 'armar_entrega.py', 'simular_equipo.py', 'pruebas_local.py', 'probar_seguridad.py', 'probar_mfa.py',
-              'probar_privacidad.py', 'probar_correo.py', 'probar_cuota_contacto.py', 'destino_temporal.py', 'comprobar_frontend_local.py']
+PROHIBIDOS = ['.env', 'CLAUDE.md', 'README.md', 'armar_entrega.py', 'simular_equipo.py', 'pruebas_local.py', 'probar_seguridad.py', 'probar_mfa.py',
+              'probar_privacidad.py', 'probar_correo.py', 'destino_temporal.py']
 PATRONES = {'clave privada': rb'-----BEGIN [A-Z ]*PRIVATE KEY', 'token Google': rb'AIza[0-9A-Za-z_-]{30,}', 'token GitHub': rb'gh[pousr]_[A-Za-z0-9]{30,}',
             'clave AWS': rb'AKIA[0-9A-Z]{16}', 'cadena de conexión': rb'postgres(?:ql)?://[^\s\'"]+:[^\s\'"@]+@'}
 
@@ -74,14 +73,6 @@ def valores_sensibles():
     return {v.encode() for k, v in valores.items() if any(c in k for c in claves) and len(v) >= 6 and 'example.test' not in v}
 
 
-def plantilla(destino):
-    """Escribe .env.example en la copia: las mismas claves y comentarios del .env, sin ningún valor."""
-    lineas = [linea if linea.startswith('#') or '=' not in linea else linea.split('=', 1)[0] + '='
-              for linea in (RAIZ / '.env').read_text(encoding='utf8').splitlines()]
-    lineas[0] = '# Plantilla: copiar como .env y llenar cada valor. No contiene secretos.'
-    (destino / '.env.example').write_text('\n'.join(lineas) + '\n', encoding='utf8')
-
-
 def verificar(destino):
     archivos = [p for p in destino.rglob('*') if p.is_file() and '.git' not in p.relative_to(destino).parts]
     problemas = [f'{p.relative_to(destino)}: archivo prohibido' for p in archivos if p.name in PROHIBIDOS]
@@ -103,5 +94,4 @@ if __name__ == '__main__':
     destino = Path(sys.argv[1]).expanduser().resolve() if len(sys.argv) > 1 else DESTINO
     preparar(destino)
     print(f'Copiados: {copiar(destino)} en {destino}')
-    plantilla(destino)
     sys.exit(0 if verificar(destino) else 1)

@@ -214,7 +214,6 @@ const AppViews = (() => {
       markCurrent(href){root.querySelectorAll('.private-nav a,.account-icon-link[href]').forEach(link=>{
         if(link.getAttribute('href')===href)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});},
       focusMain(options){root.querySelector('main')?.focus(options);},
-      actionBusy(target,on){target.disabled=on;if(on)target.setAttribute('aria-busy','true');else target.removeAttribute('aria-busy');},
       logoutFailed(){mostrarAviso('error','No se pudo cerrar la sesión. Inténtalo de nuevo.');},
       // Menú lateral: siempre visible en escritorio; en móvil, desplegable.
       sidebarHidden(hidden){sidebar.inert=hidden;if(hidden)sidebar.setAttribute('aria-hidden','true');else sidebar.removeAttribute('aria-hidden');},

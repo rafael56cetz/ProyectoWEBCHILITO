@@ -10,7 +10,7 @@ def leer(nombre):
     """Variables de un archivo de entorno del proyecto."""
     archivo = RAIZ / nombre
     if not archivo.is_file():
-        sys.exit(f'Falta el archivo {nombre} en la carpeta web-integracion')
+        sys.exit(f'Falta el archivo {nombre} en la carpeta raíz del proyecto')
     valores = {}
     for linea in archivo.read_text(encoding='utf8').splitlines():
         linea = linea.strip()
