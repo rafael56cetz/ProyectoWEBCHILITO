@@ -1,6 +1,6 @@
 from django.db import DatabaseError, connection, transaction
 
-from .respuestas import respuesta_de_base
+from .respuestas import error, respuesta_de_base
 
 
 class SecurityHeaders:
@@ -14,6 +14,21 @@ class SecurityHeaders:
             response['Cache-Control']='no-store'
             response['Vary']='Cookie'
         return response
+
+
+class LimiteDeSubida:
+    """Rechaza un formulario con archivo de más de 2 MB antes de que CSRF lo lea: Django no limita el tamaño de los archivos."""
+    MAXIMO = 2 * 1024 * 1024 + 64 * 1024
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.content_type == 'multipart/form-data':
+            largo = request.META.get('CONTENT_LENGTH', '')
+            if not largo.isdecimal() or int(largo) > self.MAXIMO:
+                return error(413, 'request-too-large')
+        return self.get_response(request)
 
 
 class ActorDeBase:

@@ -17,7 +17,7 @@ ORIGIN=os.environ.get('CHILITO_ORIGIN','http://localhost:8780')
 INSTALLED_APPS=['django.contrib.auth','django.contrib.contenttypes','django.contrib.sessions',
     'django.contrib.messages','django.contrib.staticfiles','allauth','allauth.account','allauth.headless',
     'allauth.mfa','cuentas','huerto','datos','web.apps.WebConfig','privacidad']
-MIDDLEWARE=['django.middleware.security.SecurityMiddleware','django.contrib.sessions.middleware.SessionMiddleware',
+MIDDLEWARE=['django.middleware.security.SecurityMiddleware','web.middleware.LimiteDeSubida','django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware','django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware','django.contrib.messages.middleware.MessageMiddleware',
     'allauth.account.middleware.AccountMiddleware','web.middleware.SecurityHeaders','web.sesion.SesionAcotada','web.middleware.ActorDeBase']
@@ -114,7 +114,7 @@ EMAIL_HOST_PASSWORD=os.environ.get('CHILITO_SMTP_PASSWORD','')
 EMAIL_USE_TLS=True;EMAIL_USE_SSL=False;EMAIL_TIMEOUT=10
 DEFAULT_FROM_EMAIL=os.environ.get('CHILITO_FROM_EMAIL','El Chilito <no-reply@example.test>')
 ACCOUNT_EMAIL_SUBJECT_PREFIX='[El Chilito] '
-DATA_UPLOAD_MAX_MEMORY_SIZE=32768
+DATA_UPLOAD_MAX_MEMORY_SIZE=262144
 CACHES={'default':{'BACKEND':'django.core.cache.backends.db.DatabaseCache','LOCATION':'cuentas_cuotas_acceso','TIMEOUT':3600,'OPTIONS':{'MAX_ENTRIES':10000}}}
 LOGGING={'version':1,'disable_existing_loggers':False,
  'formatters':{'seguro':{'()':'config.registro.FormatoSeguro','format':'%(asctime)s %(levelname)s %(name)s %(message)s'}},

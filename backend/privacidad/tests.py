@@ -4,12 +4,14 @@ import hashlib
 import io
 import json
 import uuid
+import zipfile
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 
 from datos.models import Auditoria, Notificacion
@@ -31,7 +33,7 @@ class TextoLegalVigente(TestCase):
                            "'<h2>Uso</h2><p onclick=\"x()\">Texto</p><script>alert(1)</script>')")
         documento = services.texto_vigente('terminos')
         self.assertEqual(documento['version'], '1.1')
-        self.assertEqual(documento['html'], '<h3>Uso</h3><p>Texto</p>')
+        self.assertEqual(documento['html'], '<h2>Uso</h2><p>Texto</p>')
         self.assertTrue(documento['registered'] and not documento['draft'])
 
     def test_el_endpoint_conserva_los_campos_del_contrato(self):
@@ -168,8 +170,8 @@ class DocumentosHTML(SimpleTestCase):
         html, texto = sanear_html('<h2 id="x">Uso</h2><p onclick="alert(1)" style="color:red">'
                                  'Texto <strong>claro</strong> y <em>editable</em>. '
                                  '<a href="https://example.test/ayuda" target="_blank">Ayuda</a></p>')
-        self.assertEqual(html, '<h3>Uso</h3><p>Texto <strong>claro</strong> y <em>editable</em>. '
-                              '<a href="https://example.test/ayuda">Ayuda</a></p>')
+        self.assertEqual(html, '<h2>Uso</h2><p>Texto <strong>claro</strong> y <em>editable</em>. '
+                              '<a href="https://example.test/ayuda" rel="noopener noreferrer nofollow">Ayuda</a></p>')
         self.assertEqual(texto, '## Uso\n\nTexto claro y editable. Ayuda')
 
     def test_elimina_contenido_activo_y_enlaces_peligrosos(self):
@@ -183,14 +185,35 @@ class DocumentosHTML(SimpleTestCase):
 
     def test_validacion_de_enlaces_no_admite_atajos_de_protocolo(self):
         from .documentos_html import sanear_html
-        for enlace in ('data:text/html,x', '//example.test/x', '/\\example.test', 'java\nscript:alert(1)', 'https://['):
+        for enlace in ('data:text/html,x', '//example.test/x', '/\\example.test', 'java\nscript:alert(1)', 'https://[', '#privacidad', '/ayuda'):
             with self.subTest(enlace=enlace):
                 html, _ = sanear_html(f'<a href="{enlace}">Texto</a>')
                 self.assertEqual(html, '<a>Texto</a>')
-        for enlace in ('#privacidad', '/ayuda', 'https://example.test', 'http://example.test', 'mailto:soporte@example.test'):
+        for enlace in ('https://example.test', 'http://example.test', 'mailto:soporte@example.test'):
             with self.subTest(enlace=enlace):
                 html, _ = sanear_html(f'<a href="{enlace}">Texto</a>')
                 self.assertIn('href=', html)
+
+    def test_titulos_tablas_y_citas_sin_atributos(self):
+        from .documentos_html import sanear_html
+        html, texto = sanear_html('<h1>A</h1><h2>B</h2><h3>C</h3><h4>D</h4><h6>E</h6><blockquote style="x"><p>Cita</p></blockquote>'
+                                 '<p><b>n</b> <i>c</i> <u>s</u></p><table class="t" border="1"><thead><tr><th colspan="2">T</th></tr></thead>'
+                                 '<tbody><tr><td style="color:red">1</td><td>2</td></tr></tbody></table>')
+        self.assertEqual(html, '<h2>A</h2><h2>B</h2><h3>C</h3><h4>D</h4><h4>E</h4><blockquote><p>Cita</p></blockquote>'
+                               '<p><strong>n</strong> <em>c</em> <u>s</u></p><table><thead><tr><th>T</th></tr></thead>'
+                               '<tbody><tr><td>1</td><td>2</td></tr></tbody></table>')
+        self.assertIn('## A', texto)
+
+    def test_html_pegado_desde_word(self):
+        from .documentos_html import sanear_html
+        word = ('<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><title>Doc</title><style>p.MsoNormal{margin:0}</style>'
+                '<xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml></head><body lang=ES-MX>'
+                '<!--StartFragment--><h1 class=MsoTitle style="mso-list:l0">Aviso<o:p></o:p></h1>'
+                '<p class=MsoListParagraph><![if !supportLists]><span>·<span>&nbsp;&nbsp;</span></span><![endif]>Primero<o:p></o:p></p>'
+                '<p class=MsoNormal><![if !vml]><img src="file:///C:/x.png"><![endif]><span style="font-family:Arial">Texto</span></p>'
+                '<!--EndFragment--></body></html>')
+        html, _ = sanear_html(word)
+        self.assertEqual(html, '<h2>Aviso</h2><p>Primero</p><p>Texto</p>')
 
     def test_comentarios_no_se_convierten_en_texto_visible(self):
         from .documentos_html import sanear_html
@@ -350,7 +373,7 @@ class TextosLegales(AdminBase):
         vista = self.post(self.sesion, '/api/admin/legales/vista-previa', {'content': sucio}).json()['html']
         for peligro in ('<script', 'onclick', 'javascript:'):
             self.assertNotIn(peligro, vista)
-        self.assertIn('<h3>Uso</h3>', vista)
+        self.assertIn('<h2>Uso</h2>', vista)
         self.assertIn('href="https://ejemplo.mx"', vista)
         creado = self.borrador(content=sucio).json()['document']
         self.assertEqual(self.sesion.get(f"/api/admin/legales/{creado['id']}").json()['document']['html'], vista)
@@ -358,10 +381,141 @@ class TextosLegales(AdminBase):
 
     def test_validacion(self):
         for cambios in ({'type': 'otro'}, {'version': 'abc'}, {'version': '1'}, {'version': '1.2.3.4'}, {'title': ' '}, {'title': 'x' * 121}, {'content': ' '},
-                        {'content': 'x' * 28001}, {'content': 'con\x00nulo'}, {'content': 5}):
+                        {'content': 'x' * 200001}, {'content': 'con\x00nulo'}, {'content': 5}):
             with self.subTest(cambios=cambios):
                 self.assertEqual(self.borrador(**cambios).status_code, 400)
         self.assertEqual(DocumentoLegal.objects.filter(estado='borrador').count(), 0)
+
+    def test_admite_textos_largos_hasta_el_limite_de_la_base(self):
+        largo = '<p>' + 'texto ' * 30000 + '</p>'
+        creado = self.borrador(content=largo)
+        self.assertEqual(creado.status_code, 200, creado.content[:200])
+        documento = creado.json()['document']
+        editado = self.post(self.sesion, f"/api/admin/legales/{documento['id']}/editar",
+                            {'expectedAt': documento['updatedAt'], 'version': '1.1', 'title': 'T', 'content': largo + '<p>más</p>'})
+        self.assertEqual(editado.status_code, 200)
+
+
+W = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+RELACION = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+
+
+def docx(cuerpo, relaciones='', extra=()):
+    """Un .docx mínimo armado en memoria: sin archivos de prueba sueltos."""
+    estilos = ''.join(f'<w:style w:type="paragraph" w:styleId="Heading{n}"><w:name w:val="heading {n}"/></w:style>' for n in (1, 2, 3))
+    partes = {
+        '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                               '<Default Extension="xml" ContentType="application/xml"/><Default Extension="rels" '
+                               'ContentType="application/vnd.openxmlformats-package.relationships+xml"/></Types>',
+        '_rels/.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                       f'<Relationship Id="rId1" Type="{RELACION}/officeDocument" Target="word/document.xml"/></Relationships>',
+        'word/document.xml': f'<?xml version="1.0" encoding="UTF-8"?><w:document {W}><w:body>{cuerpo}</w:body></w:document>',
+        'word/_rels/document.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                                        f'{relaciones}</Relationships>',
+        'word/styles.xml': f'<?xml version="1.0"?><w:styles {W}>{estilos}</w:styles>', **dict(extra)}
+    memoria = io.BytesIO()
+    with zipfile.ZipFile(memoria, 'w', zipfile.ZIP_DEFLATED) as paquete:
+        for nombre, contenido in partes.items():
+            paquete.writestr(nombre, contenido)
+    return memoria.getvalue()
+
+
+def parrafo(texto, estilo=None, formato=''):
+    propiedades = f'<w:pPr><w:pStyle w:val="{estilo}"/></w:pPr>' if estilo else ''
+    return f'<w:p>{propiedades}<w:r>{formato}<w:t xml:space="preserve">{texto}</w:t></w:r></w:p>'
+
+
+def enlace(identificador, destino):
+    return f'<Relationship Id="{identificador}" Type="{RELACION}/hyperlink" Target="{destino}" TargetMode="External"/>'
+
+
+class ImportarDocumentos(AdminBase):
+    """Subir un .docx o pegar desde Word: el servidor convierte y sanea; el archivo no se guarda."""
+    def setUp(self):
+        super().setUp()
+        self.admin = cuenta('importar-admin@example.test', 'gestionar_legales')
+        self.sesion = self.cliente(self.admin)
+
+    def subir(self, datos, nombre='aviso.docx', cliente=None, campo='documento', ruta='/api/admin/legales/importar'):
+        return (cliente or self.sesion).post(ruta, {campo: SimpleUploadedFile(nombre, datos)}, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
+
+    def codigo(self, respuesta):
+        return respuesta.status_code, respuesta.json()['code']
+
+    def test_titulos_listas_formato_enlace_y_tabla(self):
+        lista = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>'
+        numeracion = (f'<?xml version="1.0"?><w:numbering {W}><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/>'
+                      '</w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>')
+        cuerpo = (parrafo('Aviso', 'Heading1') + parrafo('Datos', 'Heading2') + parrafo('Fines', 'Heading3')
+                  + f'<w:p>{lista}<w:r><w:t>Uno</w:t></w:r></w:p><w:p>{lista}<w:r><w:t>Dos</w:t></w:r></w:p>'
+                  + parrafo('Clave', formato='<w:rPr><w:b/></w:rPr>') + parrafo('Ojo', formato='<w:rPr><w:u w:val="single"/></w:rPr>')
+                  + '<w:p><w:hyperlink r:id="rId9"><w:r><w:t>sitio</w:t></w:r></w:hyperlink></w:p>'
+                  + '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr></w:tbl>')
+        datos = docx(cuerpo, enlace('rId9', 'https://example.test/aviso'), extra=[('word/numbering.xml', numeracion)])
+        respuesta = self.subir(datos)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        self.assertEqual(respuesta.json()['html'],
+                         '<h2>Aviso</h2><h3>Datos</h3><h4>Fines</h4><ul><li>Uno</li><li>Dos</li></ul><p><strong>Clave</strong></p><p><u>Ojo</u></p>'
+                         '<p><a href="https://example.test/aviso" rel="noopener noreferrer nofollow">sitio</a></p>'
+                         '<table><tr><td><p>A</p></td><td><p>B</p></td></tr></table>')
+        registro = Auditoria.objects.get(actor=self.admin, accion='importar_documento_legal')
+        self.assertEqual(set(registro.detalle), {'kb', 'avisos_conversion'})
+        self.assertNotIn('Aviso', json.dumps(registro.detalle))
+        self.assertFalse(DocumentoLegal.objects.filter(estado='borrador').exists())
+
+    def test_quita_scripts_imagenes_estilos_y_enlaces_peligrosos(self):
+        imagen = ('<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+                  '<wp:docPr id="1" name="x" descr="foto"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+                  '<a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill>'
+                  '<a:blip r:embed="rId5"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>')
+        cuerpo = (parrafo('&lt;script&gt;alert(1)&lt;/script&gt;') + imagen
+                  + parrafo('Rojo', formato='<w:rPr><w:color w:val="FF0000"/><w:sz w:val="40"/></w:rPr>')
+                  + '<w:p><w:hyperlink r:id="rId9"><w:r><w:t>malo</w:t></w:r></w:hyperlink></w:p>')
+        relaciones = enlace('rId9', 'javascript:alert(1)') + f'<Relationship Id="rId5" Type="{RELACION}/image" Target="media/x.png"/>'
+        html = self.subir(docx(cuerpo, relaciones, extra=[('word/media/x.png', b'\x89PNG')])).json()['html']
+        self.assertEqual(html, '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p><p>Rojo</p><p><a>malo</a></p>')
+        for resto in ('<img', 'style=', 'javascript:', '<script'):
+            self.assertNotIn(resto, html)
+
+    def test_rechaza_lo_que_no_es_un_docx_valido(self):
+        valido = docx(parrafo('Hola'))
+        sin_documento = io.BytesIO()
+        with zipfile.ZipFile(sin_documento, 'w') as paquete:
+            paquete.writestr('otro.txt', 'x')
+        bomba = io.BytesIO()
+        with zipfile.ZipFile(bomba, 'w', zipfile.ZIP_DEFLATED) as paquete:
+            paquete.writestr('word/document.xml', b'0' * (21 * 1024 * 1024))
+        casos = [(valido, 'aviso.pdf', 'documento-no-docx'), (b'%PDF-1.7 hola', 'aviso.docx', 'documento-no-docx'),
+                 (b'PK\x03\x04' + b'basura' * 50, 'aviso.docx', 'documento-ilegible'), (sin_documento.getvalue(), 'aviso.docx', 'documento-ilegible'),
+                 (bomba.getvalue(), 'aviso.docx', 'documento-ilegible'), (b'PK\x03\x04' + b'0' * (2 * 1024 * 1024), 'aviso.docx', 'documento-grande')]
+        for datos, nombre, codigo in casos:
+            with self.subTest(codigo=codigo, nombre=nombre):
+                self.assertEqual(self.codigo(self.subir(datos, nombre)), (409, codigo))
+        self.assertEqual(self.codigo(self.subir(b'0' * (3 * 1024 * 1024))), (413, 'request-too-large'))
+        self.assertFalse(Auditoria.objects.filter(accion='importar_documento_legal').exists())
+
+    def test_solo_un_archivo_en_su_campo_y_con_la_capacidad(self):
+        valido = docx(parrafo('Hola'))
+        ruta = '/api/admin/legales/importar'
+        dos = self.sesion.post(ruta, {'documento': [SimpleUploadedFile('a.docx', valido), SimpleUploadedFile('b.docx', valido)]},
+                               HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
+        con_campo = self.sesion.post(ruta, {'documento': SimpleUploadedFile('a.docx', valido), 'otro': 'x'}, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
+        for respuesta in (dos, con_campo, self.subir(valido, campo='archivo'), self.post(self.sesion, ruta, {'documento': 'x'})):
+            self.assertEqual(respuesta.status_code, 400)
+        sin_capacidad = self.cliente(cuenta('importar-otra@example.test', 'gestionar_ventas'))
+        self.assertEqual(self.subir(valido, cliente=sin_capacidad).status_code, 403)
+        self.assertEqual(self.subir(valido, cliente=Client()).status_code, 401)
+
+    def test_pegado_se_sanea_en_el_servidor(self):
+        pegado = ('<html><head><style>p{color:red}</style></head><body><!--StartFragment--><h1 class=MsoTitle>Aviso</h1>'
+                  '<p class=MsoNormal style="margin:0"><b>Hola</b><o:p></o:p></p><script>alert(1)</script>'
+                  '<p><a href="javascript:alert(1)">x</a> <a href="https://example.test">y</a></p><!--EndFragment--></body></html>')
+        respuesta = self.subir(pegado.encode(), 'pegado.html', campo='html', ruta='/api/admin/legales/sanear')
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        self.assertEqual(respuesta.json()['html'], '<h2>Aviso</h2><p><strong>Hola</strong></p><p><a>x</a> '
+                                                   '<a href="https://example.test" rel="noopener noreferrer nofollow">y</a></p>')
+        self.assertEqual(self.subir(b'\xff\xfe', 'pegado.html', campo='html', ruta='/api/admin/legales/sanear').status_code, 400)
 
 
 class BitacoraDeConsentimientos(AdminBase):

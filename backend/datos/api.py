@@ -154,9 +154,9 @@ def admin_support(request, data):
 
 
 @endpoint(cap='atender_soporte')
-def admin_support_case(request, data, caso_id):
+def admin_support_case(request, data, folio):
     bounds(request, allowed=())
-    return datos.detalle_soporte(request.user, caso_id)
+    return datos.detalle_soporte(request.user, folio)
 
 
 @endpoint(('POST',), cap='atender_soporte')

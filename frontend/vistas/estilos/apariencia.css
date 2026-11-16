@@ -1128,7 +1128,7 @@ html body[data-private=true][data-role=admin] #app-page .user-metric strong.cons
 @media (max-width:330px) { html body[data-private=true][data-role=admin] #app-page .user-summary-metrics { grid-template-columns:minmax(0,1fr); } }
 
 /* Separación entre bloques de la página (Ventas → Resumen: el periodo ya no queda pegado a las cifras). */
-html body[data-private=true][data-role=admin] #app-page>:is(.bento-panel,.user-summary-metrics,.user-chart-grid-layout,.legal-editor,.console-layout) { margin-top:0;margin-bottom:var(--esp-5); }
+html body[data-private=true][data-role=admin] #app-page>:is(.bento-panel,.user-summary-metrics,.user-chart-grid-layout,.legal-editor,.console-side) { margin-top:0;margin-bottom:var(--esp-5); }
 html body[data-private=true][data-role=admin] #app-page>.bento-panel>.care-filters:only-child { margin:0; }
 
 /* Filtros: rejilla ordenada, botones al final y una línea antes de la tabla. */
@@ -1165,7 +1165,6 @@ html body[data-private=true][data-role=admin] #app-page .admin-table tbody tr:ho
 /* Consola remota: casos como fichas legibles; la seleccionada en verde. */
 html body[data-private=true][data-role=admin] .console-list .console-item { gap:var(--esp-1)!important;padding:var(--esp-3) var(--esp-4)!important;border-radius:var(--radio-campo)!important;background:var(--vidrio-base-fondo)!important;border:1px solid var(--vidrio-base-borde)!important; }
 html body[data-private=true][data-role=admin] .console-list .console-item:hover { background:var(--fila-hover)!important; }
-html body[data-private=true][data-role=admin] .console-list .console-item.is-selected { background:var(--fila-no-leida)!important;border-color:var(--insignia-verde-borde)!important;box-shadow:inset 3px 0 0 var(--claro-verde)!important; }
 html body[data-private=true][data-role=admin] .console-item-title { color:var(--claro-titulo);font-size:var(--texto-etiqueta);line-height:1.35; }
 html body[data-private=true][data-role=admin] .console-item small { color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.4;overflow-wrap:anywhere; }
 html body[data-private=true][data-role=admin] .console-inbox .user-pager { display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--esp-2); }
@@ -1213,7 +1212,10 @@ html body[data-private=true][data-role=admin] #app-page .legal-toolbar { justify
 html body[data-private=true][data-role=admin] #app-page .legal-toolbar .button { min-height:var(--boton-alto-compacto)!important;padding:0 var(--esp-4)!important;background:transparent!important;border:0!important;box-shadow:none!important; }
 html body[data-private=true][data-role=admin] #app-page .legal-toolbar .button:hover { background:var(--segmento-activo)!important; }
 html body[data-private=true][data-role=admin] #app-page .legal-preview { font-size:var(--texto-cuerpo);line-height:1.65;color:var(--claro-tinta); }
-html body[data-private=true][data-role=admin] #app-page .legal-preview :is(h2,h3) { margin:var(--esp-5) 0 var(--esp-2);color:var(--claro-titulo); }
+/* La regla de los títulos de tarjeta no aplica al texto legal: la vista previa usa la misma escala que la página pública. */
+html body[data-private=true][data-role=admin] #app-page .legal-preview h2 { margin:var(--legal-h2-arriba) 0 var(--esp-3);font-size:var(--legal-h2); }
+html body[data-private=true][data-role=admin] #app-page .legal-preview :is(h2,h3,h4) { color:var(--legal-titulo); }
+html body[data-private=true][data-role=admin] #app-page .legal-preview :is(h2,h3,h4):first-child { margin-top:0; }
 html body[data-private=true][data-role=admin] #app-page .legal-editor textarea { font-size:var(--texto-meta);line-height:1.6; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .app-actions:empty { display:none; }
 @media (max-width:640px) {

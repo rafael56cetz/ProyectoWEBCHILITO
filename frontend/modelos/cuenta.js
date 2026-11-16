@@ -106,19 +106,21 @@ const ChilitoHTTP = (() => {
   const pendingWrites = new Map();
   let onExpired = () => {};
   const csrf = () => document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('csrftoken='))?.slice(10) || '';
-  async function request(path, {method='GET', body, signal, headers={}, keepalive=false} = {}) {
+  async function request(path, {method='GET', body, signal, headers={}} = {}) {
     if (!path.startsWith('/api/') && !path.startsWith('/_allauth/browser/v1/')) throw new Error('Unsupported endpoint');
     if (method !== 'GET' && !csrf()) await configure(signal);
-    const write = method === 'POST' && path.startsWith('/api/');
+    // Un formulario con archivo solo se transforma en el servidor (no escribe datos): no lleva recibo de idempotencia.
+    const form = globalThis.FormData !== undefined && body instanceof FormData;
+    const write = method === 'POST' && path.startsWith('/api/') && !form;
     const fingerprint = write ? method+' '+path+' '+JSON.stringify(body ?? {}) : null;
     // Conserva la clave tras un resultado incierto del transporte o del servidor, para reintentar con seguridad.
     const key = write ? pendingWrites.get(fingerprint) || crypto.randomUUID() : null;
     if (write) pendingWrites.set(fingerprint,key);
     const response = await fetch(path, {
-      method, credentials:'same-origin', cache:'no-store', redirect:'error', signal, keepalive,
-      headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {}),
+      method, credentials:'same-origin', cache:'no-store', redirect:'error', signal,
+      headers:{Accept:'application/json', ...(body && !form ? {'Content-Type':'application/json'} : {}),
         ...(method !== 'GET' ? {'X-CSRFToken':decodeURIComponent(csrf())} : {}), ...(key ? {'Idempotency-Key':key} : {}), ...headers},
-      ...(body ? {body:JSON.stringify(body)} : {})
+      ...(body ? {body:form ? body : JSON.stringify(body)} : {})
     });
     let data = {};
     try { data = await response.json(); } catch { /* Never interpret an HTML error as success. */ }

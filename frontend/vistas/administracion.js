@@ -58,7 +58,8 @@ const FleetViews = (() => {
     resetFilters(root) { root.querySelector('[data-admin-form="fleet-filter"]').reset(); }});
 })();
 
-// Consola remota (5.2). Atiende una cuenta y solo ella se conecta; la sesión técnica se ve en vivo mientras la persona no la revoque.
+// Consola remota (5.2). Bandeja en #admin/soporte y cada caso en su pantalla, #admin/soporte/<folio>. Atiende una cuenta y solo ella
+// se conecta; la sesión técnica se ve en vivo mientras la persona no la revoque.
 const ConsoleViews = (() => {
   const T = AdminTableViews, {tag, orderCard} = GardenViews, act = (...args) => T.button(...args);
   const TABS = [['abierto', 'Nuevos'], ['en_atencion', 'En atención'], ['resuelto', 'Resueltos']];
@@ -85,16 +86,16 @@ const ConsoleViews = (() => {
     return `${tag(label, tone)}${caso.authorization === 'vigente' ? ` vence en ${GardenModel.lapse(caso.authorizedUntil)}` : ''}`;
   }
 
-  function item(caso, selected) {
+  function item(caso) {
     const remaining = caso.state === 'resuelto' ? (ConsoleService.results[caso.result] || '—') : caso.authorization === 'vigente' ? `${GardenModel.lapse(caso.authorizedUntil)} restantes` : AUTHORIZATION[caso.authorization][0];
-    return `<li><button type="button" class="console-item${selected ? ' is-selected' : ''}" data-admin-action="open-case" data-case="${escaparHTML(caso.id)}" aria-pressed="${selected}">
+    return `<li><button type="button" class="console-item" data-admin-action="open-case" data-folio="${escaparHTML(caso.folio)}">
       <span class="console-item-title"><strong>${escaparHTML(caso.folio)}</strong> · ${incident(caso.incident)}</span><small>${when(caso.createdAt)}</small>
       <small>${escaparHTML(caso.email)} · ${escaparHTML(caso.device)} · ${escaparHTML(remaining)}</small></button></li>`;
   }
 
   function inbox(state) {
     const {items, page, total} = state.inbox;
-    return `<section class="bento-panel console-inbox" aria-label="Bandeja">${items.length ? `<ul class="console-list">${items.map(caso => item(caso, caso.id === state.selectedId)).join('')}</ul>` : AppViews.empty('No hay casos en esta pestaña', 'Cuando llegue uno aparecerá aquí.')}${T.pager({page, total})}</section>`;
+    return `<section class="bento-panel console-inbox" aria-label="Bandeja">${items.length ? `<ul class="console-list">${items.map(item).join('')}</ul>` : AppViews.empty('No hay casos en esta pestaña', 'Cuando llegue uno aparecerá aquí.')}${T.pager({page, total})}</section>`;
   }
 
   const confirmations = {
@@ -102,7 +103,28 @@ const ConsoleViews = (() => {
     pump:(plant, seconds) => ({titulo:`¿Probar la bomba de la planta ${plant}?`, texto:`La bomba funcionará ${seconds} s y moverá agua de verdad.`, accion:'Probar bomba'}),
     resolve:{titulo:'¿Resolver el caso?', texto:'Se cerrará el caso y terminará el acceso. No se puede deshacer.', accion:'Resolver caso', peligro:true}};
 
-  const sessionActions = () => `<div class="console-actions" role="group" aria-label="Acciones del equipo">
+  // Una orden igual (tipo y planta) en curso bloquea su botón: la base no admite dos a la vez.
+  const IN_FLIGHT = ['pendiente', 'enviado'];
+  const busyKeys = orders => new Set(orders.filter(order => IN_FLIGHT.includes(order.state)).map(order => `${order.type}:${order.plant || 0}`));
+  function lockOrders(root, orders) {
+    const busy = busyKeys(orders), names = [];
+    for(const button of root.querySelectorAll('[data-admin-action="order"]')) {
+      button.disabled = busy.has(`${button.dataset.type}:0`);
+      if(button.disabled) names.push(button.textContent.trim());
+    }
+    const pump = root.querySelector('[data-admin-form="pump"]');
+    if(pump) {
+      const plant = pump.elements.plant.value, submit = pump.querySelector('[type=submit]');
+      submit.disabled = busy.has(`probar_bomba:${plant}`);
+      if(submit.disabled) names.push(`Probar bomba · planta ${plant}`);
+    }
+    const note = root.querySelector('[data-console-busy]');
+    if(!note) return;
+    note.hidden = !names.length;
+    note.textContent = names.length ? `En curso: ${names.join(', ')}. Espera a que el equipo responda o a que la orden expire para enviar otra igual.` : '';
+  }
+
+  const sessionActions = () => `<p class="user-small-copy" id="console-busy" data-console-busy role="status" hidden></p><div class="console-actions" role="group" aria-label="Acciones del equipo" aria-describedby="console-busy">
       ${act('order', 'Pedir lectura', 'light', 'data-type="lectura_inmediata"')}${act('order', 'Revisar equipo', 'light', 'data-type="autodiagnostico"')}
       ${act('order', 'Apagar lámpara', 'light', 'data-type="lampara_apagar"')}${act('order', 'Restaurar lámpara', 'light', 'data-type="lampara_automatico"')}
       ${act('order', 'Encender ventilador', 'light', 'data-type="ventilador_encender"')}${act('order', 'Apagar ventilador', 'light', 'data-type="ventilador_apagar"')}
@@ -115,8 +137,12 @@ const ConsoleViews = (() => {
     return `<section class="bento-panel console-session" aria-labelledby="console-session-title"><div class="console-session-head"><h2 id="console-session-title">Sesión técnica · ${escaparHTML(caso.device)}</h2>
         <p>Abierta ${GardenModel.ago(session.startedAt) || ''}</p>${act('close-session', 'Cerrar sesión técnica', 'light')}</div>
       <div data-console-live><p>Consultando el equipo…</p></div>${sessionActions()}
-      <h3>Órdenes de esta sesión</h3><div data-console-orders></div><h3>Eventos del equipo · últimas 24 h</h3><div data-console-events></div></section>`;
+      <h3>Eventos del equipo · últimas 24 h</h3><div data-console-events></div></section>`;
   }
+
+  // Todas las órdenes de soporte del caso, de cualquier sesión, con su estado: una pendiente se sigue viendo al volver.
+  const orderList = (orders, diagnostic = null) => (orders.length ? orders.map(orderCard).join('') : '<p>Todavía no hay órdenes en este caso.</p>') + SupportViews.diagnosticCard(diagnostic);
+  const ordersPanel = orders => `<section class="bento-panel" aria-labelledby="console-orders-title"><h2 id="console-orders-title">Órdenes del caso</h2><div data-console-orders>${orderList(orders)}</div></section>`;
 
   function readings(data) {
     if(!data) return '<p>El equipo todavía no envía lecturas.</p>';
@@ -135,7 +161,7 @@ const ConsoleViews = (() => {
   function live(data) {
     const link = GardenModel.connection(data.device);
     return {live:`<p class="console-status">${tag(link.text.split(' · ')[0], link.tone)} ${escaparHTML(link.text.split(' · ').slice(1).join(' · '))}</p>${readings(data.readings)}`,
-      orders:(data.orders.length ? data.orders.map(orderCard).join('') : '<p>Todavía no das órdenes en esta sesión.</p>') + SupportViews.diagnosticCard(data.diagnostic),
+      orders:orderList(data.orders, data.diagnostic),
       events:events(data.events)};
   }
 
@@ -147,8 +173,7 @@ const ConsoleViews = (() => {
   }
 
   function detail(state) {
-    if(!state.detail) return '<section class="bento-panel console-detail console-placeholder" id="console-detail" tabindex="-1">'+AppViews.empty('Selecciona un caso', 'Abre uno de la bandeja para ver su detalle.')+'</section>';
-    const {case: caso, diagnostic, session} = state.detail;
+    const {case: caso, diagnostic, session, orders} = state.detail;
     const [label, tone] = CASE_STATES[caso.state];
     const facts = [['Persona', none(caso.person)], ['Correo', escaparHTML(caso.email)], ['Huerto', escaparHTML(caso.garden)], ['Equipo', escaparHTML(caso.device)],
       ['Problema', incident(caso.incident)], ['Nota', none(caso.note)], ['Autorización', authorization(caso)], ['Atiende', none(caso.attendedBy)]];
@@ -157,26 +182,34 @@ const ConsoleViews = (() => {
       : caso.state === 'en_atencion' && !caso.mine ? `<p>Lo atiende ${escaparHTML(caso.attendedBy)}.</p>`
       : caso.state === 'en_atencion' && !session ? act('connect', 'Conectar', 'brand', caso.authorization === 'vigente' ? '' : 'disabled') : '';
     const mine = caso.state === 'en_atencion' && caso.mine;
-    return `<section class="bento-panel console-detail" id="console-detail" tabindex="-1"><h2>Caso <span class="folio">${escaparHTML(caso.folio)}</span> ${tag(label, tone)}</h2>
+    return `<section class="bento-panel console-detail"><h2>Caso <span class="folio">${escaparHTML(caso.folio)}</span> ${tag(label, tone)}</h2>
         <dl class="user-facts">${facts.map(([name, value]) => `<div><dt>${name}</dt><dd>${value}</dd></div>`).join('')}</dl>${closed}
         ${diagnostic ? `<h3>Autodiagnóstico adjunto</h3>${SupportViews.diagnosticCard(diagnostic)}` : ''}<div class="app-actions">${action}</div></section>
-      ${mine && session ? sessionFrame(caso, session) : ''}${mine ? resolution(caso) : ''}`;
+      ${mine && session ? sessionFrame(caso, session) : ''}${orders.length || mine ? ordersPanel(orders) : ''}${mine ? resolution(caso) : ''}`;
   }
 
-  function screen(state) {
+  const heading = () => `<div class="page-heading"><div><h1>Consola remota</h1><p>Atiende los casos con la autorización de la persona. Todo queda en la auditoría.</p></div>${act('refresh', `${icon('refresh')}<span>Actualizar</span>`)}</div>`;
+
+  function inboxScreen(state) {
     if(state.status !== 'ready') return T.status(state.status);
     const tabs = TABS.map(([id, name]) => [id, `${name} (${state.counts[id]})`]);
-    return `<div class="page-heading"><div><h1>Consola remota</h1><p>Atiende los casos con la autorización de la persona. Todo queda en la auditoría.</p></div>${act('refresh', `${icon('refresh')}<span>Actualizar</span>`)}</div>
-      ${T.tabs(tabs, state.tab)}<div class="console-layout">${inbox(state)}<div class="console-side">${detail(state)}</div></div>`;
+    return `${heading()}${T.tabs(tabs, state.tab)}${inbox(state)}`;
   }
 
-  return Object.freeze({screen, confirmations, errorText, closingText,
+  function caseScreen(state) {
+    const back = '<a class="garden-back" href="#admin/soporte">← Volver a la bandeja</a>';
+    if(state.status === 'not-found') return `${back}${heading()}<section class="bento-panel">${AppViews.empty('Este caso no existe', 'Revisa el folio o vuelve a la bandeja.')}</section>`;
+    if(state.status !== 'ready') return back + T.status(state.status);
+    return `${back}${heading()}<div class="console-side">${detail(state)}</div>`;
+  }
+
+  return Object.freeze({inboxScreen, caseScreen, confirmations, errorText, closingText, lockOrders,
     paint: (root, html) => T.paint(root, html),
     paintLive(root, data) {
       const parts = live(data);
       for(const [name, html] of Object.entries(parts)) { const slot = root.querySelector(`[data-console-${name}]`); if(slot) slot.innerHTML = html; }
-    },
-    focusDetail(root) { root.querySelector('#console-detail')?.focus(); }});
+      lockOrders(root, data.orders);
+    }});
 })();
 
 // ── Consultas ──
@@ -426,7 +459,9 @@ const LegalAdminViews = (() => {
   const {tag} = GardenViews;
   const TYPES = {terminos:'Términos y condiciones', aviso_privacidad:'Aviso de privacidad', politica_cookies:'Política de cookies'};
   const ERRORS = {'version-no-mayor':'La versión debe ser mayor que la vigente.', 'version-existente':'Ya existe esa versión de este documento.', 'documento-publicado':'Una versión publicada no se edita ni se borra: crea una nueva.',
-    'stale-record':'Alguien cambió este borrador. Vuelve a abrirlo para ver la versión nueva.'};
+    'stale-record':'Alguien cambió este borrador. Vuelve a abrirlo para ver la versión nueva.', 'documento-no-docx':'Sube un documento de Word guardado como .docx.',
+    'documento-ilegible':'No se pudo leer el documento. Ábrelo en Word y guárdalo de nuevo como .docx.', 'documento-grande':'El documento pasa de 2 MB.',
+    'request-too-large':'El documento pasa de 2 MB.', 'documento-largo':'El texto pasa de 200 000 caracteres. Divide el documento.'};
   const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
   const sha = value => escaparHTML(value.slice(0, 8));
 
@@ -449,18 +484,22 @@ const LegalAdminViews = (() => {
     const title = published ? `${TYPES[doc.type]} · versión ${doc.version}` : doc ? `Editar borrador ${doc.version}` : `Nueva versión · ${TYPES[state.type]}`;
     const back = `<a class="garden-back" href="#admin/legales">← Textos legales</a>`;
     const facts = published ? `<p>${tag('Publicada', 'verde')} ${T.merida(doc.publishedAt)}${doc.publishedBy ? ` · ${escaparHTML(doc.publishedBy)}` : ''} · huella ${sha(doc.sha256)}…</p>` : '';
-    const toolbar = published ? '' : `<div class="legal-toolbar" role="group" aria-label="Formato">${[['h2', 'Título'], ['ul', 'Lista'], ['strong', 'Negrita'], ['a', 'Enlace']].map(([tagName, text]) => T.button('tag', text, 'light', `data-tag="${tagName}"`)).join('')}</div>`;
+    const toolbar = published ? '' : `<div class="legal-toolbar" role="group" aria-label="Formato">${[['h2', 'Título'], ['ul', 'Lista'], ['strong', 'Negrita'], ['a', 'Enlace']].map(([tagName, text]) => T.button('tag', text, 'light', `data-tag="${tagName}"`)).join('')}${T.button('upload', 'Subir documento (.docx)', 'light')}</div>
+      <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-legal-file hidden>`;
     const form = `<form data-admin-form="legal" novalidate><label for="lg-version">Versión (formato 1.2)</label><input id="lg-version" name="version" type="text" maxlength="11" placeholder="1.2" value="${escaparHTML(doc?.version || '')}"${published ? ' readonly' : ''} required>
       <label for="lg-title">Título</label><input id="lg-title" name="title" type="text" maxlength="120" value="${escaparHTML(doc?.title || TYPES[state.type] || '')}"${published ? ' readonly' : ''} required>
-      <label for="lg-content">Contenido</label>${toolbar}<textarea id="lg-content" name="content" rows="18" maxlength="28000"${published ? ' readonly' : ''} required>${escaparHTML(doc?.content || '')}</textarea>
-      ${published ? '' : `<div class="app-actions"><button class="button btn-liquid-brand" type="submit">Guardar borrador</button>${T.button('preview-editor', 'Vista previa')}${doc ? T.button('publish-editor', 'Publicar', 'brand') : ''}</div>`}</form>`;
+      <label for="lg-content">Contenido</label>${toolbar}<textarea id="lg-content" name="content" rows="18" maxlength="200000"${published ? ' readonly' : ''} required${published ? '' : ' aria-describedby="lg-content-help"'}>${escaparHTML(doc?.content || '')}</textarea>
+      ${published ? '' : `<p class="user-small-copy" id="lg-content-help">Puedes pegar desde Word: el formato se limpia en el servidor. El borrador se guarda solo cada 10 segundos.</p>
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Guardar borrador</button>${T.button('preview-editor', 'Vista previa')}${T.button('publish-editor', 'Publicar', 'brand', doc ? '' : 'hidden')}</div>
+      <p class="user-small-copy" data-legal-saved role="status"></p>`}</form>`;
     return `${back}${AppViews.heading(title)}${facts}<div class="legal-editor"><section class="bento-panel">${form}</section><section class="bento-panel"><h2>Vista previa</h2><div class="legal-preview" data-legal-preview>${doc ? doc.html : '<p>Pulsa «Vista previa» para ver el texto como lo verá el público.</p>'}</div></section></div>${T.dialog}`;
   }
 
   const confirmations = {
     publish:(type, version) => ({titulo:`¿Publicar la versión ${version} de ${TYPES[type]}?`,
       texto:`Todas las cuentas recibirán un aviso y deberán ${type === 'politica_cookies' ? 'volver a decidir sobre cookies' : 'aceptarla al entrar'}. Una versión publicada no se puede editar ni borrar.`, accion:'Publicar'}),
-    remove:{titulo:'¿Eliminar este borrador?', texto:'No se puede deshacer.', accion:'Eliminar', peligro:true}};
+    remove:{titulo:'¿Eliminar este borrador?', texto:'No se puede deshacer.', accion:'Eliminar', peligro:true},
+    replace:{titulo:'¿Reemplazar el contenido?', texto:'El texto actual del borrador se sustituirá por el del documento.', accion:'Reemplazar'}};
 
   // El HTML ya viene saneado del servidor; el navegador solo lo coloca.
   function showPreview(root, html) { root.querySelector('[data-legal-preview]').innerHTML = html; }
@@ -473,7 +512,22 @@ const LegalAdminViews = (() => {
     area.focus();
   }
 
-  return Object.freeze({listScreen, editorScreen, confirmations, errorText, showPreview, previewDialog, insertTag});
+  // Pegado y documento subido: el texto es el HTML que devolvió el servidor, y entra como valor del campo, no como HTML de la página.
+  function insertText(root, text, start, end) {
+    const area = root.querySelector('[name=content]');
+    area.setRangeText(text, start, end, 'end');
+    area.focus();
+  }
+  function replaceContent(root, text) { root.querySelector('[name=content]').value = text; }
+  function chooseFile(root) { const input = root.querySelector('[data-legal-file]'); input.value = ''; input.click(); }
+  function saved(root, at) {
+    const line = root.querySelector('[data-legal-saved]'), publish = root.querySelector('[data-admin-action="publish-editor"]');
+    // Un borrador nuevo ya guardado se puede publicar.
+    if(at && publish) publish.hidden = false;
+    if(line) line.textContent = at ? `Guardado · ${at.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', timeZone:'America/Merida'})}` : 'No se pudo guardar automáticamente. Usa «Guardar borrador» para ver el motivo.';
+  }
+
+  return Object.freeze({listScreen, editorScreen, confirmations, errorText, showPreview, previewDialog, insertTag, insertText, replaceContent, chooseFile, saved});
 })();
 
 // ── Consentimientos ──

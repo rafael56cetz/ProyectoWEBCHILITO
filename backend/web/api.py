@@ -42,7 +42,16 @@ def page(items, request, mapper=lambda row: row, allowed=('page',)):
     return {'status': 'ready', **paginar(items, bounds(request, allowed), mapper)}
 
 
-def endpoint(methods=('GET',), fields=(), cap=None):
+def subida(request, campo):
+    """El único archivo de un formulario multipart, sin más campos. El tamaño lo limita antes `LimiteDeSubida`."""
+    if request.content_type != 'multipart/form-data' or request.POST or set(request.FILES) != {campo} or len(request.FILES.getlist(campo)) != 1:
+        raise InputError
+    return request.FILES[campo]
+
+
+def endpoint(methods=('GET',), fields=(), cap=None, archivo=None):
+    """`archivo` nombra el campo de un POST multipart que solo transforma lo subido: sin recibo de idempotencia, porque no
+    cambia datos y la respuesta puede pesar más de lo que conviene guardar."""
     def wrap(func):
         @wraps(func)
         def view(request, *args, **kwargs):
@@ -57,6 +66,11 @@ def endpoint(methods=('GET',), fields=(), cap=None):
                 if request.method == 'GET':
                     resultado = func(request, {}, *args, **kwargs)
                     return resultado if isinstance(resultado, HttpResponse) else JsonResponse(resultado)
+                if archivo:
+                    subido = subida(request, archivo)
+                    if not operacion.dentro_de_cuota(request.user, request.path):
+                        return failure(429, 'rate-limited')
+                    return JsonResponse(func(request, subido, *args, **kwargs))
                 data = body(request, fields)
                 if not operacion.dentro_de_cuota(request.user, request.path):
                     return failure(429, 'rate-limited')

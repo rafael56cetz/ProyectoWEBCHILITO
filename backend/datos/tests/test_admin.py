@@ -21,6 +21,7 @@ from web.models import Idempotencia
 
 MAC = '02:00:00:00:aa:{:02x}'
 UUID_AJENO = '00000000-0000-4000-8000-000000000001'
+FOLIO_AJENO = 'CS-00000000'
 
 
 class BaseAdmin(TestCase):
@@ -73,7 +74,7 @@ class Capacidades(BaseAdmin):
         ('get', '/api/admin/consentimientos', 'ver_consentimientos'), ('get', '/api/admin/consentimientos/resumen', 'ver_consentimientos'),
         ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos'),
         ('get', '/api/admin/flota', 'ver_flota'), ('get', '/api/admin/soporte', 'atender_soporte'),
-        ('get', f'/api/admin/soporte/{UUID_AJENO}', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender', 'atender_soporte'),
+        ('get', f'/api/admin/soporte/{FOLIO_AJENO}', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender', 'atender_soporte'),
         ('post', f'/api/admin/soporte/{UUID_AJENO}/conectar', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/resolver', 'atender_soporte'),
         ('get', f'/api/admin/sesiones/{UUID_AJENO}', 'atender_soporte'), ('post', f'/api/admin/sesiones/{UUID_AJENO}/accion', 'atender_soporte'),
         ('post', f'/api/admin/sesiones/{UUID_AJENO}/cerrar', 'atender_soporte'),
@@ -442,6 +443,7 @@ class Consola(BaseAdmin):
         self.persona = self.cliente(get_user_model().objects.get(email='soporte-persona@example.test'))
         respuesta = self.post(self.persona, f'/api/huertos/{self.huerto}/soporte', {'incident': 'bomba', 'note': 'No riega', 'consent': True})
         self.caso = respuesta.json()['case']['id']
+        self.folio = respuesta.json()['case']['folio']
 
     def conectar(self, cliente=None):
         cliente = cliente or self.admin_ana
@@ -466,7 +468,7 @@ class Consola(BaseAdmin):
         caso = bandeja['items'][0]
         self.assertEqual((caso['id'], caso['folio'][:3], caso['email'], caso['device'], caso['authorization'], caso['mine']),
                          (self.caso, 'CS-', 'soporte-persona@example.test', 'SOP-0001', 'vigente', False))
-        detalle = self.admin_ana.get(f'/api/admin/soporte/{self.caso}').json()
+        detalle = self.admin_ana.get(f'/api/admin/soporte/{self.folio}').json()
         self.assertEqual((detalle['case']['note'], detalle['diagnostic'], detalle['session']), ('No riega', None, None))
         self.assertEqual(self.admin_ana.get('/api/admin/soporte?estado=en_atencion').json()['total'], 0)
         for consulta in ('?estado=cancelado', '?x=1', '?page=0'):
@@ -522,8 +524,8 @@ class Consola(BaseAdmin):
         self.assertEqual(self.post(self.admin_beto, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'}).status_code, 404)
         self.assertEqual(self.post(self.admin_beto, f'/api/admin/sesiones/{sesion}/cerrar').status_code, 404)
         self.assertIsNone(SoporteSesion.objects.get(pk=sesion).cerrada_en)
-        self.assertEqual(self.admin_beto.get(f'/api/admin/soporte/{self.caso}').json()['session'], None)
-        self.assertEqual(self.admin_ana.get(f'/api/admin/soporte/{self.caso}').json()['session']['id'], sesion)
+        self.assertEqual(self.admin_beto.get(f'/api/admin/soporte/{self.folio}').json()['session'], None)
+        self.assertEqual(self.admin_ana.get(f'/api/admin/soporte/{self.folio}').json()['session']['id'], sesion)
 
     def test_sin_atender_no_se_conecta_ni_se_resuelve(self):
         self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar')), (409, 'caso-no-tuyo'))
@@ -590,8 +592,47 @@ class Consola(BaseAdmin):
         self.post(self.admin_ana, f'/api/admin/soporte/{caso}/atender')
         self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{caso}/conectar')), (409, 'sesion-abierta'))
 
+    def test_al_volver_se_retoma_la_misma_sesion_con_todas_las_ordenes_del_caso(self):
+        sesion = self.conectar()
+        self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'probar_bomba', 'plant': 1, 'duration': 2})
+        # Salir de la pantalla ya no cierra nada: el detalle trae la sesión abierta y la orden pendiente.
+        detalle = self.admin_ana.get(f'/api/admin/soporte/{self.folio}').json()
+        self.assertEqual(detalle['session']['id'], sesion)
+        self.assertEqual([(orden['type'], orden['state']) for orden in detalle['orders']], [('probar_bomba', 'pendiente')])
+        self.assertEqual(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar').json()['session']['id'], sesion)
+        self.assertEqual(SoporteSesion.objects.filter(caso_id=self.caso).count(), 1)
+        self.assertIsNone(SoporteSesion.objects.get(pk=sesion).cerrada_en)
+
+    def test_las_ordenes_de_una_sesion_cerrada_siguen_en_el_caso(self):
+        primera = self.conectar()
+        self.post(self.admin_ana, f'/api/admin/sesiones/{primera}/accion', {'type': 'reiniciar'})
+        self.post(self.admin_ana, f'/api/admin/sesiones/{primera}/cerrar')
+        self.assertIsNone(self.admin_ana.get(f'/api/admin/soporte/{self.folio}').json()['session'])
+        segunda = self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar').json()['session']['id']
+        self.assertNotEqual(segunda, primera)
+        self.post(self.admin_ana, f'/api/admin/sesiones/{segunda}/accion', {'type': 'lectura_inmediata'})
+        tipos = [orden['type'] for orden in self.admin_ana.get(f'/api/admin/sesiones/{segunda}').json()['orders']]
+        self.assertEqual(sorted(tipos), ['lectura_inmediata', 'reiniciar'])
+        self.assertEqual(len(self.admin_ana.get(f'/api/admin/soporte/{self.folio}').json()['orders']), 2)
+
+    def test_otro_admin_no_retoma_la_sesion(self):
+        sesion = self.conectar()
+        detalle = self.admin_beto.get(f'/api/admin/soporte/{self.folio}').json()
+        self.assertEqual((detalle['session'], detalle['case']['mine']), (None, False))
+        self.assertEqual(self.codigo(self.post(self.admin_beto, f'/api/admin/soporte/{self.caso}/conectar')), (409, 'caso-no-tuyo'))
+        self.assertEqual(self.admin_beto.get(f'/api/admin/sesiones/{sesion}').status_code, 404)
+        self.assertEqual(SoporteSesion.objects.count(), 1)
+
+    def test_revocar_con_la_sesion_abierta_no_deja_retomarla(self):
+        sesion = self.conectar()
+        self.post(self.persona, f'/api/soporte/{self.caso}/revocar')
+        self.assertEqual(self.admin_ana.get(f'/api/admin/sesiones/{sesion}').json()['session']['state'], 'closed')
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/soporte/{self.caso}/conectar')), (409, 'autorizacion-no-vigente'))
+        self.assertEqual(self.codigo(self.post(self.admin_ana, f'/api/admin/sesiones/{sesion}/accion', {'type': 'reiniciar'})), (409, 'sesion-cerrada'))
+
     def test_casos_o_sesiones_inexistentes(self):
-        for metodo, ruta in (('get', f'/api/admin/soporte/{UUID_AJENO}'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender'),
+        for metodo, ruta in (('get', f'/api/admin/soporte/{FOLIO_AJENO}'), ('get', f'/api/admin/soporte/{UUID_AJENO}'),
+                             ('get', f'/api/admin/soporte/{self.folio.lower()}'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender'),
                              ('get', f'/api/admin/sesiones/{UUID_AJENO}')):
             with self.subTest(ruta=ruta):
                 respuesta = self.admin_ana.get(ruta) if metodo == 'get' else self.post(self.admin_ana, ruta)

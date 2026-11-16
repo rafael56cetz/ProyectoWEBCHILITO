@@ -53,13 +53,13 @@ El menú agrupa los destinos; cada uno aparece solo con su capacidad y el servid
 | Grupo | Ruta | Capacidad | Pantalla | Archivos |
 |---|---|---|---|---|
 | Operación | `#admin/flota` | `ver_flota` | Telemetría de flota: totales, tendencias de 7 días, tabla y problemas | `FleetViews/Controller` |
-| Operación | `#admin/soporte` | `atender_soporte` | Consola remota: bandeja, atender, conectar, órdenes, resolver | `ConsoleViews/Controller` |
+| Operación | `#admin/soporte` (y `/<folio>`) | `atender_soporte` | Consola remota: bandeja y una pantalla por caso; atender, conectar (se retoma al volver), órdenes del caso, resolver | `ConsoleViews/Controller` |
 | Operación | `#admin/mantenimientos` | `gestionar_mantenimientos` | Cuidados de todos los huertos: buscar, corregir, anular | `MaintenanceViews/Controller` (`huerto.js`) |
 | Gestión | `#admin/solicitudes` | `atender_consultas` | Consultas del producto | `InquiryViews/Controller` |
 | Gestión | `#admin/equipos` (y `/<id>`) | `gestionar_dispositivos` | Inventario de equipos: alta, desvincular, rotar credencial, retirar | `EquipmentViews/Controller` |
 | Gestión | `#admin/ventas` | `gestionar_ventas` | Ventas, pagos, entregas y notas | `SalesViews/Controller` |
 | Gestión | `#admin/guias` | `gestionar_guias` | Guías de cuidado: crear, editar, publicar, retirar | `CareGuideViews/AdminController` (`huerto.js`) |
-| Legal | `#admin/legales` (y `/<id>`) | `gestionar_legales` | Textos legales: borradores, vista previa, publicar | `LegalAdminViews/Controller` |
+| Legal | `#admin/legales` (y `/<id>`) | `gestionar_legales` | Textos legales: borradores (subir .docx, pegar desde Word, autoguardado), vista previa, publicar | `LegalAdminViews/Controller` |
 | Legal | `#admin/consentimientos` | `ver_consentimientos` | Bitácora de consentimientos y exportación CSV | `ConsentViews/Controller` |
 | Super admin | `#admin/administradores` | `gestionar_administradores` | Altas y bajas de capacidades, historial y actividad | `AdminAccessViews/Controller` |
 
@@ -159,6 +159,8 @@ Todos devuelven JSON con el formato de `web/respuestas.py`. «Sesión» signific
 | `/api/admin/ventas/<venta_id>/cancelar` | POST | `gestionar_ventas` |
 | `/api/admin/legales` | GET,POST | `gestionar_legales` |
 | `/api/admin/legales/vista-previa` | POST | `gestionar_legales` |
+| `/api/admin/legales/importar` | POST (multipart, `.docx`) | `gestionar_legales` |
+| `/api/admin/legales/sanear` | POST (multipart, HTML pegado) | `gestionar_legales` |
 | `/api/admin/legales/<documento_id>` | GET | `gestionar_legales` |
 | `/api/admin/legales/<documento_id>/editar` | POST | `gestionar_legales` |
 | `/api/admin/legales/<documento_id>/eliminar` | POST | `gestionar_legales` |
@@ -168,7 +170,7 @@ Todos devuelven JSON con el formato de `web/respuestas.py`. «Sesión» signific
 | `/api/admin/consentimientos/exportar` | GET | `ver_consentimientos` |
 | `/api/admin/flota` | GET | `ver_flota` |
 | `/api/admin/soporte` | GET | `atender_soporte` |
-| `/api/admin/soporte/<caso_id>` | GET | `atender_soporte` |
+| `/api/admin/soporte/<folio>` | GET | `atender_soporte` |
 | `/api/admin/soporte/<caso_id>/atender` | POST | `atender_soporte` |
 | `/api/admin/soporte/<caso_id>/conectar` | POST | `atender_soporte` |
 | `/api/admin/soporte/<caso_id>/resolver` | POST | `atender_soporte` |

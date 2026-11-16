@@ -42,40 +42,42 @@ const FleetController = (() => {
   return {mount};
 })();
 
-// Consola remota: atender, conectar, dar órdenes y resolver. Mientras hay sesión técnica se consulta el servidor cada 10 s
-// para enterarse de una revocación; al salir de la pantalla la sesión se cierra.
+// Consola remota: la bandeja y la pantalla de cada caso (#admin/soporte/<folio>). Salir de la pantalla no cierra la sesión técnica:
+// al volver se retoma sola. Mientras hay sesión se consulta el servidor cada 10 s para enterarse de una revocación.
 const ConsoleController = (() => {
   const POLL_MS = 10000;
-  function mount({root, service = ConsoleService} = {}) {
+  // Pestaña de la bandeja a la que se vuelve desde un caso.
+  let inboxTab = 'abierto';
+  function mount({root, route, service = ConsoleService} = {}) {
     const life = new AbortController();
-    let state = {status:'loading', tab:'abierto', counts:{abierto:0, en_atencion:0, resuelto:0}, inbox:{items:[], page:1, total:0}, selectedId:null, detail:null};
+    const folio = route?.extra || '';
+    let state = {status:'loading', tab:inboxTab, counts:{abierto:0, en_atencion:0, resuelto:0}, inbox:{items:[], page:1, total:0}, detail:null};
     let serial = 0, pollSerial = 0, working = false, poller = null;
-    const paint = () => ConsoleViews.paint(root, ConsoleViews.screen(state));
     const fail = result => mostrarAviso('error', ConsoleViews.errorText(result.code));
+    const caseId = () => state.detail?.case.id || null;
     const sessionId = () => state.detail?.session?.id || null;
+    function paint() {
+      ConsoleViews.paint(root, folio ? ConsoleViews.caseScreen(state) : ConsoleViews.inboxScreen(state));
+      if(state.detail) ConsoleViews.lockOrders(root, state.detail.orders);
+    }
 
     async function loadInbox(page) {
       const result = await service.inbox(state.tab, page);
-      if(life.signal.aborted || result.status !== 'ready') return false;
-      state = {...state, status:'ready', counts:result.counts, inbox:{items:result.items, page:result.page, total:result.total}};
-      return true;
-    }
-    async function loadDetail() {
-      if(!state.selectedId) { state = {...state, detail:null}; return; }
-      const result = await service.detail(state.selectedId);
       if(life.signal.aborted) return;
-      if(result.status === 'ready') state = {...state, detail:{case:result.case, diagnostic:result.diagnostic, session:result.session}};
-      else { state = {...state, selectedId:null, detail:null}; fail(result); }
+      state = result.status === 'ready' ? {...state, status:'ready', counts:result.counts, inbox:{items:result.items, page:result.page, total:result.total}} : {...state, status:'error'};
     }
-    async function refresh({page = state.inbox.page, focus = false} = {}) {
+    async function loadCase() {
+      const result = await service.detail(folio);
+      if(life.signal.aborted) return;
+      state = result.status === 'ready' ? {...state, status:'ready', detail:{case:result.case, diagnostic:result.diagnostic, session:result.session, orders:result.orders}}
+        : {...state, status:result.code === 'not-found' || result.code === 'invalid-input' ? 'not-found' : 'error', detail:null};
+    }
+    async function refresh({page = state.inbox.page} = {}) {
       const id = ++serial;
-      const listed = await loadInbox(page);
-      if(listed) await loadDetail();
+      await (folio ? loadCase() : loadInbox(page));
       if(life.signal.aborted || id !== serial) return;
-      if(!listed) state = {...state, status:'error'};
       paint();
       if(sessionId()) startPolling(); else stopPolling();
-      if(focus) ConsoleViews.focusDetail(root);
     }
 
     function stopPolling() { clearInterval(poller); poller = null; pollSerial++; }
@@ -91,6 +93,7 @@ const ConsoleController = (() => {
       if(result.code === 'not-found') { await sessionEnded('manual'); return; }
       if(result.status !== 'ready') return;
       if(result.session.state === 'closed') { await sessionEnded(result.session.reason); return; }
+      state = {...state, detail:{...state.detail, orders:result.orders}};
       ConsoleViews.paintLive(root, result);
     }
     async function sessionEnded(reason) {
@@ -99,18 +102,12 @@ const ConsoleController = (() => {
       await refresh();
     }
 
-    async function closeSession(keepalive = false) {
-      const id = sessionId();
-      if(!id) return;
+    async function closeSession() {
       stopPolling();
-      const result = await service.endSession(id, keepalive);
-      if(!life.signal.aborted && result.status !== 'accepted' && result.code !== 'not-found') fail(result);
-    }
-    async function openCase(id) {
-      if(id === state.selectedId) return;
-      await closeSession();
-      state = {...state, selectedId:id, detail:null};
-      await refresh({focus:true});
+      const result = await service.endSession(sessionId());
+      if(life.signal.aborted) return;
+      if(result.status === 'accepted' || result.code === 'not-found') mostrarAviso('exito', 'Sesión técnica cerrada.'); else fail(result);
+      await refresh();
     }
     async function change(request, message) {
       const result = await request;
@@ -130,7 +127,7 @@ const ConsoleController = (() => {
       if(result === 'otro' && !note) { mostrarAviso('error', 'Escribe una nota cuando el resultado es «Otro».'); return; }
       if(!await confirmar(ConsoleViews.confirmations.resolve)) return;
       stopPolling();
-      await change(service.resolve(state.selectedId, result, note), 'Caso resuelto. El acceso de la persona terminó.');
+      await change(service.resolve(caseId(), result, note), 'Caso resuelto. El acceso de la persona terminó.');
     }
 
     root.addEventListener('click', async event => {
@@ -139,15 +136,18 @@ const ConsoleController = (() => {
       const {adminAction: action, tab, page, type} = trigger.dataset;
       working = true;
       try {
-        if(action === 'tab') { await closeSession(); state = {...state, tab, selectedId:null, detail:null}; await refresh({page:1}); }
+        if(action === 'tab') { state = {...state, tab}; inboxTab = tab; await refresh({page:1}); }
         else if(action === 'page') await refresh({page:Number(page)});
         else if(action === 'refresh') await refresh();
-        else if(action === 'open-case') await openCase(trigger.dataset.case);
-        else if(action === 'attend') await change(service.attend(state.selectedId), 'El caso quedó a tu nombre.');
-        else if(action === 'connect') await change(service.connect(state.selectedId), 'Sesión técnica abierta.');
+        else if(action === 'open-case') location.hash = `#admin/soporte/${trigger.dataset.folio}`;
+        else if(action === 'attend') await change(service.attend(caseId()), 'El caso quedó a tu nombre.');
+        else if(action === 'connect') await change(service.connect(caseId()), 'Sesión técnica abierta.');
         else if(action === 'order') await order({type}, type === 'reiniciar' ? ConsoleViews.confirmations.reboot : null);
-        else if(action === 'close-session') { await closeSession(); mostrarAviso('exito', 'Sesión técnica cerrada.'); await refresh(); }
+        else if(action === 'close-session') await closeSession();
       } finally { working = false; }
+    }, {signal:life.signal});
+    root.addEventListener('change', event => {
+      if(event.target.name === 'plant' && state.detail) ConsoleViews.lockOrders(root, state.detail.orders);
     }, {signal:life.signal});
     root.addEventListener('submit', async event => {
       event.preventDefault();
@@ -163,13 +163,7 @@ const ConsoleController = (() => {
     }, {signal:life.signal});
     document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !working) pollOnce(); }, {signal:life.signal});
     refresh({page:1});
-    return {dispose() {
-      serial++; stopPolling();
-      const id = sessionId();
-      // keepalive: el cierre sale aunque la pestaña se esté cerrando.
-      if(id) service.endSession(id, true);
-      life.abort();
-    }};
+    return {dispose() { serial++; stopPolling(); life.abort(); }};
   }
   return {mount};
 })();
@@ -425,34 +419,83 @@ const AdminAccessController = (() => {
 })();
 
 // ── Legales ──
-// Textos legales: lista por tipo y editor. El HTML que se muestra lo devuelve el servidor ya saneado.
+// Textos legales: lista por tipo y editor. El HTML que se muestra lo devuelve el servidor ya saneado, también el de un .docx
+// subido o el de lo pegado desde Word. El borrador se guarda solo cada 10 s si cambió, para no perder trabajo si la sesión vence.
 const LegalAdminController = (() => {
-  const NEW_PREFIX = 'nuevo-';
+  const NEW_PREFIX = 'nuevo-', AUTOSAVE_MS = 10000;
   function mount({root, route, service = LegalAdminService}) {
     const life = new AbortController();
-    const creating = route.extra?.startsWith(NEW_PREFIX), documentId = creating ? '' : route.extra || '';
+    let creating = route.extra?.startsWith(NEW_PREFIX), documentId = creating ? '' : route.extra || '';
     const newType = creating && service.TYPES.includes(route.extra.slice(NEW_PREFIX.length)) ? route.extra.slice(NEW_PREFIX.length) : 'terminos';
     let state = {status:'loading', type:'terminos', data:null, document:null, preview:null};
-    let serial = 0, working = false;
+    let serial = 0, working = false, autosave = null, lastSaved = '';
     const paint = () => AdminTableViews.paint(root, route.extra ? LegalAdminViews.editorScreen({...state, type:newType}) : LegalAdminViews.listScreen(state));
     const fail = result => mostrarAviso('error', LegalAdminViews.errorText(result.code));
+    const editorForm = () => root.querySelector('[data-admin-form="legal"]');
     async function load() {
       const id = ++serial;
       const result = await (route.extra ? (creating ? Promise.resolve({status:'ready', document:null}) : service.detail(documentId)) : service.byType(state.type));
       if(life.signal.aborted || id !== serial) return;
       state = result.status !== 'ready' ? {...state, status:'error'} : route.extra ? {...state, status:'ready', document:result.document} : {...state, status:'ready', data:result};
       paint();
+      if(route.extra && state.status === 'ready' && state.document?.state !== 'publicada') startAutosave();
     }
     const fields = form => ({version:form.elements.version.value.trim(), title:form.elements.title.value.trim(), content:form.elements.content.value});
-    async function save(form) {
-      const values = fields(form);
+    async function persist(values) {
       const result = await (creating ? service.create({type:newType, ...values}) : service.edit(documentId, {expectedAt:state.document.updatedAt, ...values}));
+      if(!life.signal.aborted && result.status === 'accepted') { state = {...state, document:result.document}; lastSaved = JSON.stringify(values); }
+      return result;
+    }
+    async function save(form) {
+      const result = await persist(fields(form));
       if(life.signal.aborted) return null;
       if(result.status !== 'accepted') { fail(result); return null; }
       if(creating) { location.hash = `#admin/legales/${result.document.id}`; return result.document; }
-      state = {...state, document:result.document};
       LegalAdminViews.showPreview(root, result.document.html);
       return result.document;
+    }
+
+    function startAutosave() {
+      clearInterval(autosave);
+      lastSaved = JSON.stringify(fields(editorForm()));
+      autosave = setInterval(autosaveOnce, AUTOSAVE_MS);
+    }
+    async function autosaveOnce() {
+      const form = editorForm();
+      if(working || !form) return;
+      const values = fields(form);
+      if(JSON.stringify(values) === lastSaved || !service.VERSION.test(values.version) || !values.title || !values.content.trim()) return;
+      working = true;
+      try {
+        const wasCreating = creating, result = await persist(values);
+        if(life.signal.aborted) return;
+        if(result.status !== 'accepted') {
+          if(result.code === 'stale-record') { clearInterval(autosave); fail(result); } else LegalAdminViews.saved(root, null);
+          return;
+        }
+        // Un borrador nuevo ya existe: la dirección cambia sin volver a montar el editor, para no perder el cursor.
+        if(wasCreating) { creating = false; documentId = result.document.id; history.replaceState(null, '', `#admin/legales/${documentId}`); }
+        LegalAdminViews.saved(root, new Date());
+        LegalAdminViews.showPreview(root, result.document.html);
+      } finally { working = false; }
+    }
+
+    async function importDocx(file) {
+      const problem = service.fileProblem(file);
+      if(problem) { fail({code:problem}); return; }
+      if(editorForm().elements.content.value.trim() && !await confirmar(LegalAdminViews.confirmations.replace)) return;
+      const result = await service.importDocx(file);
+      if(life.signal.aborted) return;
+      if(result.status !== 'ready') { fail(result); return; }
+      LegalAdminViews.replaceContent(root, result.html);
+      LegalAdminViews.showPreview(root, result.html);
+      mostrarAviso('exito', 'Documento convertido. Revisa la vista previa antes de guardar.');
+    }
+    async function paste(area, html) {
+      const start = area.selectionStart, end = area.selectionEnd;
+      const result = await service.sanitize(html);
+      if(life.signal.aborted) return;
+      if(result.status === 'ready') LegalAdminViews.insertText(root, result.html, start, end); else fail(result);
     }
     async function previewOf(id) {
       const result = await service.detail(id);
@@ -503,6 +546,7 @@ const LegalAdminController = (() => {
         else if(action === 'publish' && await publish(id, at, state.type, version)) await load();
         else if(action === 'remove') await remove(id, at);
         else if(action === 'tag') LegalAdminViews.insertTag(root, trigger.dataset.tag);
+        else if(action === 'upload') LegalAdminViews.chooseFile(root);
         else if(action === 'preview-editor') await previewEditor(root.querySelector('[data-admin-form="legal"]'));
         else if(action === 'publish-editor') await publishFromEditor(root.querySelector('[data-admin-form="legal"]'));
         else if(action === 'close-dialog') AdminTableViews.dismiss(root);
@@ -513,11 +557,27 @@ const LegalAdminController = (() => {
       if(working || event.target.closest('[data-admin-form]')?.dataset.adminForm !== 'legal') return;
       working = true;
       try {
-        if(await save(event.target) && !creating) mostrarAviso('exito', 'Borrador guardado.');
+        const wasCreating = creating;
+        if(await save(event.target) && !wasCreating) mostrarAviso('exito', 'Borrador guardado.');
       } finally { working = false; }
     }, {signal:life.signal});
+    root.addEventListener('change', async event => {
+      const file = event.target.matches('[data-legal-file]') ? event.target.files[0] : null;
+      if(!file || working) return;
+      working = true;
+      try { await importDocx(file); } finally { working = false; }
+    }, {signal:life.signal});
+    // Pegar desde Word: el HTML del portapapeles nunca entra tal cual; lo sanea el servidor. Sin HTML, el pegado es el normal.
+    root.addEventListener('paste', async event => {
+      const area = event.target.closest('[name=content]');
+      if(!area || area.readOnly || !event.clipboardData?.types.includes('text/html')) return;
+      event.preventDefault();
+      if(working) return;
+      working = true;
+      try { await paste(area, event.clipboardData.getData('text/html')); } finally { working = false; }
+    }, {signal:life.signal});
     load();
-    return {redraw() {}, dispose() { serial++; life.abort(); }};
+    return {redraw() {}, dispose() { serial++; clearInterval(autosave); life.abort(); }};
   }
   return {mount};
 })();
@@ -635,7 +695,7 @@ const AppController = (() => {
       clearTimeout(loadingTimer);
       view.pageBusy(false);
       if(route.screen==='admin') {
-        const screens = {flota:() => FleetController.mount({root:page}), soporte:() => ConsoleController.mount({root:page}), mantenimientos:() => MaintenanceController.mount({root:page}), solicitudes:() => InquiryController.mount({root:page}), guias:() => CareGuideAdminController.mount({root:page}),
+        const screens = {flota:() => FleetController.mount({root:page}), soporte:() => ConsoleController.mount({root:page,route}), mantenimientos:() => MaintenanceController.mount({root:page}), solicitudes:() => InquiryController.mount({root:page}), guias:() => CareGuideAdminController.mount({root:page}),
           equipos:() => EquipmentController.mount({root:page,route}), ventas:() => SalesController.mount({root:page}), legales:() => LegalAdminController.mount({root:page,route}),
           consentimientos:() => ConsentController.mount({root:page}), administradores:() => AdminAccessController.mount({root:page})};
         adminPanel = screens[route.detail]();

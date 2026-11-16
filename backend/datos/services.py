@@ -205,6 +205,12 @@ def _orden_de_soporte_dto(comando):
             'state': comando.estado, 'createdAt': _fecha(comando.creado_en), 'error': comando.detalle_error or None}
 
 
+def _ordenes_del_caso(caso):
+    """Todas las órdenes de soporte del caso, de cualquier sesión: al volver a la pantalla se ve lo que sigue en curso."""
+    ordenes = Comando.objects.filter(sesion__caso_id=caso.pk, origen='soporte').order_by('-creado_en')[:MAXIMO_LISTA_SESION]
+    return [_orden_de_soporte_dto(orden) for orden in ordenes]
+
+
 def _revision_dto(revision):
     return {'component': revision.componente, 'result': revision.resultado, 'detail': revision.detalle or None}
 
@@ -222,12 +228,11 @@ def soporte(actor, huerto_id):
     huerto = huerto_propio(actor, huerto_id)
     casos = list(SoporteCaso.objects.filter(huerto_id=huerto.pk, solicitante_id=actor.pk).order_by('-creado_en')[:HISTORIAL_CASOS + 1])
     activo = next((caso for caso in casos if caso.estado in CASOS_ACTIVOS), None)
-    ordenes = (Comando.objects.filter(sesion__caso_id=activo.pk, origen='soporte').order_by('-creado_en')[:50] if activo else [])
     ultimo = Autodiagnostico.objects.filter(huerto_id=huerto.pk, solicitado_por_id=actor.pk).order_by('-iniciado_en').first()
     return {'status': 'ready', 'hasDevice': Dispositivo.objects.filter(huerto_id=huerto.pk).exists(),
             'active': _caso_dto(activo) if activo else None,
             'history': [_caso_dto(caso) for caso in casos if caso is not activo][:HISTORIAL_CASOS],
-            'orders': [_orden_de_soporte_dto(orden) for orden in ordenes],
+            'orders': _ordenes_del_caso(activo) if activo else [],
             'lastDiagnostic': autodiagnostico_dto(ultimo) if ultimo else None}
 
 
@@ -365,13 +370,15 @@ def _sesion_dto(sesion):
     return {'id': str(sesion.pk), 'startedAt': _fecha(sesion.iniciada_en)}
 
 
-def detalle_soporte(actor, caso_id):
+def detalle_soporte(actor, folio):
     admin = require_cap(actor, CAPACIDAD_SOPORTE)
-    caso = _caso_de_soporte(caso_id)
+    caso = _casos_admin().filter(folio=folio).first()
+    if caso is None:
+        raise Http404
     sesion = _sesion_abierta_del_caso(admin, caso)
     adjunto = Autodiagnostico.objects.filter(pk=caso.autodiagnostico_id).first() if caso.autodiagnostico_id else None
     return {'status': 'ready', 'case': _caso_admin_dto(caso, admin), 'diagnostic': autodiagnostico_dto(adjunto) if adjunto else None,
-            'session': _sesion_dto(sesion) if sesion else None}
+            'session': _sesion_dto(sesion) if sesion else None, 'orders': _ordenes_del_caso(caso)}
 
 
 @transaction.atomic
@@ -391,11 +398,11 @@ def conectar_caso(actor, caso_id):
     admin = require_cap(actor, CAPACIDAD_SOPORTE)
     caso = _caso_de_soporte(caso_id, bloquear=True)
     _caso_propio_en_atencion(admin, caso)
+    if _autorizacion(caso) != 'vigente':
+        raise ReglaDeNegocio('autorizacion-no-vigente', 'La persona ya no autoriza el acceso o la autorización venció.')
     existente = _sesion_abierta_del_caso(admin, caso)
     if existente:
         return {'status': 'accepted', 'session': _sesion_dto(existente)}
-    if _autorizacion(caso) != 'vigente':
-        raise ReglaDeNegocio('autorizacion-no-vigente', 'La persona ya no autoriza el acceso o la autorización venció.')
     if SoporteSesion.objects.filter(administrador_id=admin.pk, cerrada_en__isnull=True).exists():
         raise ReglaDeNegocio('sesion-abierta', 'Ya tienes una sesión técnica abierta en otro caso. Ciérrala antes de conectarte.')
     sesion = SoporteSesion.objects.create(caso=caso, administrador=admin)
@@ -447,12 +454,11 @@ def estado_sesion(actor, sesion_id):
     if motivo:
         return {'status': 'ready', 'session': resumen}
     eventos = DispositivoEvento.objects.filter(dispositivo_id=caso.dispositivo_id, ocurrido_en__gte=timezone.now() - EVENTOS_DE_SESION)
-    ordenes = Comando.objects.filter(sesion_id=sesion.pk).order_by('-creado_en')[:MAXIMO_LISTA_SESION]
     diagnostico = Autodiagnostico.objects.filter(comando__sesion_id=sesion.pk).order_by('-iniciado_en').first()
     return {'status': 'ready', 'session': resumen, 'device': _equipo_de_sesion(caso), 'readings': _lecturas_actuales(caso),
             'events': [{'type': evento.tipo, 'detail': evento.detalle or None, 'at': _fecha(evento.ocurrido_en)}
                        for evento in eventos.order_by('-ocurrido_en', '-id')[:MAXIMO_LISTA_SESION]],
-            'orders': [_orden_de_soporte_dto(orden) for orden in ordenes],
+            'orders': _ordenes_del_caso(caso),
             'diagnostic': autodiagnostico_dto(diagnostico) if diagnostico else None}
 
 
@@ -493,7 +499,7 @@ def _cerrar_sesion(sesion, actor, motivo):
 def cerrar_sesion_tecnica(actor, sesion_id):
     admin = require_cap(actor, CAPACIDAD_SOPORTE)
     sesion = _sesion_propia(admin, sesion_id, bloquear=True)
-    # Cerrar una sesión que la base ya cerró (revocación) no es un error: la pantalla lo hace al salir.
+    # Cerrar una sesión que la base ya cerró (revocación) no es un error.
     if sesion.cerrada_en is None:
         _cerrar_sesion(sesion, admin, 'manual')
     return {'status': 'accepted'}

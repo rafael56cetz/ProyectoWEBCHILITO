@@ -12,18 +12,18 @@ const ConsoleService = (() => {
   const results = Object.freeze({solucionado:'Problema solucionado', sin_falla:'Sin falla detectada', sin_respuesta:'Sin respuesta de la persona usuaria', otro:'Otro (explicado en la nota)'});
   const bombSeconds = Object.freeze({min:1, max:5});
   const path = (root, id, rest = '') => AdminHTTP.validUuid(id) ? `${root}/${id}${rest}` : null;
-  const post = (url, body = {}, options = {}) => AdminHTTP.call(url, {method:'POST', body, ...options});
+  const post = (url, body = {}) => AdminHTTP.call(url, {method:'POST', body});
   return Object.freeze({
     results, bombSeconds,
     inbox: (state, page) => AdminHTTP.call(cases + AdminHTTP.query({estado:state, page})),
-    detail: id => AdminHTTP.call(path(cases, id)),
+    detail: folio => AdminHTTP.call(/^CS-[0-9A-F]{8}$/.test(folio) ? `${cases}/${folio}` : null),
     attend: id => post(path(cases, id, '/atender')),
     connect: id => post(path(cases, id, '/conectar')),
     resolve: (id, result, note) => post(path(cases, id, '/resolver'), {result, note}),
     // El sondeo no cuenta como actividad: la consola abierta sin tocarla no mantiene viva la sesión de la cuenta.
     session: (id, signal) => AdminHTTP.call(path(sessions, id), {signal, headers:{'X-Chilito-Sondeo':'1'}}),
     order: (id, body) => post(path(sessions, id, '/accion'), body),
-    endSession: (id, keepalive = false) => post(path(sessions, id, '/cerrar'), {}, {keepalive})
+    endSession: id => post(path(sessions, id, '/cerrar'))
   });
 })();
 
@@ -83,10 +83,10 @@ const AdminHTTP = (() => {
   const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
   const validUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
   const query = values => { const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== '' && value != null)); return params.size ? `?${params}` : ''; };
-  async function call(path, {method = 'GET', body, signal, headers, keepalive} = {}) {
+  async function call(path, {method = 'GET', body, signal, headers} = {}) {
     if(!path) return {status:'error', code:'invalid-input'};
     try {
-      const response = await ChilitoHTTP.request(path, {method, body, signal, headers, keepalive});
+      const response = await ChilitoHTTP.request(path, {method, body, signal, headers});
       if(response.http === 401) { ChilitoHTTP.sessionExpired(); return {status:'error', code:'unauthenticated'}; }
       return response.http === 200 ? response.body : {status:'error', code:response.body?.code || 'unavailable'};
     } catch { return {status:'error', code:'network'}; }
@@ -139,8 +139,16 @@ const AdminAccessService = (() => {
 const LegalAdminService = (() => {
   const base = '/api/admin/legales';
   const document = (id, rest = '') => AdminHTTP.validUuid(id) ? `${base}/${id}${rest}` : null;
+  const MAX_FILE = 2 * 1024 * 1024;
+  const upload = (rest, field, value, name) => { const form = new FormData(); form.append(field, value, name); return AdminHTTP.call(base + rest, {method:'POST', body:form}); };
   return Object.freeze({
     TYPES: ['terminos', 'aviso_privacidad', 'politica_cookies'],
+    VERSION: /^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?$/,
+    // Solo ayuda a la persona: el servidor vuelve a revisar extensión, firma y tamaño.
+    fileProblem: file => !/\.docx$/i.test(file.name) ? 'documento-no-docx' : file.size > MAX_FILE ? 'documento-grande' : null,
+    importDocx: file => upload('/importar', 'documento', file, file.name),
+    // El HTML del portapapeles viaja como archivo: puede pesar más que el límite de una petición JSON.
+    sanitize: html => upload('/sanear', 'html', new Blob([html], {type:'text/html'}), 'pegado.html'),
     byType: type => AdminHTTP.call(base + AdminHTTP.query({tipo:type})),
     detail: id => AdminHTTP.call(document(id)),
     create: values => AdminHTTP.call(base, {method:'POST', body:values}),

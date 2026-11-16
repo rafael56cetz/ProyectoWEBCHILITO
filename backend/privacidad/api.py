@@ -142,6 +142,16 @@ def admin_legal_preview(request, data):
     return legales.vista_previa(request.user, data.get('content'))
 
 
+@endpoint(('POST',), cap='gestionar_legales', archivo='documento')
+def admin_legal_import(request, archivo):
+    return legales.importar_docx(request.user, archivo)
+
+
+@endpoint(('POST',), cap='gestionar_legales', archivo='html')
+def admin_legal_sanitize(request, archivo):
+    return legales.sanear_pegado(request.user, archivo)
+
+
 @endpoint(('POST',), ('expectedAt', 'version', 'title', 'content'), cap='gestionar_legales')
 def admin_legal_edit(request, data, documento_id):
     return legales.editar(request.user, documento_id, data.get('expectedAt'), data.get('version'), data.get('title'), data.get('content'))

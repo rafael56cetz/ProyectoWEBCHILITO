@@ -64,6 +64,12 @@
   /* Medidas de componentes del panel */
   --kpi-alto:96px;--fila-alto:48px;--campo-alto:46px;--filtro-ancho-min:160px;
   --barra-alto:64px;--contenido-max:1280px;--menu-ancho:268px;--menu-ancho-total:300px;
+
+  /* Textos legales: la página pública y la vista previa del editor usan la misma tipografía de lectura. */
+  --legal-tinta:#26231f;--legal-titulo:#13261b;--legal-enlace:#2f6a48;--legal-linea:rgba(70,40,20,.16);
+  --legal-cita:rgba(47,106,72,.45);--legal-cabecera:rgba(47,106,72,.08);
+  --legal-h2:clamp(21px,1.8vw,24px);--legal-h3:19px;--legal-h4:17px;--legal-tabla:.94em;
+  --legal-parrafo:18px;--legal-h2-arriba:44px;--legal-h3-arriba:32px;--legal-sangria:1.4em;
 }
 
 .hero,.auth-visual,.functions-section {

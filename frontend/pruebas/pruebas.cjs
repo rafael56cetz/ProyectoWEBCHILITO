@@ -99,6 +99,8 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   context.editorState = {status:'ready', type:'terminos', document:{...draft, content:'<p>' + context.bad + '</p>', html:'<p>servidor</p>'}};
   const editor = run('LegalAdminViews.editorScreen(editorState)');
   assert.ok(editor.includes('&lt;img src=x') && !editor.includes('<img src=x') && editor.includes('<p>servidor</p>'), 'el contenido va escapado en el editor; la vista previa es el HTML del servidor');
+  assert.ok(editor.includes('data-admin-action="upload"') && editor.includes('data-legal-file') && editor.includes('accept=".docx') && editor.includes('maxlength="200000"') && editor.includes('data-legal-saved'));
+  assert.ok(/data-admin-action="publish-editor" hidden/.test(run("LegalAdminViews.editorScreen({status:'ready', type:'terminos', document:null})")), 'un borrador nuevo se publica cuando ya existe');
   assert.ok(run('LegalAdminViews.confirmations.publish("politica_cookies", "2.0").texto').includes('volver a decidir sobre cookies'));
   assert.ok(!run('LegalAdminViews.editorScreen({...editorState, document:{...editorState.document, state:"publicada", publishedAt:"2026-11-08T11:00:00Z"}})').includes('Guardar borrador'));
   context.consentState = {status:'ready', summary:{terms:{version:'1.1', accepted:3, accounts:5}, privacy:{version:'1.1', accepted:3, accounts:5}, statistics:{browsers:2, accepted:1, percent:50}}, filters:{}, exportUrl:'/api/admin/consentimientos/exportar', exportLimit:50000,
@@ -140,26 +142,48 @@ suite('flota, consola remota y mantenimientos', async () => {
   // Consola: sin token ni pines; cada paso solo aparece para quien corresponde.
   const caso = {id:'11111111-1111-4111-8111-111111111111', folio:'CS-1A2B3C4D', incident:'bomba', state:'abierto', createdAt:'2026-11-14T10:00:00Z', person:context.bad, email:'ana@b.test', garden:context.bad, device:'ESP32-1',
     note:context.bad, authorization:'vigente', authorizedUntil:new Date(Date.now() + 5 * 3600000).toISOString(), revokedAt:null, attendedBy:null, mine:false, result:null, resolutionNote:null, closedAt:null};
-  const consoleState = (over, session = null) => { context.consoleState = {status:'ready', tab:'abierto', counts:{abierto:1, en_atencion:1, resuelto:0}, inbox:{items:[caso], page:1, total:1}, selectedId:caso.id,
-    detail:{case:{...caso, ...over}, diagnostic:null, session}}; return run('ConsoleViews.screen(consoleState)'); };
+  // La bandeja y cada caso son pantallas aparte: la bandeja no muestra detalle y el caso no muestra la bandeja.
+  context.inboxState = {status:'ready', tab:'abierto', counts:{abierto:1, en_atencion:1, resuelto:0}, inbox:{items:[caso], page:1, total:1}, detail:null};
+  const bandeja = run('ConsoleViews.inboxScreen(inboxState)');
+  assert.ok(!bandeja.includes('<img src=x') && bandeja.includes('Nuevos (1)') && bandeja.includes('data-folio="CS-1A2B3C4D"') && bandeja.includes('Página 1 de 1') && !bandeja.includes('data-admin-action="attend"'));
+  const consoleState = (over, session = null, orders = []) => { context.consoleState = {status:'ready', detail:{case:{...caso, ...over}, diagnostic:null, session, orders}};
+    return run('ConsoleViews.caseScreen(consoleState)'); };
   const nuevo = consoleState({});
-  assert.ok(!nuevo.includes('<img src=x') && nuevo.includes('Nuevos (1)') && nuevo.includes('data-admin-action="attend"') && !nuevo.includes('data-admin-action="connect"') && nuevo.includes('Página 1 de 1'));
+  assert.ok(!nuevo.includes('<img src=x') && nuevo.includes('href="#admin/soporte"') && nuevo.includes('Volver a la bandeja') && nuevo.includes('data-admin-action="attend"')
+    && !nuevo.includes('data-admin-action="connect"') && !nuevo.includes('console-item') && !nuevo.includes('Nuevos (1)'));
+  assert.ok(run("ConsoleViews.caseScreen({status:'not-found'})").includes('Este caso no existe'));
   assert.ok(!/token|GPIO|pin/i.test(nuevo.replace(/spinner|pinned/gi, '')), 'la consola no habla de token ni de pines');
   const ajeno = consoleState({state:'en_atencion', attendedBy:'otra@b.test'});
   assert.ok(ajeno.includes('Lo atiende otra@b.test') && !ajeno.includes('data-admin-action="connect"') && !ajeno.includes('data-admin-form="resolve"'));
   const mio = consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true});
-  assert.ok(mio.includes('data-admin-action="connect"') && mio.includes('data-admin-form="resolve"') && !mio.includes('data-console-live'));
+  assert.ok(mio.includes('data-admin-action="connect"') && mio.includes('data-admin-form="resolve"') && !mio.includes('data-console-live') && mio.includes('Órdenes del caso'));
+  // Sin sesión abierta, las órdenes del caso se siguen viendo con su estado.
+  const pendiente = {id:'o1', type:'reiniciar', plant:null, duration:null, state:'pendiente', createdAt:'2026-11-14T10:00:00Z', error:null};
+  assert.ok(consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true}, null, [pendiente]).includes('Pendiente'));
   assert.ok(consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true, authorization:'revocada'}).includes('data-admin-action="connect" disabled'));
   const conectado = consoleState({state:'en_atencion', attendedBy:'yo@b.test', mine:true}, {id:'22222222-2222-4222-8222-222222222222', startedAt:new Date().toISOString()});
   assert.ok(conectado.includes('Cerrar sesión técnica') && conectado.includes('data-type="reiniciar"') && conectado.includes('Probar bomba') && !conectado.includes('data-admin-action="connect"'));
   const huecos = {}; for(const name of ['live', 'orders', 'events']) huecos[`[data-console-${name}]`] = {innerHTML:''};
-  context.rootFalso = {querySelector: selector => huecos[selector] || null};
+  // Botones de orden falsos: una orden igual en curso bloquea el suyo y el aviso dice por qué.
+  const botones = ['reiniciar', 'lectura_inmediata'].map(type => ({dataset:{type}, disabled:false, textContent:type === 'reiniciar' ? 'Reiniciar equipo' : 'Pedir lectura'}));
+  const enviar = {disabled:false}, bomba = {elements:{plant:{value:'2'}}, querySelector:() => enviar};
+  huecos['[data-admin-form="pump"]'] = bomba; huecos['[data-console-busy]'] = {hidden:true, textContent:''};
+  context.rootFalso = {querySelector: selector => huecos[selector] || null, querySelectorAll: () => botones};
   context.vivo = {session:{state:'open'}, device:{connection:'en_linea', lastConnectionAt:'2026-11-14T10:00:00Z', lastReadingAt:new Date().toISOString(), firmware:'1.0.3'},
     readings:{measuredAt:'2026-11-14T10:00:00Z', temperature:29.5, airHumidity:71, light:null, tankHasWater:true, plants:[{number:1, moisture:41, adc:2710}]},
     events:[{type:'conectado', detail:context.bad, at:'2026-11-14T09:00:00Z'}], orders:[{id:'o', type:'probar_bomba', plant:2, duration:3, state:'enviado', createdAt:'2026-11-14T10:00:00Z', error:null}], diagnostic:null};
   run('ConsoleViews.paintLive(rootFalso, vivo)');
   assert.ok(huecos['[data-console-live]'].innerHTML.includes('Sin lectura') && huecos['[data-console-live]'].innerHTML.includes('ADC 2710') && huecos['[data-console-live]'].innerHTML.includes('Con agua'));
   assert.ok(huecos['[data-console-orders]'].innerHTML.includes('Prueba de bomba · planta 2 · 3 s') && !huecos['[data-console-events]'].innerHTML.includes('<img src=x'));
+  assert.deepEqual([botones[0].disabled, botones[1].disabled, enviar.disabled], [false, false, true]);
+  assert.ok(!huecos['[data-console-busy]'].hidden && huecos['[data-console-busy]'].textContent.includes('Probar bomba · planta 2') && huecos['[data-console-busy]'].textContent.includes('Espera'));
+  bomba.elements.plant.value = '1';
+  context.ordenes = [pendiente, {...pendiente, id:'o2', type:'lectura_inmediata', state:'confirmado'}];
+  run('ConsoleViews.lockOrders(rootFalso, ordenes)');
+  assert.deepEqual([botones[0].disabled, botones[1].disabled, enviar.disabled], [true, false, false]);
+  assert.ok(huecos['[data-console-busy]'].textContent.includes('Reiniciar equipo'));
+  run('ConsoleViews.lockOrders(rootFalso, [])');
+  assert.ok(huecos['[data-console-busy]'].hidden);
   assert.equal(run('ConsoleViews.closingText("revocada")'), 'La persona revocó el acceso. La sesión se cerró.');
   assert.match(run('ConsoleViews.confirmations.reboot.texto'), /unos segundos/);
   assert.match(run('ConsoleViews.confirmations.pump(2, 3).titulo'), /planta 2/);
@@ -244,7 +268,7 @@ suite('fechas', async () => {
 // ── Contrato de los adaptadores: rechazos del servidor, CSRF, idempotencia, contraseñas ───────
 suite('contrato de adaptadores', async () => {
   const context = vm.createContext({console, crypto:webcrypto, structuredClone, DOMException, AbortController, AbortSignal, Date, Map, Set, Object, Array, JSON, Number, String, RegExp, Error, encodeURIComponent, decodeURIComponent,
-    URLSearchParams, document:{cookie:'csrftoken=test-csrf'}, window:{dispatchEvent() {}}, Event, fetch:null});
+    URLSearchParams, FormData, Blob, document:{cookie:'csrftoken=test-csrf'}, window:{dispatchEvent() {}}, Event, fetch:null});
   const calls = []; let respond;
   context.fetch = async (path, options) => { calls.push({path, options}); return respond(path, options); };
   cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/huerto.js', 'modelos/administracion.js');
@@ -257,9 +281,10 @@ suite('contrato de adaptadores', async () => {
   let n = 0; respond = () => { if(n++ === 0) throw new Error('network'); return reply(200, {status:'accepted'}); };
   await evaluate("GardenService.care('1',{type:'cosecha',plant:1})"); await evaluate("GardenService.care('1',{type:'cosecha',plant:1})");
   assert.equal(calls.at(-2).options.headers['Idempotency-Key'], calls.at(-1).options.headers['Idempotency-Key']);
-  // Consola remota: no hay token. Las rutas llevan un UUID y, con otra cosa, no se hace ninguna llamada.
+  // Consola remota: no hay token. Las rutas llevan un UUID (el detalle, el folio) y, con otra cosa, no se hace ninguna llamada.
   const caso = '00000000-0000-4000-8000-000000000001', before = calls.length;
   assert.equal((await evaluate("ConsoleService.connect('no-es-uuid')")).code, 'invalid-input'); assert.equal(calls.length, before);
+  assert.equal((await evaluate("ConsoleService.detail('cs-1a2b3c4d')")).code, 'invalid-input'); assert.equal(calls.length, before);
   respond = () => reply(200, {status:'accepted'});
   await evaluate(`ConsoleService.connect('${caso}')`);
   assert.equal(calls.at(-1).path, `/api/admin/soporte/${caso}/conectar`); assert.equal(calls.at(-1).options.method, 'POST');
@@ -267,9 +292,22 @@ suite('contrato de adaptadores', async () => {
   assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}`); assert.equal(calls.at(-1).options.headers['X-Chilito-Sondeo'], '1');
   await evaluate(`ConsoleService.order('${caso}', {type:'probar_bomba', plant:1, duration:3})`);
   assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/accion`); assert.deepEqual(JSON.parse(calls.at(-1).options.body), {type:'probar_bomba', plant:1, duration:3});
-  await evaluate(`ConsoleService.endSession('${caso}', true)`);
-  assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/cerrar`); assert.equal(calls.at(-1).options.keepalive, true);
+  await evaluate("ConsoleService.detail('CS-1A2B3C4D')");
+  assert.equal(calls.at(-1).path, '/api/admin/soporte/CS-1A2B3C4D');
+  await evaluate(`ConsoleService.endSession('${caso}')`);
+  assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/cerrar`); assert.equal(calls.at(-1).options.keepalive, undefined);
   assert.equal(evaluate("typeof AdminService"), 'undefined');
+  // Textos legales: el .docx y lo pegado viajan como formulario con archivo, sin JSON ni recibo de idempotencia.
+  respond = () => reply(200, {status:'ready', html:'<p>x</p>'});
+  await evaluate("LegalAdminService.sanitize('<p onclick=x>hola</p>')");
+  const pegado = calls.at(-1);
+  assert.equal(pegado.path, '/api/admin/legales/sanear'); assert.ok(pegado.options.body instanceof FormData);
+  assert.equal(pegado.options.headers['Content-Type'], undefined); assert.equal(pegado.options.headers['Idempotency-Key'], undefined);
+  assert.equal(await pegado.options.body.get('html').text(), '<p onclick=x>hola</p>');
+  assert.equal(pegado.options.headers['X-CSRFToken'], 'test-csrf');
+  assert.equal(evaluate("LegalAdminService.fileProblem({name:'aviso.pdf', size:10})"), 'documento-no-docx');
+  assert.equal(evaluate("LegalAdminService.fileProblem({name:'Aviso.DOCX', size:3 * 1024 * 1024})"), 'documento-grande');
+  assert.equal(evaluate("LegalAdminService.fileProblem({name:'aviso.docx', size:2 * 1024 * 1024})"), null);
   // Panel por sesión: el rol no abre nada por sí mismo, solo elige el destino que el servidor validará.
   assert.equal(evaluate("AppModel.panelHome({role:'user'})"), '#huerto');
   assert.equal(evaluate("AppModel.panelHome({role:'admin',capabilities:['ver_flota'],profile:{}})"), '#admin/flota');
@@ -596,6 +634,69 @@ suite('MVC', () => {
   assert.ok(!/allowedAdmin\(/.test(bloque('vistas/comun.js', 'Panel')), 'la vista del panel no debe consultar capacidades');
 
   console.log('PASS MVC: controladores sin escrituras al DOM (1 excepción documentada); vistas y controladores sin acceso al servidor.');
+});
+
+// ── Editor de textos legales: autoguardado, pegado y documento subido ─────────────────────────
+suite('editor legal: autoguardado cada 10 s, pegado saneado en el servidor y .docx', async () => {
+  const llamadas = {created:[], edited:[], sanitized:[], imported:[], inserted:[], saved:[], notices:[], replaced:[], cleared:0};
+  let tick = null, editResult = null;
+  const area = {name:'content', readOnly:false, selectionStart:2, selectionEnd:2, closest(selector) { return selector === '[name=content]' ? this : null; }};
+  const form = {elements:{version:{value:'1.2'}, title:{value:'Términos'}, content:{value:'<p>a</p>'}}};
+  const handlers = {};
+  const root = {addEventListener:(type, fn) => { handlers[type] = fn; }, querySelector:selector => selector === '[data-admin-form="legal"]' ? form : null};
+  const doc = {id:'11111111-1111-4111-8111-111111111111', type:'terminos', state:'borrador', updatedAt:'2026-11-16T10:00:00Z', html:'<p>a</p>'};
+  const service = {TYPES:['terminos'], VERSION:/^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?$/, fileProblem:file => /\.docx$/i.test(file.name) ? null : 'documento-no-docx',
+    create:async values => { llamadas.created.push(values); return {status:'accepted', document:{...doc}}; },
+    edit:async (id, values) => { llamadas.edited.push([id, values]); return editResult || {status:'accepted', document:{...doc, updatedAt:'2026-11-16T10:00:10Z'}}; },
+    sanitize:async html => { llamadas.sanitized.push(html); return {status:'ready', html:'<p>hola</p>'}; },
+    importDocx:async file => { llamadas.imported.push(file); return {status:'ready', html:'<h2>Doc</h2>'}; }};
+  const history = {replaced:[], replaceState(state, title, url) { this.replaced.push(url); }};
+  const context = vm.createContext({AbortController, JSON, Date, Promise, history, location:{hash:''},
+    setInterval:fn => { tick = fn; return 7; }, clearInterval:() => { llamadas.cleared += 1; },
+    mostrarAviso:(type, text) => llamadas.notices.push([type, text]), confirmar:async () => true,
+    AdminTableViews:{paint() {}}, LegalAdminService:service,
+    LegalAdminViews:{editorScreen:() => '', listScreen:() => '', errorText:code => code, showPreview() {}, insertTag() {},
+      insertText:(r, text, start, end) => llamadas.inserted.push([text, start, end]), replaceContent:(r, text) => llamadas.replaced.push(text),
+      saved:(r, at) => llamadas.saved.push(at), chooseFile() {}, confirmations:{replace:{}}}});
+  vm.runInContext(bloque('controladores/administracion.js', 'Legales'), context);
+  vm.runInContext('LegalAdminController', context).mount({root, route:{extra:'nuevo-terminos'}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(typeof tick, 'function', 'el editor de un borrador arranca el autoguardado');
+  await tick();
+  assert.equal(llamadas.created.length, 0, 'sin cambios no guarda');
+  form.elements.version.value = 'abc'; form.elements.content.value = '<p>b</p>';
+  await tick();
+  assert.equal(llamadas.created.length, 0, 'un borrador nuevo sin versión válida no se crea solo');
+  form.elements.version.value = '1.2';
+  await tick();
+  assert.deepEqual(JSON.parse(JSON.stringify(llamadas.created)), [{type:'terminos', version:'1.2', title:'Términos', content:'<p>b</p>'}]);
+  assert.deepEqual(history.replaced, [`#admin/legales/${doc.id}`]);
+  assert.ok(llamadas.saved.at(-1) instanceof Date);
+  await tick();
+  assert.equal(llamadas.edited.length, 0, 'lo ya guardado no se vuelve a enviar');
+  form.elements.content.value = '<p>c</p>';
+  await tick();
+  assert.equal(llamadas.edited.length, 1); assert.equal(llamadas.edited[0][0], doc.id); assert.equal(llamadas.edited[0][1].expectedAt, doc.updatedAt);
+  editResult = {status:'error', code:'stale-record'};
+  form.elements.content.value = '<p>d</p>';
+  const antes = llamadas.cleared;
+  await tick();
+  assert.equal(llamadas.cleared, antes + 1, 'si otra persona cambió el borrador, el autoguardado se detiene');
+  assert.deepEqual(llamadas.notices.at(-1), ['error', 'stale-record']);
+  // Pegar HTML: se cancela el pegado nativo y entra el resultado del servidor, nunca el HTML del portapapeles.
+  let prevented = 0;
+  const sucio = '<p onclick="x()">hola</p><script>alert(1)</script>';
+  await handlers.paste({target:area, preventDefault:() => { prevented += 1; }, clipboardData:{types:['text/plain', 'text/html'], getData:() => sucio}});
+  assert.equal(prevented, 1); assert.deepEqual(llamadas.sanitized, [sucio]); assert.deepEqual(llamadas.inserted, [['<p>hola</p>', 2, 2]]);
+  await handlers.paste({target:area, preventDefault:() => { prevented += 1; }, clipboardData:{types:['text/plain'], getData:() => 'texto'}});
+  assert.equal(prevented, 1, 'sin HTML el pegado es el normal');
+  // Documento: un archivo que no es .docx no sale del navegador; uno válido reemplaza el contenido con el HTML del servidor.
+  const input = files => ({matches:selector => selector === '[data-legal-file]', files});
+  await handlers.change({target:input([{name:'aviso.pdf', size:10}])});
+  assert.equal(llamadas.imported.length, 0); assert.deepEqual(llamadas.notices.at(-1), ['error', 'documento-no-docx']);
+  await handlers.change({target:input([{name:'aviso.docx', size:10}])});
+  assert.equal(llamadas.imported.length, 1); assert.deepEqual(llamadas.replaced, ['<h2>Doc</h2>']);
+  console.log('PASS editor legal: autoguardado cada 10 s, pegado saneado en el servidor y .docx');
 });
 
 // ── Ejecución: una suite tras otra ────────────────────────────────────────────────────────────

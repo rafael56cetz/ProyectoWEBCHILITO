@@ -2,7 +2,11 @@
 avisa a las cuentas al publicar y no deja tocar una versión publicada; no sanea el contenido: eso se hace aquí, en el servidor,
 tanto para la vista previa como para lo que verá el público."""
 import hashlib
+import io
 import re
+import zipfile
+
+import mammoth
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -19,8 +23,18 @@ CAPACIDAD = 'gestionar_legales'
 TIPOS = ('terminos', 'aviso_privacidad', 'politica_cookies')
 VERSION = re.compile(r'^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?$')
 MAXIMO_TITULO = 120
-# La petición completa no puede pasar de 32 KB (DATA_UPLOAD_MAX_MEMORY_SIZE): el texto cabe con holgura en 28 000 caracteres.
-MAXIMO_CONTENIDO = 28000
+MAXIMO_CONTENIDO = 200000
+MAXIMO_ARCHIVO = 2 * 1024 * 1024
+# Un .docx es un ZIP: estos topes detienen un archivo pequeño que se descomprime en cientos de MB.
+MAXIMO_ENTRADAS = 200
+MAXIMO_DESCOMPRIMIDO = 20 * 1024 * 1024
+FIRMA_ZIP = b'PK\x03\x04'
+# Los títulos de Word pasan a h2, h3 y h4; se nombran por identificador y por nombre (Word en español conserva el nombre inglés).
+NIVELES = {1: 'h2', 2: 'h3', 3: 'h4', 4: 'h4', 5: 'h4', 6: 'h4'}
+MAPA_DE_ESTILOS = '\n'.join(
+    [f"p.Heading{n} => {h}:fresh\np[style-name='Heading {n}'] => {h}:fresh\np[style-name='heading {n}'] => {h}:fresh" for n, h in NIVELES.items()]
+    + ["p.Title => h2:fresh", "p[style-name='Title'] => h2:fresh", "p[style-name='Quote'] => blockquote > p:fresh",
+       "p[style-name='Intense Quote'] => blockquote > p:fresh", 'u => u'])
 
 
 def _fecha(valor):
@@ -83,6 +97,67 @@ def vista_previa(actor, contenido):
     if not isinstance(contenido, str) or len(contenido) > MAXIMO_CONTENIDO or '\x00' in contenido:
         raise ValidationError('Contenido no válido')
     return {'status': 'ready', 'html': sanear_html(contenido)[0]}
+
+
+def _no_docx():
+    return ReglaDeNegocio('documento-no-docx', 'Sube un documento de Word guardado como .docx.')
+
+
+def _ilegible():
+    return ReglaDeNegocio('documento-ilegible', 'No se pudo leer el documento. Ábrelo en Word y guárdalo de nuevo como .docx.')
+
+
+def _bytes_de_docx(archivo):
+    if not archivo.name.lower().endswith('.docx'):
+        raise _no_docx()
+    if archivo.size > MAXIMO_ARCHIVO:
+        raise ReglaDeNegocio('documento-grande', 'El documento pasa de 2 MB.')
+    datos = archivo.read()
+    if not datos.startswith(FIRMA_ZIP):
+        raise _no_docx()
+    try:
+        with zipfile.ZipFile(io.BytesIO(datos)) as paquete:
+            entradas = paquete.infolist()
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, ValueError, EOFError):
+        raise _ilegible() from None
+    if (len(entradas) > MAXIMO_ENTRADAS or sum(entrada.file_size for entrada in entradas) > MAXIMO_DESCOMPRIMIDO
+            or 'word/document.xml' not in {entrada.filename for entrada in entradas}):
+        raise _ilegible()
+    return datos
+
+
+def _html_dentro_del_limite(html):
+    if len(html) > MAXIMO_CONTENIDO:
+        raise ReglaDeNegocio('documento-largo', 'El texto convertido pasa de 200 000 caracteres. Divide el documento.')
+    return html
+
+
+def importar_docx(actor, archivo):
+    """Convierte un .docx a HTML saneado. El archivo no se guarda: el editor recibe el HTML y lo guarda el borrador."""
+    usuario = s.require_cap(actor, CAPACIDAD)
+    datos = _bytes_de_docx(archivo)
+    try:
+        resultado = mammoth.convert_to_html(io.BytesIO(datos), style_map=MAPA_DE_ESTILOS, include_embedded_style_map=False,
+                                            external_file_access=False, convert_image=lambda imagen: [])
+    # mammoth lee un archivo que no controlamos: cualquier fallo al interpretarlo es un documento ilegible.
+    except Exception:
+        raise _ilegible() from None
+    html = _html_dentro_del_limite(sanear_html(resultado.value)[0])
+    s.auditar(usuario, 'importar_documento_legal', entidad='documento_legal',
+              detalle={'kb': -(-len(datos) // 1024), 'avisos_conversion': len(resultado.messages)})
+    return {'status': 'ready', 'html': html}
+
+
+def sanear_pegado(actor, archivo):
+    """HTML del portapapeles saneado con la misma lista blanca. Llega como archivo para no chocar con el límite de JSON."""
+    s.require_cap(actor, CAPACIDAD)
+    if archivo.size > MAXIMO_ARCHIVO:
+        raise ReglaDeNegocio('documento-grande', 'Lo que pegaste pasa de 2 MB.')
+    try:
+        contenido = archivo.read().decode('utf-8')
+    except UnicodeDecodeError:
+        raise ValidationError('Texto no válido') from None
+    return {'status': 'ready', 'html': _html_dentro_del_limite(sanear_html(contenido)[0])}
 
 
 def _hash(contenido):
