@@ -81,6 +81,11 @@
 /* ── Zona acceso ─────────────────────────────────────────────────────────────────────────────── */
 .auth-flow {
   --text:#142419;--muted:#4a5d4e;--sage:#264d32;--focus:#264d32;
+  /* Aceptar textos nuevos: tarjetas de vidrio sobre el vidrio oscuro del acceso. */
+  --acepta-fondo:rgba(255,255,255,.07);--acepta-borde:rgba(255,255,255,.16);--acepta-filo:inset 0 1px 0 rgba(255,255,255,.12);
+  --acepta-fila:rgba(0,0,0,.16);--acepta-fila-borde:rgba(255,255,255,.12);
+  --acepta-enlace:rgba(255,255,255,.1);--acepta-enlace-hover:rgba(255,255,255,.18);--acepta-enlace-borde:rgba(255,255,255,.24);
+  --acepta-marcado:rgba(214,232,167,.12);--acepta-marcado-borde:rgba(214,232,167,.6);--acepta-suave:rgba(255,255,255,.84);
 }
 .auth-flow .btn-liquid-light { --liquid-fill:#f6f9f6; }
 .auth-layout.auth-flow { --focus:#fff; }

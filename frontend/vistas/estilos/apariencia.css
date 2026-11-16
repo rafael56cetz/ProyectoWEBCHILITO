@@ -86,6 +86,31 @@ html body .auth-layout .password-eye-btn { color:#fff!important;background:rgba(
 .auth-layout .field-error,.auth-layout .terms-field .field-error { color:#ffc4ba; }
 .auth-layout .terms-label,.auth-layout .password-tips-title { color:#fff; }
 .auth-layout .terms-label input[type=checkbox] { accent-color:#fff; }
+/* Aceptar textos nuevos: cada documento es una tarjeta con su título y «Leer documento» en la misma fila,
+   y la casilla es una fila entera que se puede tocar y se marca al aceptar. */
+.auth-layout [data-legal-form] { display:grid;gap:var(--esp-3); }
+.auth-layout [data-legal-form] .legal-card { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--esp-3);min-width:0;margin:0;padding:var(--esp-4);
+  border:1px solid var(--acepta-borde);border-radius:var(--radio-aviso);background:var(--acepta-fondo);box-shadow:var(--acepta-filo); }
+.auth-layout [data-legal-form] .legal-card legend { float:left;width:auto;min-width:0;margin:0;padding:0;color:#fff;font-size:16px;font-weight:650;line-height:1.35;overflow-wrap:anywhere; }
+.auth-layout [data-legal-form] .auth-text-link { justify-self:end;gap:6px;min-height:36px;padding:0 var(--esp-3);border:1px solid var(--acepta-enlace-borde);border-radius:var(--radio-boton);
+  background:var(--acepta-enlace);font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap;transition:background var(--duracion-corta) ease; }
+.auth-layout [data-legal-form] .auth-text-link:hover { background:var(--acepta-enlace-hover); }
+.auth-layout [data-legal-form] .auth-text-link .icon { width:16px;height:16px; }
+.auth-layout [data-legal-form] .legal-check { grid-column:1/-1;display:flex;align-items:flex-start;gap:var(--esp-3);margin:0;padding:var(--esp-3) var(--esp-4);
+  border:1px solid var(--acepta-fila-borde);border-radius:var(--radio-campo);background:var(--acepta-fila);color:var(--acepta-suave);font-size:15px;line-height:1.45;cursor:pointer;
+  transition:background var(--duracion-corta) ease,border-color var(--duracion-corta) ease; }
+.auth-layout [data-legal-form] .legal-check:has(input:checked) { border-color:var(--acepta-marcado-borde);background:var(--acepta-marcado);color:#fff; }
+.auth-layout [data-legal-form] .legal-check input { flex:0 0 20px;width:20px;height:20px;margin:1px 0 0;accent-color:var(--cookies-activo);cursor:pointer; }
+.auth-layout [data-legal-form] .legal-check input:focus-visible { outline:3px solid #fff;outline-offset:3px; }
+.auth-layout [data-legal-form] .step-actions { margin-top:var(--esp-2); }
+@media (max-width:480px) {
+  .auth-layout [data-legal-form] .legal-card { grid-template-columns:minmax(0,1fr); }
+  .auth-layout [data-legal-form] .auth-text-link { justify-self:start; }
+}
+@media (forced-colors:active) {
+  .auth-layout [data-legal-form] :is(.legal-card,.legal-check,.auth-text-link) { border-color:CanvasText;background:Canvas;color:CanvasText; }
+  .auth-layout [data-legal-form] .legal-check:has(input:checked) { outline:2px solid Highlight; }
+}
 .auth-layout .password-meter { background:rgba(255,255,255,.2); }
 .auth-layout .password-meter>span,.auth-layout .password-length.is-met .password-meter>span { background:#fff; }
 .auth-layout .password-check [data-password-check-icon] { border-color:rgba(255,255,255,.55);color:#fff; }
