@@ -3,7 +3,7 @@
 .glass-filter { position:absolute; }
 
 /* Botones sobre superficies oscuras */
-html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid) {
+html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid) {
   background:rgba(255,255,255,.05)!important;border-color:transparent!important;box-shadow:var(--lg-dark)!important;
 }
 html body .sidebar .btn-liquid-sidebar:not([aria-current]),
@@ -18,7 +18,7 @@ html body .btn-liquid-light { background:rgba(255,255,255,.72)!important;border-
 /* La refracción solo se aprecia sobre imagen o contenido en movimiento. Safari no la dibuja. */
 @supports (backdrop-filter:url(#x)) and (not (-webkit-touch-callout:none)) {
   @media (hover:hover) {
-    html body :is(.public-header .button,.home .button,.app-header .button):not(:disabled):not(.btn-liquid-brand) {
+    html body :is(.public-header .button,.home .button):not(:disabled):not(.btn-liquid-brand) {
       -webkit-backdrop-filter:url(#container-glass)!important;backdrop-filter:url(#container-glass)!important;
     }
   }
@@ -52,7 +52,7 @@ html body .btn-liquid-light { background:rgba(255,255,255,.72)!important;border-
 @keyframes letter-rise { from { transform:translateY(115%); } to { transform:none; } }
 
 @media (prefers-reduced-transparency:reduce) {
-  html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid-secondary,.btn-liquid-dark,.btn-liquid) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+  html body :is(.btn-liquid-nav,.btn-liquid-primary,.btn-liquid) { background:#24503f!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
 }
 @media (forced-colors:active) {
   html body .button { box-shadow:none!important;border:1px solid ButtonText!important; }
@@ -367,19 +367,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog.app-d
 html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog :is(h2,h3,label,span,strong) { color:var(--claro-tinta)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog p { color:var(--claro-suave)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog::backdrop { background:rgba(31,25,21,.38); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .maint-dialog-actions { display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:20px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .maint-dialog-actions [data-danger] { order:-1;margin-right:auto; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) .maint-dialog-actions [type=submit]:not([data-danger]) { order:1; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog[data-maint-dialog] { width:min(560px,calc(100vw - 32px))!important;max-width:none; }
-
-html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog[data-maint-dialog] { position:fixed; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog .maint-dialog-close {
-  position:absolute;top:14px;right:14px;display:grid;place-items:center;width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:50%;
-  color:var(--claro-tinta);background:transparent;box-shadow:none;cursor:pointer;
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog .maint-dialog-close:hover { background:rgba(31,25,21,.06); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog .maint-dialog-close .icon { width:20px;height:20px; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) dialog[data-maint-dialog] h2 { padding-right:48px; }
 
 /* Formularios de mantenimiento: cuadrícula estable en vez de filas que se parten. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-maint-create] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) auto;gap:16px;align-items:end; }

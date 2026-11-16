@@ -44,7 +44,6 @@ body[data-private=true] .metric { display:block; }
 body[data-private=true] .metric h3 { margin:0 0 12px; }
 body[data-private=true] .metric strong { display:block; }
 body[data-private=true] .metric strong small,.plant-reading strong small { font-size:.48em; margin-left:5px; }
-body[data-private=true] .reading-note { color:#4a5d4e; line-height:1.6; margin-top:16px; }
 .sensor-track span { display:block; height:100%; border-radius:inherit; background:#526d59; }
 .bento-panel { padding:28px; border:1px solid #d4dfd6; border-radius:var(--radio-tarjeta); background:#fff; box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 8px 26px -12px rgba(20,42,27,.12); }
 .bento-panel h2 { font-size:22px; margin:20px 0 12px; line-height:1.3; }
@@ -81,8 +80,7 @@ body[data-private=true] .reading-note { color:#4a5d4e; line-height:1.6; margin-t
 .notice-facts dt,.profile-facts dt { color:#4a5d4e; font-size:14px; margin-bottom:5px; }
 .notice-facts dd,.profile-facts dd { margin:0; color:#142419; font-weight:500; line-height:1.5; }
 
-.notice-detail,.account-profile,.assistant-panel { max-width:780px; }
-.assistant-panel p { font-size:18px; margin-bottom:0; }
+.notice-detail,.account-profile { max-width:780px; }
 .app-actions { display:flex; gap:12px; flex-wrap:wrap; }
 #app-feedback:not([hidden]) { padding:16px; margin-bottom:24px; border-radius:16px; background:#edf3ee; border:1px solid #819486; color:#264d32; line-height:1.6; }
 #app-feedback[role=alert] { color:#8b291f; background:#fff3f0; }
@@ -203,7 +201,7 @@ body[data-private=true] .account-session .account-logout { flex:0 0 auto;gap:10p
   .privacy-flow .bento-panel { background:#fff!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
 }
 @media(forced-colors:active) {
-  .privacy-flow :is(.bento-panel,.privacy-notice,.privacy-information,.privacy-feedback,input,select,textarea) { color:CanvasText!important; background:Canvas!important; border:1px solid CanvasText; box-shadow:none!important; }
+  .privacy-flow :is(.bento-panel,input,select,textarea) { color:CanvasText!important; background:Canvas!important; border:1px solid CanvasText; box-shadow:none!important; }
   .privacy-flow :is(p,label,dt,dd) { color:CanvasText; }
 }
 body:is([data-screen=terminos],[data-screen=privacidad],[data-screen=cookies]) {

@@ -7,8 +7,8 @@ PROJECT_ROOT=BASE_DIR.parent
 PROFILE=os.environ['CHILITO_ENV']
 SECRET_KEY=os.environ.get('CHILITO_DJANGO_KEY','')
 if len(SECRET_KEY)<32:raise ImproperlyConfigured('Suministra CHILITO_DJANGO_KEY externo de al menos 32 caracteres')
-CHILITO_SUPPORT_KEY=os.environ.get('CHILITO_SUPPORT_KEY','')
-if len(CHILITO_SUPPORT_KEY.encode())<32:raise ImproperlyConfigured('Suministra CHILITO_SUPPORT_KEY independiente de al menos 32 bytes')
+CHILITO_IDEMPOTENCIA_SECRETO=os.environ.get('CHILITO_IDEMPOTENCIA_SECRETO','')
+if len(CHILITO_IDEMPOTENCIA_SECRETO.encode())<32:raise ImproperlyConfigured('Suministra CHILITO_IDEMPOTENCIA_SECRETO independiente de al menos 32 bytes')
 CHILITO_VINCULACION_SECRETO=os.environ.get('CHILITO_VINCULACION_SECRETO','')
 if len(CHILITO_VINCULACION_SECRETO.encode())<32:raise ImproperlyConfigured('Suministra CHILITO_VINCULACION_SECRETO de al menos 32 bytes')
 DEBUG=False

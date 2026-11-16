@@ -17,7 +17,7 @@ DESTINO = RAIZ.parent / 'el-chilito-nube'
 INCLUIR = ['README.md', '.gitignore',
            'backend/manage.py', 'backend/requirements-lock.txt', 'backend/config', 'backend/cuentas', 'backend/datos',
            'backend/huerto', 'backend/privacidad', 'backend/tests', 'backend/web',
-           'frontend/index.html', 'frontend/favicon.svg', 'frontend/controladores', 'frontend/modelos', 'frontend/vistas', 'frontend/legales',
+           'frontend/index.html', 'frontend/favicon.svg', 'frontend/controladores', 'frontend/modelos', 'frontend/vistas',
            'frontend/pruebas', 'sql/privilegios.sql', 'sql/instalacion',
            'backend/tools/README.md',
            *[f'backend/tools/{n}.py' for n in ('__init__', 'servir_local', 'entorno_local', 'pruebas_local', 'destino_temporal', 'comprobar_frontend_local', 'probar_seguridad', 'probar_mfa',

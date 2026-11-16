@@ -170,11 +170,7 @@ Un índice sobre `chilito_identidad_correo` impide duplicar cuentas: en Gmail ig
 | `privacidad_eventoprivacidad` | Accesos y rectificaciones |
 | `privacidad_conteonavegacion` | Totales diarios, sin identidad |
 
-Los textos visibles se editan en `frontend/legales/aviso-privacidad.html`, `terminos.html` y
-`politica-cookies.html`. La página refleja las ediciones; si la huella no coincide con una versión
-registrada, muestra el texto como borrador sin versión registrada. Editar el HTML no registra una
-versión nueva automáticamente. Los archivos de `backend/privacidad/documentos/` se conservan para
-compatibilidad e historial.
+Los textos visibles se redactan y publican desde Administración → Textos legales.
 
 ### Flujos
 

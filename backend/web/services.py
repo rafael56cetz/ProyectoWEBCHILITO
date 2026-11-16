@@ -63,7 +63,7 @@ def ejecutar_idempotente(actor, clave, ruta, huella, trabajo):
 
 def huella_de(datos):
     texto = json.dumps(datos, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
-    return hmac.new(settings.CHILITO_SUPPORT_KEY.encode(), texto.encode(), hashlib.sha256).hexdigest()
+    return hmac.new(settings.CHILITO_IDEMPOTENCIA_SECRETO.encode(), texto.encode(), hashlib.sha256).hexdigest()
 
 
 

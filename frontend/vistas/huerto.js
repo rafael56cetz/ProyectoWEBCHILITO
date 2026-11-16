@@ -183,7 +183,7 @@ const GardenViews = (() => {
     const drawn = series.map(item => ({name:item.name, points:(Array.isArray(item.points) ? item.points : [])
       .filter(point => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.at))).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))}));
     const all = drawn.flatMap(item => item.points);
-    if(all.length < 2) return emptyChart(title, unit, labels);
+    if(!all.length) return emptyChart(title, unit, labels);
     const times = all.map(point => Date.parse(point.at)), first = Math.min(...times), last = Math.max(...times);
     const banded = point => Number.isFinite(point.min) && Number.isFinite(point.max);
     const extent = all.flatMap(point => banded(point) ? [point.value, point.min, point.max] : [point.value]);
@@ -228,9 +228,9 @@ const GardenViews = (() => {
     const since = plant.stageSince ? ` (desde el ${AppViews.date(plant.stageSince)})` : '';
     const sown = plant.sowingDate ? `Sembrada el ${AppViews.date(plant.sowingDate)}${plant.daysSown === null ? '' : ` (hace ${plant.daysSown} días)`}` : 'Sin fecha de siembra';
     const careLabels = {rellenar_deposito:'Recarga del depósito', sustrato:'Sustrato y perlita', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
-    const watering = lastWatering ? `Último riego: ${{automatico:'automático', usuario:'tuyo', soporte:'de soporte'}[lastWatering.origin] || lastWatering.origin}, ${lastWatering.duration ?? '—'} s, ${GardenModel.ago(lastWatering.at)}` : 'Sin riegos registrados';
+    const watering = lastWatering ? `Último riego: ${{automatico:'automático', usuario:'tuyo', soporte:'de soporte'}[lastWatering.origin] || escaparHTML(lastWatering.origin)}, ${lastWatering.duration ?? '—'} s, ${GardenModel.ago(lastWatering.at)}` : 'Sin riegos registrados';
     return `<a class="garden-back" href="${withGarden('huerto', garden.id)}">← Mi huerto</a>
-      <div class="page-heading"><div><h1>Planta ${plant.number} · «${escaparHTML(plant.name)}»</h1><p>${STAGES[plant.stage] || plant.stage}${escaparHTML(since)} · ${escaparHTML(sown)}</p></div>${button('edit', 'Editar')}</div>
+      <div class="page-heading"><div><h1>Planta ${plant.number} · «${escaparHTML(plant.name)}»</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${escaparHTML(since)} · ${escaparHTML(sown)}</p></div>${button('edit', 'Editar')}</div>
       <div class="user-chart-toolbar"><h2>Humedad del sustrato</h2><div class="user-range-control" role="group" aria-label="Periodo">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>
       ${chart('Humedad del sustrato', series, '%', range, 'plant')}
       <section class="bento-panel"><h2>Línea de vida</h2>${stages.length ? `<ol class="user-history-list">${stages.map(item => `<li><span>${icon('leaf')}</span><div><h3>${STAGES[item.stage] || item.stage}</h3><p>${AppViews.date(item.since)}</p></div></li>`).join('')}</ol>` : '<p>Aún no hay etapas registradas.</p>'}</section>

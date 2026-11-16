@@ -576,6 +576,9 @@ const ConsentController = (() => {
 
 // ── Panel ──
 const AppController = (() => {
+  const BELL_MIN_MS = 5000;
+  // Compartido entre montajes: varias cargas seguidas no repiten la consulta.
+  let bellPending = false, bellAskedAt = 0;
   // Qué destinos ve esta sesión: decisión de coordinación (la autorización real sigue en el servidor).
   function navigation(route, session) {
     const isAdmin = route.screen==='admin' || session?.role==='admin';
@@ -677,11 +680,16 @@ const AppController = (() => {
       view.pageBusy(false);
       data = route.screen === 'avisos' ? response : AppModel.profile(response);
       draw();
-      if(route.screen === 'avisos' && route.detail && data.status === 'ready' && !data.item.read) { await request('mark-read', {id:route.detail}); refreshBell(); }
+      if(route.screen === 'avisos' && route.detail && data.status === 'ready' && !data.item.read) { await request('mark-read', {id:route.detail}); refreshBell(true); }
     }
-    // Contador de la campana (3.4): al cargar cada pantalla y cada 60 s en segundo plano.
-    async function refreshBell() {
-      const response = await request('counter');
+    // Contador de la campana (3.4): una vez al cargar cada pantalla y cada 60 s en segundo plano.
+    // Tras leer avisos se fuerza, porque el número cambió.
+    async function refreshBell(forced = false) {
+      if(!forced && (bellPending || Date.now() - bellAskedAt < BELL_MIN_MS)) return;
+      bellPending = true;
+      bellAskedAt = Date.now();
+      let response;
+      try { response = await request('counter'); } finally { bellPending = false; }
       if(!lifetime.signal.aborted && response.status === 'ready') view.bell(response.unread);
     }
     async function openNotice(row) {
@@ -690,7 +698,7 @@ const AppController = (() => {
       await request('mark-read', {id:noticeId});
       busy = false;
       if(lifetime.signal.aborted) return;
-      refreshBell();
+      refreshBell(true);
       location.hash = link || `#avisos/${noticeId}`;
     }
     async function markAllRead() {
@@ -701,7 +709,7 @@ const AppController = (() => {
       if(response.status !== 'accepted') { mostrarAviso('error', 'No se pudieron marcar los avisos como leídos.'); return; }
       mostrarAviso('exito', 'Avisos marcados como leídos.');
       await load();
-      refreshBell();
+      refreshBell(true);
     }
     async function loadMore() {
       busy = true;

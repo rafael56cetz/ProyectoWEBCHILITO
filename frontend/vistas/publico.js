@@ -342,18 +342,10 @@ const LegalViews = Object.freeze({
       host.append(message);
       return;
     }
-    let nodes;
-    if(typeof result.html === 'string') {
-      const template = document.createElement('template');
-      template.innerHTML = result.html;
-      nodes = template.content.textContent.trim() ? [...template.content.childNodes] : [];
-    } else {
-      nodes = result.text.split(/\n{2,}/).map(item => item.trim()).filter(item => item && !item.startsWith('# ')).map(block => {
-        const node = document.createElement(block.startsWith('## ') ? 'h3' : 'p');
-        node.textContent = block.replace(/^## /,'');
-        return node;
-      });
-    }
+    // El servidor ya sanea el HTML con su lista blanca; el navegador solo lo coloca.
+    const template = document.createElement('template');
+    template.innerHTML = typeof result.html === 'string' ? result.html : '';
+    const nodes = template.content.textContent.trim() ? [...template.content.childNodes] : [];
     // Archivo vacío: se dice que está en redacción, nunca se inventa texto.
     const pending = !nodes.length ? '[PENDIENTE: documento en redacción]' :
       !result.registered ? '[PENDIENTE: borrador en edición, sin versión registrada]' : '';

@@ -119,6 +119,12 @@ suite('flota, consola remota y mantenimientos', async () => {
   assert.ok(!fleet.includes('<img src=x') && fleet.includes('Equipos vinculados') && fleet.includes('Problemas (24 h)') && fleet.includes('Página 1 de 1') && fleet.includes('href="#admin/equipos/5"') && fleet.includes('Orden fallida'));
   assert.ok(run('FleetViews.screen(fleetState, {inventory:false})').includes('data-admin-action="peek"'));
   for(const gone of ['Evaporación', 'Mosquitto', 'Correlaciones', 'Vida mediana', 'mini bombas']) assert.ok(!fleet.includes(gone), gone);
+  // Con un solo punto la tendencia muestra su valor; sin puntos queda vacía.
+  assert.equal((fleet.match(/user-chart is-empty/g) || []).length, 2);
+  context.fleetState.data.trends = {moisture:[{at:'2026-11-14T12:00:00Z', value:50.1}], temperature:[]};
+  const unPunto = run('FleetViews.screen(fleetState, {inventory:true})');
+  assert.equal((unPunto.match(/user-chart is-empty/g) || []).length, 1);
+  assert.ok(unPunto.includes('user-chart-dot') && unPunto.includes(run('AppModel.number(50.1)')));
   // Consola: sin token ni pines; cada paso solo aparece para quien corresponde.
   const caso = {id:'11111111-1111-4111-8111-111111111111', folio:'CS-1A2B3C4D', incident:'bomba', state:'abierto', createdAt:'2026-11-14T10:00:00Z', person:context.bad, email:'ana@b.test', garden:context.bad, device:'ESP32-1',
     note:context.bad, authorization:'vigente', authorizedUntil:new Date(Date.now() + 5 * 3600000).toISOString(), revokedAt:null, attendedBy:null, mine:false, result:null, resolutionNote:null, closedAt:null};
@@ -388,6 +394,8 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(wizard({step:3, device:{identifier:'<b>CHI</b>'}}).includes('¡Tu equipo quedó vinculado!') && !wizard({step:3, device:{identifier:'<b>CHI</b>'}}).includes('<b>CHI</b>'));
   const page = V.plantPage({garden, plant:{...plants[0], name:'<i>x</i>'}, stages:[{stage:'germinacion', since:'2026-11-01'}], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
   assert.ok(page.includes('Regar esta planta') && page.includes('Línea de vida') && !page.includes('<i>x</i>'));
+  const hostil = V.plantPage({garden, plant:{...plants[0], stage:'<u>etapa</u>'}, stages:[], series:[], range:'24h', care:[], lastWatering:{origin:'<u>origen</u>', duration:3, at:'2026-11-14T10:00:00Z'}, hasDevice:true});
+  assert.ok(!hostil.includes('<u>') && hostil.includes('&lt;u&gt;etapa'), 'etapa y origen del riego se escapan');
   assert.ok(V.plantDialogs(plants[0], true).water.includes('Si el depósito no tiene agua, tu equipo no regará.'));
   assert.ok(V.myGardens({status:'ready', gardens:[detail(equipo).garden]}).includes('Desvincular equipo'));
   assert.ok(V.myGardens({status:'ready', gardens:[detail(null).garden]}).includes('Archivar huerto'));
