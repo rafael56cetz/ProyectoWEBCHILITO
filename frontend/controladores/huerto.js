@@ -433,6 +433,7 @@ const CareController = (() => {
       if(!trigger) return;
       const {gardenAction: action, type, page} = trigger.dataset;
       if(action === 'reload') await load();
+      else if(action === 'care-type') CareViews.pickType(root, type);
       else if(action === 'care-quick' && type === 'rellenar_deposito') await register({type});
       else if(action === 'care-quick') CareViews.prepare(root, type);
       else if(action === 'care-page') await loadCares(Number(page));

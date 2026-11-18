@@ -500,6 +500,15 @@ suite('Mi huerto y retirada de despliegues', async () => {
     {id:'b', type:'cosecha', plant:null, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:true, reason:'Se anotó mal'}]});
   assert.ok(careList.includes('<s>') && careList.includes('Anulado') && careList.includes('Corregido por soporte') && careList.includes('7 chiles') && !careList.includes('<img src=x'));
   assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants}).includes('¿Qué hiciste?'));
+  // Rediseño: los chips muestran el tipo, pero el <select id="care-type" name="type"> y los atajos siguen en el formulario.
+  const careScreen = Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants});
+  assert.equal((careScreen.match(/data-garden-action="care-type"/g) || []).length, 5, 'un chip por tipo de cuidado');
+  assert.equal((careScreen.match(/aria-pressed="true"/g) || []).length, 1, 'un solo chip elegido al abrir');
+  assert.ok(careScreen.includes('data-type="rellenar_deposito" aria-pressed="true"'), 'el elegido es el del select');
+  assert.ok(/<select id="care-type" name="type"[^>]*>/.test(careScreen), 'el select del tipo sigue en el formulario');
+  assert.equal((careScreen.match(/data-garden-action="care-quick"/g) || []).length, 3, 'los tres atajos siguen');
+  assert.ok(careScreen.includes('data-care-guide-link') && careScreen.includes('Atajos'));
+  assert.ok(careList.includes('is-corrected'), 'la fila corregida trae su clase para el estilo');
   const idle = {hasDevice:true, active:null, history:[], orders:[], lastDiagnostic:null};
   const support = Sp.screen({status:'ready', gardens:[garden], garden, data:idle, diagnostic:null});
   assert.ok(support.includes('Revisar mi equipo') && support.includes('Autorizo al equipo de soporte') && support.includes('disabled') && !/token/i.test(support));

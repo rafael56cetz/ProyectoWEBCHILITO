@@ -390,27 +390,32 @@ const TechnicalViews = (() => {
 const CareViews = (() => {
   const {tag, button, selector, screenTitle, noGarden, loading, failed} = GardenViews;
   const TYPES = {rellenar_deposito:'Rellenar depósito', sustrato:'Revisar sustrato', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
+  // Solo presentación: el ícono de cada tipo en los chips y en el historial.
+  const CARE_ICONS = {rellenar_deposito:'drop', sustrato:'layers', germinacion:'sprout', cosecha:'leaf', inspeccion:'eye'};
   const PAGE_SIZE = 25;
   const dateField = (name, label, hint = '') => `<div class="maint-date-control"><label for="care-${name}">${label}</label>
     <div class="maint-date-field"><input type="text" name="${name}" id="care-${name}" placeholder="aaaa-mm-dd" maxlength="10" autocomplete="off" spellcheck="false"${hint ? ' aria-describedby="care-when-hint"' : ''}>
     <button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div>${hint ? `<p id="care-when-hint" class="user-small-copy">${hint}</p>` : ''}</div>`;
   const plantOptions = (plants, whole) => `<option value="">${whole ? 'Todo el huerto' : '—'}</option>${plants.map(plant => `<option value="${plant.number}">${escaparHTML(plant.name)}</option>`).join('')}`;
   const typeOptions = selected => Object.entries(TYPES).map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
+  // Chips del tipo: muestran el <select id="care-type"> (que sigue en el formulario) y lo cambian con su mismo evento «change».
+  const typeChips = selected => `<div class="care-type-chips" role="group" aria-labelledby="care-type-label">${Object.entries(TYPES).map(([value, label]) => button('care-type', `${icon(CARE_ICONS[value])}<span>${label}</span>`, 'light', `data-type="${value}" aria-pressed="${value === selected}"`).replace('class="button ', 'class="button care-chip ')).join('')}</div>`;
 
   function form(plants) {
     return `<section class="bento-panel garden-form care-register" aria-labelledby="care-title"><h2 id="care-title">Registrar un cuidado</h2>
       <form data-garden-form="care" novalidate>
-        <label for="care-type">¿Qué hiciste?</label><select id="care-type" name="type">${typeOptions('rellenar_deposito')}</select>
+        <div class="care-type-field"><label for="care-type" id="care-type-label">¿Qué hiciste?</label>${typeChips('rellenar_deposito')}<select id="care-type" name="type" class="care-type-select" tabindex="-1" aria-hidden="true">${typeOptions('rellenar_deposito')}</select></div>
         <div data-care-plant hidden><label for="care-plant">¿En qué planta?</label><select id="care-plant" name="plant">${plantOptions(plants, false)}</select></div>
         ${dateField('when', '¿Cuándo?', 'Déjalo vacío para registrar ahora, o escribe un día de hasta 7 días atrás.')}
         <div data-care-chiles hidden><label for="care-chiles">Chiles cosechados (opcional)</label><input id="care-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric"></div>
-        <button class="button btn-liquid-brand" type="submit">Registrar</button></form>
-      <div class="user-quick-actions care-actions" aria-label="Accesos rápidos">${button('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, 'light', 'data-type="rellenar_deposito"')}${button('care-quick', `${icon('leaf')}<span>Registrar cosecha</span>`, 'light', 'data-type="cosecha"')}${button('care-quick', `${icon('drop')}<span>Revisé el sustrato</span>`, 'light', 'data-type="sustrato"')}
+        <div class="care-register-footer"><button class="button btn-liquid-brand" type="submit">Registrar</button></div></form>
+      <p class="care-shortcuts-title" id="care-shortcuts-title">Atajos</p>
+      <div class="user-quick-actions care-actions" aria-labelledby="care-shortcuts-title">${button('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, 'light', 'data-type="rellenar_deposito"')}${button('care-quick', `${icon('leaf')}<span>Registrar cosecha</span>`, 'light', 'data-type="cosecha"')}${button('care-quick', `${icon('drop')}<span>Revisé el sustrato</span>`, 'light', 'data-type="sustrato"')}
         <a class="button btn-liquid-light user-care-guide-link" href="#mantenimiento/sustrato" data-care-guide-link="${CareGuideService.SUBSTRATE_KEY}">${icon('book')}<span>Ver guía de sustrato</span></a></div></section>`;
   }
 
   function filters(plants) {
-    return `<section class="bento-panel" aria-labelledby="care-history-title"><h2 id="care-history-title">Historial de cuidados</h2>
+    return `<section class="bento-panel care-history" aria-labelledby="care-history-title"><h2 id="care-history-title">Historial de cuidados</h2>
       <form class="care-filters" data-garden-form="care-filter" novalidate>
         <div><label for="filter-plant">Planta</label><select id="filter-plant" name="planta"><option value="">Todas</option><option value="huerto">Todo el huerto</option>${plants.map(plant => `<option value="${plant.number}">${escaparHTML(plant.name)}</option>`).join('')}</select></div>
         <div><label for="filter-type">Tipo</label><select id="filter-type" name="tipo"><option value="">Todos</option>${typeOptions('')}</select></div>
@@ -425,7 +430,8 @@ const CareViews = (() => {
     const title = TYPES[item.type] || escaparHTML(item.type);
     const marks = `${item.voided ? tag('Anulado', 'rojo') : ''}${item.corrected ? tag('Corregido por soporte', 'ambar') : ''}`;
     const reason = item.reason ? `<details><summary>Motivo</summary><p>${escaparHTML(item.reason)}</p></details>` : '';
-    return `<li class="care-row${item.voided ? ' is-voided' : ''}"><span>${icon('check')}</span><div><h3>${item.voided ? `<s>${title}</s>` : title}</h3><p>${when(item.doneAt)} · ${where}${detail}</p>${marks ? `<div class="care-row-marks">${marks}</div>` : ''}${reason}</div></li>`;
+    const mark = item.voided ? 'close' : item.corrected ? 'pencil' : CARE_ICONS[item.type] || 'check';
+    return `<li class="care-row${item.voided ? ' is-voided' : ''}${item.corrected ? ' is-corrected' : ''}"><span>${icon(mark)}</span><div><h3>${item.voided ? `<s>${title}</s>` : title}</h3><p>${when(item.doneAt)} · ${where}${detail}</p>${marks ? `<div class="care-row-marks">${marks}</div>` : ''}${reason}</div></li>`;
   }
   const when = value => AppViews.date(value);
 
@@ -453,6 +459,14 @@ const CareViews = (() => {
     const first = select.options[0];
     first.textContent = type === 'inspeccion' ? 'Todo el huerto' : '—';
     if(type === 'rellenar_deposito') select.value = '';
+    root.querySelectorAll('.care-type-chips [data-type]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.type === type)));
+  }
+  // Un chip pone su tipo en el <select> y lanza el mismo «change» que ya escucha el controlador.
+  function pickType(root, type) {
+    const select = root.querySelector('#care-type');
+    if(!select || !(type in TYPES)) return;
+    select.value = type;
+    select.dispatchEvent(new Event('change', {bubbles:true}));
   }
   function prepare(root, type) {
     const form = root.querySelector('[data-garden-form="care"]');
@@ -467,7 +481,7 @@ const CareViews = (() => {
   }
   const resetFilters = root => root.querySelector('[data-garden-form="care-filter"]').reset();
 
-  return Object.freeze({screen, list, adjust, prepare, reset, resetFilters, types:TYPES});
+  return Object.freeze({screen, list, adjust, pickType, prepare, reset, resetFilters, types:TYPES});
 })();
 
 const SupportViews = (() => {
