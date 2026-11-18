@@ -89,7 +89,9 @@ const GardenSummaryController = (() => {
     async function confirmOrder(type) {
       if(await confirmar(GardenViews.confirmations[type])) await runOrder({type});
     }
+    // «Ya lo rellené»: la confirmación estándar y, al aceptar, la recarga con la hora de confirmación (sin fecha).
     async function recordRefill() {
+      if(!await confirmar(GardenViews.confirmations.refill)) return;
       const result = await service.care(state.detail.garden.id, {type:'rellenar_deposito'});
       if(life.signal.aborted) return;
       mostrarAviso(result.status === 'accepted' ? 'exito' : 'error', result.status === 'accepted' ? 'Recarga registrada.' : GardenViews.errorText(result.code));
@@ -476,7 +478,7 @@ const CareController = (() => {
       else if(action === 'care-when') CareViews.pickWhen(root, trigger.dataset.when);
       else if(action === 'care-chiles') CareViews.stepChiles(root, trigger.dataset.step);
       else if(action === 'care-date') CareViews.openDate(root, trigger.dataset.date);
-      else if(action === 'care-quick' && type === 'rellenar_deposito') await register({type});
+      else if(action === 'care-quick' && type === 'rellenar_deposito') { if(await confirmar(GardenViews.confirmations.refill)) await register({type}); }
       else if(action === 'care-quick') CareViews.prepare(root, type);
       else if(action === 'care-page') await loadCares(Number(page));
       else if(action === 'care-clear') { filters = {}; CareViews.resetFilters(root); await loadCares(1); }

@@ -1390,14 +1390,20 @@ html body[data-private=true][data-role=admin] #app-page .care-admin-form>.care-a
 
 /* Depósito con flotador: líneas de la tarjeta, botón de recarga desactivado con su motivo e historial de cargas. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat .garden-tank-line { color:var(--claro-titulo); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-panel { grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-actions { display:flex;flex-direction:column;gap:var(--esp-2);padding:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-panel { grid-template-columns:minmax(0,1fr); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-actions { display:flex;flex-direction:column;align-items:flex-start;gap:var(--esp-2);margin:var(--esp-3) 0; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="refill"]:disabled,
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="care-quick"]:disabled { opacity:.55;cursor:not-allowed; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .refill-reason { margin:var(--esp-2) 0 0;color:var(--claro-suave); }
+/* Fases de la tarjeta Depósito: «Es hora de rellenar tu depósito», registro a la espera de lectura y flotador que sigue en nivel bajo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-call { display:flex;align-items:center;gap:var(--esp-2);margin:var(--esp-2) 0;font-size:1.05rem;font-weight:700;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-note { display:flex;align-items:flex-start;gap:var(--esp-2);margin:var(--esp-2) 0;padding:var(--esp-3);border:1px solid var(--claro-linea);border-radius:var(--radio-campo);color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-note.is-warning { border-color:#b7791f;background:rgba(183,121,31,.08); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history { display:flex;flex-direction:column;gap:var(--esp-3); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history .tank-load.is-open h3 { color:var(--claro-verde); }
-/* Recarga detectada por confirmar: aviso dentro de la tarjeta Depósito con «Confirmar recarga» (primario) y «No fue una recarga». */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history { display:flex;flex-direction:column;gap:var(--esp-3); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history .tank-load.is-open h3 { color:var(--claro-verde); }
+/* Agua detectada sin aviso de la persona: «¿Ya lo rellenaste?» con «Sí, ya lo rellené» (primario) y «No fue una recarga». */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending { display:flex;flex-direction:column;gap:var(--esp-2);margin:var(--esp-3) 0;padding:var(--esp-3);border:1px solid var(--claro-verde);border-radius:var(--radio-campo); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending-title { display:flex;align-items:center;gap:var(--esp-2);margin:0;font-weight:600;color:var(--claro-titulo); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending-copy { margin:0;color:var(--claro-suave); }

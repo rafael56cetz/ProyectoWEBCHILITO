@@ -621,10 +621,9 @@ suite('depósito con flotador', async () => {
   const detail = (gardenDevice, tankData) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:{tankHasWater:tankData?.hasWater ?? null}, lamp:null, summary:null, tank:tankData});
   const withDevice = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank({hasWater:false, lowSince:'2026-11-18T15:30:00Z', canRefill:true, refillBlock:null}))}, 'Ana');
   assert.ok(withDevice.includes('Nivel bajo <small>desde') && withDevice.includes('Última recarga:') && withDevice.includes('(detectada por tu equipo)'));
-  assert.ok(/data-garden-action="refill"(?![^>]*disabled)/.test(withDevice), 'con nivel bajo el botón está activo');
+  assert.ok(/class="button btn-liquid-brand" data-garden-action="refill"(?![^>]*disabled)/.test(withDevice), 'con nivel bajo «Ya lo rellené» es el primario y está activo');
   const blocked = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank())}, 'Ana');
-  assert.ok(/data-garden-action="refill"[^>]*disabled aria-describedby="refill-reason"/.test(blocked) && blocked.includes('id="refill-reason"')
-    && blocked.includes('Tu depósito tiene agua desde tu última recarga'), 'con agua el botón se desactiva con el motivo');
+  assert.ok(!/data-garden-action="refill"/.test(blocked) && !blocked.includes('id="refill-reason"'), 'con agua la tarjeta no tiene botones');
   assert.ok(blocked.includes('Te diremos cuánto dura tu depósito cuando se termine esta carga.'));
   const noDeviceTank = tank({hasDevice:false, hasWater:null, canRefill:false, refillBlock:'espera', nextRefillAt:'2099-01-01T12:00:00Z', refillEverySeconds:3 * 86400});
   const B = V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null, noDeviceTank)}, 'Ana');
@@ -645,21 +644,47 @@ suite('depósito con flotador', async () => {
   const row = item => Care.list({status:'ready', page:1, total:1, items:[{id:'a', type:'rellenar_deposito', plant:null, chiles:null, doneAt:'2026-11-18T14:00:00Z', voided:false, corrected:false, ...item}]});
   assert.ok(row({origin:'equipo'}).includes('Detectada por tu equipo'));
   assert.ok(!row({origin:'persona'}).includes('Detectada por tu equipo'));
-  // Recarga detectada por confirmar (web.0005): texto, botones solo con una pendiente e insignia de la confirmada.
+  // Agua detectada sin aviso (web.0005/0006): texto, botones solo con una detección real e insignia de la confirmada.
   const DETECTION = '0b6f9a3e-2c4d-4e5f-8a7b-1c2d3e4f5a6b';
-  assert.equal(M.pendingRefill(tank({pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), 'Detectamos una recarga hoy a las 10:05');
+  assert.equal(M.pendingRefill(tank({state:'detectada', pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), 'Detectada hoy a las 10:05.');
   assert.equal(M.pendingRefill(tank({pendingRefill:null}), NOW), '');
+  assert.equal(M.pendingRefill(tank({state:'rellenar', hasWater:false, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), '', 'con nivel bajo no hay pregunta');
   const confirmed = M.tankSummary(tank({lastRefill:{...refill('2026-11-18T14:00:00Z'), confirmed:true, byOwner:true}}), NOW);
   assert.equal(confirmed.lines[0], 'Última recarga: hoy a las 08:00 (detectada por tu equipo · confirmada por ti)');
   assert.equal(M.detectedLabel({origin:'equipo', confirmed:true, byOwner:false}), 'Detectada por tu equipo · confirmada por soporte');
   assert.equal(M.detectedLabel({origin:'equipo', confirmed:false}), 'Detectada por tu equipo', 'las automáticas anteriores no dicen quién confirmó');
-  const pendingTank = tank({hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new Date().toISOString()}});
+  const pendingTank = tank({state:'detectada', hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new Date().toISOString()}});
   const pending = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, pendingTank)}, 'Ana');
-  assert.ok(/Detectamos una recarga hoy a las \d\d:\d\d/.test(pending), 'el aviso de la detección en la tarjeta Depósito');
-  assert.ok(new RegExp(`class="button btn-liquid-brand" data-garden-action="refill-confirm" data-detection="${DETECTION}"`).test(pending), 'Confirmar recarga es el primario');
-  assert.ok(new RegExp(`class="button btn-liquid-light" data-garden-action="refill-discard" data-detection="${DETECTION}"`).test(pending), 'No fue una recarga es el secundario');
-  assert.ok(pending.includes('Confirmar recarga') && pending.includes('No fue una recarga'));
-  for(const html of [withDevice, blocked, B]) assert.ok(!/refill-confirm|refill-discard|Detectamos una recarga/.test(html), 'sin detección pendiente no hay botones');
+  assert.ok(pending.includes('Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?') && /Detectada hoy a las \d\d:\d\d\./.test(pending), 'la pregunta en la tarjeta Depósito');
+  assert.ok(new RegExp(`class="button btn-liquid-brand" data-garden-action="refill-confirm" data-detection="${DETECTION}"`).test(pending), '«Sí, ya lo rellené» es el primario');
+  assert.ok(new RegExp(`class="button btn-liquid-light" data-garden-action="refill-discard" data-detection="${DETECTION}"`).test(pending), '«No fue una recarga» es el secundario');
+  assert.ok(pending.includes('Sí, ya lo rellené') && pending.includes('No fue una recarga') && !pending.includes('Confirmar recarga'));
+  for(const html of [withDevice, blocked, B]) assert.ok(!/refill-confirm|refill-discard|¿Ya lo rellenaste\?|Confirmar recarga/.test(html), 'sin detección real no hay pregunta');
+  // Fases de la tarjeta Depósito (1 a 6) con lo que manda el servidor.
+  const card = data => V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank(data))}, 'Ana');
+  const mine = refill('2026-11-18T17:00:00Z', 'persona', true);
+  const s1 = card({state:'con_agua', lastRefill:mine, averageSeconds:3 * 86400});
+  assert.ok(s1.includes('Con agua') && s1.includes('Última recarga: hoy a las 11:00 (registrada por ti)') && s1.includes('Tu depósito dura en promedio 3 días.'), 'fase 1');
+  assert.ok(!/data-garden-action="refill/.test(s1), 'fase 1: sin botones');
+  const s1b = card({state:'con_agua', lastRefill:{...refill('2026-11-18T14:00:00Z'), confirmed:true, byOwner:true}});
+  assert.ok(s1b.includes('(detectada por tu equipo · confirmada por ti)'), 'fase 1: la confirmada');
+  const s2 = card({state:'rellenar', hasWater:false, lowSince:'2026-11-18T15:30:00Z', lastRefill:null, canRefill:true, refillBlock:null});
+  assert.ok(s2.includes('Es hora de rellenar tu depósito') && s2.includes('Ya lo rellené') && /class="button btn-liquid-brand" data-garden-action="refill"/.test(s2), 'fase 2');
+  const refillAsk = V.confirmations.refill;
+  assert.deepEqual([refillAsk.titulo, refillAsk.accion, Boolean(refillAsk.peligro)], ['¿Confirmas que ya rellenaste el depósito?', 'Sí, ya lo rellené', false], 'fase 3: la confirmación estándar');
+  assert.ok(pending.includes('Tu equipo detectó agua'), 'fase 4');
+  const s5 = card({state:'sigue_bajo', hasWater:false, lowSince:'2026-11-18T15:30:00Z', lastRefill:mine, canRefill:false, refillBlock:'repetida'});
+  assert.ok(s5.includes('Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.') && s5.includes('(registrada por ti)'), 'fase 5');
+  assert.ok(!/data-garden-action="refill/.test(s5) && !s5.includes('Es hora de rellenar'), 'fase 5: sin botón');
+  const waitingCard = card({state:'esperando_lectura', hasWater:false, lowSince:'2026-11-18T15:30:00Z', lastRefill:mine, canRefill:false, refillBlock:'repetida'});
+  assert.ok(waitingCard.includes('Esperamos la siguiente lectura de tu equipo.') && !/data-garden-action="refill/.test(waitingCard), 'registrada, a la espera de lectura');
+  // Fase 6: lo que devuelve la API tras un solo «medir --sin-agua» (y aunque llegara una detección con nivel bajo).
+  const onlyLow = {state:'rellenar', hasWater:false, lowSince:'2026-11-18T17:59:00Z', pendingRefill:null, lastRefill:null, canRefill:true, refillBlock:null};
+  for(const data of [onlyLow, {...onlyLow, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:00:00Z'}}, {...onlyLow, state:undefined}]) {
+    const html = card(data);
+    assert.ok(html.includes('Es hora de rellenar tu depósito') && html.includes('Ya lo rellené'), 'fase 6: pide rellenar');
+    assert.ok(!html.includes('Confirmar recarga') && !html.includes('¿Ya lo rellenaste?') && !/refill-confirm|refill-discard/.test(html), 'fase 6: no pregunta por una recarga');
+  }
   const discard = V.confirmations['refill-discard'];
   assert.ok(discard.peligro && discard.accion === 'No fue una recarga' && discard.texto.includes('no se registrará ninguna recarga'), '«No fue una recarga» pide confirmación');
   assert.ok(row({origin:'equipo', confirmed:true, byOwner:true}).includes('Detectada por tu equipo · confirmada por ti'), 'historial de mantenimiento');
@@ -676,12 +701,14 @@ suite('depósito con flotador', async () => {
   assert.equal(calls.length, 2);
   // Controlador: «No fue una recarga» pasa por el diálogo de confirmación antes de llamar al servidor.
   const control = bloque('controladores/huerto.js', 'Huerto');
+  assert.match(control, /async function recordRefill\(\) \{\n\s+if\(!await confirmar\(GardenViews\.confirmations\.refill\)\) return;/, '«Ya lo rellené» confirma antes de registrar');
+  assert.match(read('controladores/huerto.js'), /action === 'care-quick' && type === 'rellenar_deposito'\) \{ if\(await confirmar\(GardenViews\.confirmations\.refill\)\) await register/, '«Rellené el depósito» usa la misma confirmación');
   assert.match(control, /if\(discard && !await confirmar\(GardenViews\.confirmations\['refill-discard'\]\)\) return;/);
   assert.match(control, /action === 'refill-confirm' \|\| action === 'refill-discard'/);
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.33'], 'todos los estáticos en mvc.33');
+  assert.deepEqual([...versions], ['?v=mvc.36'], 'todos los estáticos en mvc.36');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 

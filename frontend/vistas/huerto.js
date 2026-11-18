@@ -88,34 +88,44 @@ const GardenViews = (() => {
   // Celda del bloque de resumen; la usan Mi huerto y el Panel técnico.
   const stat = (ico, title, main, note, tone = '') => `<div class="garden-stat${tone}"><h2>${icon(ico)}${title}</h2><strong>${main}</strong><p>${note}</p></div>`;
 
-  // Depósito: estado del flotador, última recarga y cuánto dura (con equipo) o cada cuánto se rellena (sin equipo).
+  // Depósito: estado del flotador, lo que toca hacer (rellenar, responder a una detección, revisar el flotador), última recarga
+  // y cuánto dura (con equipo) o cada cuánto se rellena (sin equipo). La fase la decide el servidor (tank.state).
   function tankStat(tank, fallbackHasWater) {
     const info = GardenModel.tankSummary(tank || (fallbackHasWater == null ? null : {hasWater:fallbackHasWater}));
     const main = `${info.status}${info.lowSince ? ` <small>desde ${escaparHTML(info.lowSince)}</small>` : ''}`;
-    return `<div class="garden-stat garden-tank${info.tone}"><h2>${icon('tank')}Depósito de agua</h2><strong>${main}</strong>
-      ${info.lines.map(text => `<p class="garden-tank-line">${escaparHTML(text)}</p>`).join('')}${pendingRefill(tank)}<p>Depósito de 19 L · el flotador solo detecta nivel bajo</p></div>`;
+    return `<div class="garden-stat garden-tank${info.tone}"><h2>${icon('tank')}Depósito de agua</h2>${tankNotice(tank)}<strong>${main}</strong>
+      ${info.lines.map(text => `<p class="garden-tank-line">${escaparHTML(text)}</p>`).join('')}${tankActions(tank)}<p>Depósito de 19 L · el flotador solo detecta nivel bajo</p></div>`;
   }
-  // Recarga detectada por el flotador que espera al dueño: confirmarla (crea el cuidado) o decir que no fue una recarga.
-  function pendingRefill(tank) {
-    const text = GardenModel.pendingRefill(tank);
-    if(!text) return '';
-    const id = escaparHTML(tank.pendingRefill.id);
-    return `<div class="tank-pending" role="group" aria-labelledby="tank-pending-title"><p class="tank-pending-title" id="tank-pending-title">${icon('drop')}<span>${escaparHTML(text)}</span></p>
-      <p class="tank-pending-copy">¿La confirmas? Solo las recargas confirmadas cuentan para calcular cuánto dura tu depósito.</p>
-      <div class="tank-pending-actions">${button('refill-confirm', `${icon('check')}<span>Confirmar recarga</span>`, 'brand', `data-detection="${id}"`)}${button('refill-discard', 'No fue una recarga', 'light', `data-detection="${id}"`)}</div></div>`;
+  function tankNotice(tank) {
+    const notice = GardenModel.tankNotice(tank);
+    if(!notice || notice.kind === 'detected') return '';
+    if(notice.kind === 'refill') return `<p class="tank-call" role="status">${icon('drop')}<span>${escaparHTML(notice.title)}</span></p>`;
+    return `<p class="tank-note${notice.kind === 'warning' ? ' is-warning' : ''}" role="status">${icon(notice.kind === 'warning' ? 'info' : 'clock')}<span>${escaparHTML(notice.text)}</span></p>`;
+  }
+  // Acciones según la fase: «Ya lo rellené» con nivel bajo (o sin equipo), la pregunta de una detección real o nada.
+  function tankActions(tank) {
+    const stage = GardenModel.tankStage(tank);
+    if(stage === 'detectada') {
+      const notice = GardenModel.tankNotice(tank);
+      if(!notice) return '';
+      const id = escaparHTML(tank.pendingRefill.id);
+      return `<div class="tank-pending" role="group" aria-labelledby="tank-pending-title"><p class="tank-pending-title" id="tank-pending-title">${icon('drop')}<span>${escaparHTML(notice.title)}</span></p>
+      <p class="tank-pending-copy">${escaparHTML(notice.text)} Solo las recargas que registras o confirmas cuentan para calcular cuánto dura tu depósito.</p>
+      <div class="tank-pending-actions">${button('refill-confirm', `${icon('check')}<span>Sí, ya lo rellené</span>`, 'brand', `data-detection="${id}"`)}${button('refill-discard', 'No fue una recarga', 'light', `data-detection="${id}"`)}</div></div>`;
+    }
+    if(stage !== 'rellenar' && stage !== 'sin_equipo') return '';
+    const refill = refillButton('refill', `${icon('tank')}<span>Ya lo rellené</span>`, tank, '', '', 'brand');
+    return `<div class="garden-tank-actions">${refill.button}${refill.reason}</div>`;
   }
   // Botón de recarga manual: desactivado cuando el servidor no la permite, con el motivo a la vista.
-  function refillButton(action, content, tank, extraClass = '', attrs = '') {
+  function refillButton(action, content, tank, extraClass = '', attrs = '', tone = 'light') {
     const {allowed, reason} = GardenModel.refillState(tank);
     const id = `${action}-reason`;
-    const html = button(action, content, 'light', `${attrs}${allowed ? '' : ` disabled aria-describedby="${id}"`}`);
+    const html = button(action, content, tone, `${attrs}${allowed ? '' : ` disabled aria-describedby="${id}"`}`);
     return {button:extraClass ? html.replace('class="button ', `class="button ${extraClass} `) : html,
       reason:allowed ? '' : `<p class="refill-reason user-small-copy" id="${id}" data-refill-reason>${escaparHTML(reason)}</p>`};
   }
-  function tankPanel(tank) {
-    const refill = refillButton('refill', `${icon('tank')}<span>Registrar recarga</span>`, tank);
-    return `<section class="bento-panel garden-stats garden-tank-panel" aria-label="Depósito de agua">${tankStat(tank)}<div class="garden-tank-actions">${refill.button}${refill.reason}</div></section>`;
-  }
+  const tankPanel = tank => `<section class="bento-panel garden-stats garden-tank-panel" aria-label="Depósito de agua">${tankStat(tank)}</section>`;
 
   function metrics(detail) {
     const {metrics: m, lamp, plants} = detail;
@@ -146,15 +156,14 @@ const GardenViews = (() => {
   function quickActions(detail) {
     const off = detail.lamp?.mode === 'manual-off';
     const tile = (ico, label) => `${icon(ico)}<span>${label}</span>`;
-    const refill = refillButton('refill', tile('tank', 'Registrar recarga'), detail.tank);
+    // La recarga del depósito vive en su tarjeta («Ya lo rellené»), según lo que marque el flotador.
     return `<div class="user-section-heading"><div><h2>Acciones rápidas</h2></div></div>
       <section class="user-quick-actions garden-actions" aria-label="Acciones rápidas">
-        ${refill.button}
         <a class="button btn-liquid-light" href="#mantenimiento">${tile('check', 'Registrar un cuidado')}</a>
         ${button('order', tile('activity', 'Revisar mi equipo'), 'light', 'data-type="autodiagnostico"')}
         ${button('order-confirm', tile('sun', off ? 'Restaurar automático' : 'Apagar lámpara'), 'light', `data-type="${off ? 'lampara_automatico' : 'lampara_apagar'}"`)}
         <a class="button btn-liquid-light is-featured" href="#soporte">${tile('support', 'Solicitar revisión técnica')}</a></section>
-      ${refill.reason}<div data-order-card></div>
+      <div data-order-card></div>
       <p class="user-safety-copy">Ante una emergencia, utiliza el paro físico del equipo.</p>`;
   }
 
@@ -321,6 +330,7 @@ const GardenViews = (() => {
     lampara_automatico:{titulo:'¿Restaurar el modo automático?', texto:'Se enviará la orden a tu equipo. La lámpara volverá a seguir su horario.', accion:'Restaurar automático'},
     desvincular: identifier => ({titulo:`¿Desvincular el equipo ${identifier}?`, texto:'Dejará de enviar lecturas a este huerto. Para volver a usarlo tendrás que vincularlo de nuevo.', accion:'Desvincular equipo', peligro:true}),
     archivar: name => ({titulo:`¿Archivar ${name}?`, texto:'Dejarás de verlo. Su historial se conserva.', accion:'Archivar huerto', peligro:true}),
+    refill:{titulo:'¿Confirmas que ya rellenaste el depósito?', texto:'Registraremos la recarga con la hora de ahora.', accion:'Sí, ya lo rellené'},
     'refill-discard':{titulo:'¿No fue una recarga?', texto:'Descartaremos esta detección y no se registrará ninguna recarga. No se puede deshacer.', accion:'No fue una recarga', peligro:true}};
 
   return Object.freeze({

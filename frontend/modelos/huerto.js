@@ -137,8 +137,26 @@ const GardenModel = (() => {
   // Una recarga del equipo confirmada dice quién la confirmó; las automáticas anteriores (sin autor), solo que la detectó el equipo.
   const DETECTED = item => item.confirmed ? `Detectada por tu equipo · confirmada por ${item.byOwner ? 'ti' : 'soporte'}` : 'Detectada por tu equipo';
   const REFILL_AUTHOR = refill => refill.origin === 'equipo' ? DETECTED(refill).replace(/^D/, 'd') : refill.byOwner ? 'registrada por ti' : 'registrada por soporte';
-  // «Detectamos una recarga hoy a las 10:05»: solo mientras espera la confirmación.
-  const pendingRefill = (tank, now = Date.now()) => tank?.pendingRefill ? `Detectamos una recarga ${meridaWhen(tank.pendingRefill.detectedAt, now)}` : '';
+  // Fase de la tarjeta Depósito (la decide el servidor): con_agua | rellenar | detectada | esperando_lectura | sigue_bajo |
+  // sin_lectura | sin_equipo. Sin «state» (respuesta anterior), se deduce lo mínimo y nunca se supone una detección.
+  function tankStage(tank) {
+    if(!tank) return null;
+    if(tank.state) return tank.state;
+    if(!tank.hasDevice) return 'sin_equipo';
+    return tank.hasWater === true ? 'con_agua' : tank.hasWater === false ? 'rellenar' : 'sin_lectura';
+  }
+  // La pregunta «¿Ya lo rellenaste?» solo con una detección real: pendiente, en fase «detectada» y con agua en la última lectura.
+  const pendingRefill = (tank, now = Date.now()) => tank?.pendingRefill && tankStage(tank) === 'detectada' && tank.hasWater === true
+    ? `Detectada ${meridaWhen(tank.pendingRefill.detectedAt, now)}.` : '';
+  // Lo que la tarjeta destaca en cada fase (título, aviso o espera), además del estado y la última recarga.
+  function tankNotice(tank, now = Date.now()) {
+    const stage = tankStage(tank);
+    if(stage === 'rellenar') return {kind:'refill', title:'Es hora de rellenar tu depósito', text:''};
+    if(stage === 'sigue_bajo') return {kind:'warning', title:'', text:'Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.'};
+    if(stage === 'esperando_lectura') return {kind:'waiting', title:'', text:`Registraste la recarga ${tank.lastRefill ? meridaWhen(tank.lastRefill.at, now) : ''}. Esperamos la siguiente lectura de tu equipo.`.replace(' .', '.')};
+    if(stage === 'detectada' && pendingRefill(tank, now)) return {kind:'detected', title:'Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?', text:pendingRefill(tank, now)};
+    return null;
+  }
   // ¿Se puede registrar una recarga a mano? Si no, el motivo que se muestra junto al botón.
   function refillState(tank, now = Date.now()) {
     if(!tank || tank.canRefill) return {allowed:true, reason:''};
@@ -170,7 +188,7 @@ const GardenModel = (() => {
   }
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
     pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
-    meridaWhen, meridaDay, humanDuration, refillState, tankSummary, pendingRefill, detectedLabel:DETECTED});
+    meridaWhen, meridaDay, humanDuration, refillState, tankSummary, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
 })();
 
 // ── Guias ──
