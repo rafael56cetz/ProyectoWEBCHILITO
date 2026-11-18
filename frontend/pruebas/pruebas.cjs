@@ -448,6 +448,14 @@ suite('Mi huerto y retirada de despliegues', async () => {
   const page = V.plantPage({garden, plant:{...plants[0], name:'<i>x</i>'}, stages:[{stage:'germinacion', since:'2026-11-01'}], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
   assert.ok(page.includes('Regar esta planta') && page.includes('Línea de vida') && !page.includes('<i>x</i>'));
   assert.ok(V.plantPage({garden, plant:plants[0], stages:[], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true}).includes('<h1>Planta 1</h1>'), 'el nombre de fábrica no se repite en el título');
+  // Línea de vida: con una sola etapa se explica cómo seguir llenándola; con 0 o con 2 y más, no.
+  const AVISO_LINEA = 'Cambia la etapa en Editar para ir llenando su línea de vida.';
+  const conEtapas = stages => V.plantPage({garden, plant:plants[0], stages, series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
+  const etapa = (stage, since) => ({stage, since});
+  assert.ok(conEtapas([etapa('sin_sembrar', '2026-11-01')]).includes(AVISO_LINEA), 'con 1 etapa aparece el aviso');
+  assert.ok(!conEtapas([etapa('sin_sembrar', '2026-11-01'), etapa('germinacion', '2026-11-05')]).includes(AVISO_LINEA), 'con 2 etapas no aparece');
+  assert.ok(!conEtapas([etapa('sin_sembrar', '2026-11-01'), etapa('germinacion', '2026-11-05'), etapa('plantula', '2026-11-10')]).includes(AVISO_LINEA), 'con 3 etapas no aparece');
+  assert.ok(!conEtapas([]).includes(AVISO_LINEA), 'sin etapas no aparece');
   assert.ok(page.includes('<h1>Planta 1 · «&lt;i&gt;x&lt;/i&gt;»</h1>'), 'un nombre propio sí se muestra, escapado');
   const hostil = V.plantPage({garden, plant:{...plants[0], stage:'<u>etapa</u>'}, stages:[], series:[], range:'24h', care:[], lastWatering:{origin:'<u>origen</u>', duration:3, at:'2026-11-14T10:00:00Z'}, hasDevice:true});
   assert.ok(!hostil.includes('<u>') && hostil.includes('&lt;u&gt;etapa'), 'etapa y origen del riego se escapan');
