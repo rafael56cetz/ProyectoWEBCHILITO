@@ -508,6 +508,26 @@ suite('Mi huerto y retirada de despliegues', async () => {
     {id:'b', type:'cosecha', plant:null, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:true, reason:'Se anotó mal'}]});
   assert.ok(careList.includes('<s>') && careList.includes('Anulado') && careList.includes('Corregido por soporte') && careList.includes('7 chiles') && !careList.includes('<img src=x'));
   assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants}).includes('¿Qué hiciste?'));
+  // Rediseño: los chips muestran el tipo, pero el <select id="care-type" name="type"> y los atajos siguen en el formulario.
+  const careScreen = Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants});
+  assert.equal((careScreen.match(/data-garden-action="care-type"/g) || []).length, 5, 'un chip por tipo de cuidado');
+  assert.equal((careScreen.match(/data-garden-action="care-type"[^>]*aria-pressed="true"/g) || []).length, 1, 'un solo tipo elegido al abrir');
+  assert.ok(/<select id="care-plant" name="plant"[^>]*>/.test(careScreen) && (careScreen.match(/data-garden-action="care-plant"/g) || []).length === data.plants.length + 1, 'un botón por planta más «Todo el huerto»');
+  assert.ok(careScreen.includes('data-when="now"') && careScreen.includes('data-when="yesterday"') && careScreen.includes('data-when="pick"'), 'Ahora, Ayer y Elegir día');
+  assert.ok(careScreen.includes('data-step="-1"') && careScreen.includes('data-step="1"') && /id="care-chiles" name="chiles"[^>]*readonly/.test(careScreen), 'chiles con − y +');
+  assert.ok(careScreen.includes('id="filter-period"') && careScreen.includes('Últimos 7 días'), 'periodo en el historial');
+  assert.ok(careScreen.includes('data-type="rellenar_deposito" aria-pressed="true"'), 'el elegido es el del select');
+  assert.ok(/<select id="care-type" name="type"[^>]*>/.test(careScreen), 'el select del tipo sigue en el formulario');
+  // Los chips reemplazan a «Registrar cosecha» y «Revisé el sustrato»; «Rellené el depósito» (registro en un clic) se conserva.
+  assert.equal((careScreen.match(/data-garden-action="care-quick"/g) || []).length, 1, 'solo queda el atajo del depósito');
+  assert.ok(careScreen.includes('data-type="rellenar_deposito"') && careScreen.includes('data-care-guide-link'));
+  assert.ok(careScreen.includes('data-care-status') && careScreen.includes('Último relleno de depósito'), 'fila de estado arriba del formulario');
+  const careStatus = Care.status({status:'ready', page:1, total:2, items:[
+    {id:'a', type:'sustrato', plant:3, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:true, corrected:false},
+    {id:'b', type:'cosecha', plant:2, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:false}]}, []);
+  assert.ok(careStatus.includes('Planta 2 · 7 chiles'), 'la última cosecha con planta y chiles');
+  assert.equal((careStatus.match(/Sin registros/g) || []).length, 3, 'lo anulado no cuenta y sin registros se dice');
+  assert.ok(careList.includes('is-corrected'), 'la fila corregida trae su clase para el estilo');
   const idle = {hasDevice:true, active:null, history:[], orders:[], lastDiagnostic:null};
   const support = Sp.screen({status:'ready', gardens:[garden], garden, data:idle, diagnostic:null});
   assert.ok(support.includes('Revisar mi equipo') && support.includes('Autorizo al equipo de soporte') && support.includes('disabled') && !/token/i.test(support));

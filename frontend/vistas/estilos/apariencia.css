@@ -855,23 +855,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form>.button { grid-area:3/1/4/3;width:100%; }
 }
 
-/* Mantenimiento: el formulario a la izquierda y los accesos rápidos como fichas a la derecha. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register { grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:var(--esp-4) var(--esp-6);align-items:start;max-width:none; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>h2 { grid-column:1/-1;margin:0!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form { grid-column:1; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form>.button[type=submit] { justify-self:end;min-width:160px;margin-top:var(--esp-2); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions {
-  grid-column:2;grid-row:2;display:grid;grid-template-columns:1fr;gap:var(--esp-2);margin:0;padding:0 0 0 var(--esp-6);
-  border-top:0;box-shadow:inset 1px 0 0 var(--claro-linea);
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-actions>.button { justify-content:flex-start;gap:var(--esp-3);min-height:52px!important;padding:0 var(--esp-4)!important;border-radius:16px!important;white-space:normal;text-align:left; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-actions>.button .icon { flex:0 0 20px;color:var(--claro-verde); }
-@media (max-width:900px) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register { grid-template-columns:1fr; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions { grid-column:1;grid-row:auto;grid-template-columns:repeat(2,minmax(0,1fr));padding:var(--esp-4) 0 0;box-shadow:inset 0 1px 0 var(--claro-linea); }
-}
-@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions { grid-template-columns:1fr; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form>.button[type=submit] { justify-self:stretch; } }
-
 /* Historiales (cuidados, solicitudes, planta, resúmenes): cada registro es una fila de vidrio base con su ícono en un medallón,
    el título firme arriba y fecha y lugar debajo. Las insignias van a la derecha cuando hay espacio. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list { display:grid;gap:var(--esp-2); }
@@ -887,18 +870,143 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list :is(p,small) { margin:0;color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.45; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li>div>p:first-child { color:var(--claro-tinta);font-size:var(--texto-etiqueta); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list .badge { justify-self:start;margin-top:var(--esp-1); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks { display:flex;flex-wrap:wrap;gap:var(--esp-2);margin-top:var(--esp-1); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks .badge { margin:0; }
-@media (min-width:720px) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row>div { grid-template-columns:minmax(0,1fr) auto;column-gap:var(--esp-4); }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row>div>:not(.care-row-marks) { grid-column:1; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks { grid-column:2;grid-row:1/span 2;align-self:center;justify-content:flex-end;margin:0; }
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided { background:var(--fila-anulada); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided>span { background:var(--insignia-rojo-fondo);color:var(--insignia-rojo-texto); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided h3 { color:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list details { margin-top:var(--esp-1); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list summary { width:fit-content;color:var(--claro-verde);font-size:var(--texto-meta);font-weight:600;cursor:pointer; }
+
+/* Mantenimiento (panel del usuario): fila de estado, «Registrar un cuidado» e «Historial de cuidados».
+   Solo presentación; colores propios de estas tres zonas en variables locales. */
+html body[data-private=true][data-role=user] #app-page :is(.care-status,.care-register,.care-history) {
+  --cz-ficha:#fffaf5;--cz-ficha-borde:#f0e0d1;--cz-sombra:0 8px 30px rgba(120,70,30,.06);
+  --cz-verde:#2f6048;--cz-texto:#14281d;--cz-suave:#566a5e;--cz-control:#cdb8a4;--cz-acento:#e8694a;--cz-tinte:#e3efe6;
+  --cz-rojo-fondo:#fde3df;--cz-rojo-texto:#8a2b1f;--cz-ambar-fondo:#f9e6c8;--cz-ambar-texto:#6b3f06;
+}
+html body[data-private=true][data-role=user] #app-page :is(.care-status,.care-register,.care-history) .icon { stroke-width:2; }
+html body[data-private=true][data-role=user] #app-page :is(.care-status,.care-register,.care-history) :is(button,a,input,select,summary):focus-visible { outline:3px solid var(--cz-acento)!important;outline-offset:2px!important; }
+@media (prefers-reduced-motion:no-preference) {
+  html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) :is(.button,a,input,select,summary) { transition:background-color .15s ease,color .15s ease,border-color .15s ease,box-shadow .15s ease!important; }
+}
+
+/* 1 · Fila de tarjetas de estado */
+html body[data-private=true][data-role=user] #app-page .care-status { margin:0 0 20px; }
+html body[data-private=true][data-role=user] #app-page .care-status-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:14px;margin:0;padding:0;list-style:none; }
+html body[data-private=true][data-role=user] #app-page .care-status-card { display:grid;align-content:start;gap:4px;min-width:0;padding:16px 18px;border:1px solid var(--cz-ficha-borde);border-radius:20px;background:var(--cz-ficha);box-shadow:var(--cz-sombra); }
+html body[data-private=true][data-role=user] #app-page .care-status-card p { margin:0!important;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-status-label { color:var(--cz-suave)!important;font-size:13px;font-weight:700;line-height:1.35; }
+html body[data-private=true][data-role=user] #app-page .care-status-value { color:var(--cz-texto)!important;font-size:20px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums; }
+html body[data-private=true][data-role=user] #app-page .care-status-detail { color:var(--cz-suave)!important;font-size:13px;line-height:1.4; }
+
+/* Fichas: mismo marco para registrar e historial */
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) { display:grid;grid-template-columns:minmax(0,1fr);gap:20px;max-width:none;margin-bottom:0;padding:24px 28px;color:var(--cz-texto);border:1px solid var(--cz-ficha-borde)!important;border-radius:28px;background:var(--cz-ficha)!important;box-shadow:var(--cz-sombra)!important; }
+html body[data-private=true][data-role=user] #app-page .care-register + .care-history { margin-top:20px; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history)>h2 { margin:0!important;color:var(--cz-texto);font-size:22px!important;font-weight:800;line-height:1.25; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) :is(select,input:where(:not([type=checkbox]):not([type=radio]))) { width:100%;height:44px;min-height:44px;box-sizing:border-box;padding:0 12px;color:var(--cz-texto);font-size:14px;border:1px solid var(--cz-control)!important;border-radius:14px!important;background-color:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field input { padding-right:48px; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field button { width:44px;color:var(--cz-verde);border:0!important;border-radius:0 14px 14px 0!important;background:transparent!important; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field button:hover { background:var(--cz-tinte)!important; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field .icon { color:var(--cz-verde); }
+
+/* 2 · «Registrar un cuidado» */
+html body[data-private=true][data-role=user] #app-page .care-register>form { display:grid;gap:20px;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-register>form label { display:block;margin:0 0 8px;color:var(--cz-texto);font-size:14px;font-weight:700;line-height:1.3; }
+/* El <select> del tipo sigue en el formulario (lo usa el controlador), oculto a la vista y a los lectores: los chips lo muestran. */
+html body[data-private=true][data-role=user] #app-page .care-register .care-hidden-select { position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;margin:-1px!important;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0!important;opacity:0;pointer-events:none; }
+html body[data-private=true][data-role=user] #app-page .care-type-field>label { pointer-events:none; }
+html body[data-private=true][data-role=user] #app-page .care-chips { display:flex;flex-wrap:wrap;gap:10px; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip { display:inline-flex;align-items:center;gap:8px;height:48px;min-height:48px!important;padding:0 18px!important;color:var(--cz-texto)!important;font-size:15px;font-weight:700;white-space:nowrap;border:1px solid var(--cz-control)!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip:hover { border-color:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip .icon { flex:0 0 20px;width:20px;height:20px;color:var(--cz-verde); }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip[aria-pressed=true] { color:#fff!important;border-color:var(--cz-verde)!important;background:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip[aria-pressed=true] .icon { color:#fff; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-label { display:block;margin:0 0 8px;color:var(--cz-texto);font-size:14px;font-weight:700;line-height:1.3; }
+html body[data-private=true][data-role=user] #app-page .care-plant-field[hidden] { display:none!important; }
+/* «¿Cuándo?»: en el depósito se ve el campo de siempre; en los demás, las pestañas y el campo solo con «Elegir día». */
+html body[data-private=true][data-role=user] #app-page .care-when { display:grid;gap:12px;min-width:0; }
+html body[data-private=true][data-role=user] #app-page .care-when[data-when-mode=field] :is(.care-when-label,.care-when-chips) { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-when:not([data-when-mode=field]) .care-when-date>.maint-date-control>label { position:absolute!important;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap; }
+html body[data-private=true][data-role=user] #app-page .care-when .care-when-label { margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-when-date[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-when-date { max-width:400px; }
+/* Chiles: − número + (el número no se escribe; cambia con los botones). */
+html body[data-private=true][data-role=user] #app-page .care-stepper { display:inline-flex;align-items:center;gap:8px;padding:4px;border:1px solid var(--cz-control);border-radius:999px;background:#fff; }
+html body[data-private=true][data-role=user] #app-page .care-stepper .care-step { display:grid;place-items:center;width:44px;height:44px;min-height:44px!important;padding:0!important;color:var(--cz-verde)!important;border:1px solid var(--cz-control)!important;border-radius:50%!important;background:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-stepper .care-step:hover { border-color:var(--cz-verde)!important;background:var(--cz-tinte)!important; }
+html body[data-private=true][data-role=user] #app-page .care-stepper .care-step .icon { width:20px;height:20px; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input { width:72px!important;height:44px;min-height:44px;padding:0!important;text-align:center;font-size:18px!important;font-weight:800;font-variant-numeric:tabular-nums;border:0!important;background:transparent!important;-moz-appearance:textfield;appearance:textfield;cursor:default; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input::-webkit-inner-spin-button,html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input::placeholder { color:var(--cz-texto);opacity:1; }
+html body[data-private=true][data-role=user] #app-page .care-fields { display:flex;flex-wrap:wrap;gap:24px 36px;align-items:flex-start; }
+html body[data-private=true][data-role=user] #app-page .care-fields>* { flex:1 1 220px;min-width:0;max-width:340px; }
+html body[data-private=true][data-role=user] #app-page .care-fields>.care-when { flex:1 1 380px;max-width:480px; }
+html body[data-private=true][data-role=user] #app-page .care-plant-chips .care-chip { height:auto;min-height:48px!important;max-width:100%;white-space:normal!important;text-align:left;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-fields>[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-register #care-when-hint { margin:8px 0 0!important;color:var(--cz-suave)!important;font-size:13.5px;line-height:1.45; }
+html body[data-private=true][data-role=user] #app-page .care-register-footer { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 24px; }
+html body[data-private=true][data-role=user] #app-page .care-register-help { flex:1 1 260px;margin:0!important;color:var(--cz-suave)!important;font-size:14px;line-height:1.5; }
+html body[data-private=true][data-role=user] #app-page .care-register-help .care-guide-link { color:var(--cz-verde);font-weight:700;text-decoration:underline;text-underline-offset:3px;border-radius:4px; }
+html body[data-private=true][data-role=user] #app-page .care-register-help .care-guide-link:hover { color:var(--cz-texto); }
+html body[data-private=true][data-role=user] #app-page .care-register-actions { display:flex;flex-wrap:wrap;align-items:center;gap:12px; }
+/* «Rellené el depósito» registra con un clic: se conserva como botón secundario junto a «Registrar». */
+html body[data-private=true][data-role=user] #app-page .care-register .care-quick-refill { display:inline-flex;align-items:center;gap:8px;height:52px;min-height:52px!important;padding:0 22px!important;color:var(--cz-texto)!important;font-size:15px;font-weight:700;border:1px solid var(--cz-control)!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-quick-refill .icon { width:20px;height:20px;color:var(--cz-verde); }
+html body[data-private=true][data-role=user] #app-page .care-register .care-quick-refill:hover { border-color:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-submit { height:52px;min-height:52px!important;padding:0 34px!important;color:#fff!important;font-size:16px;font-weight:800;border:1px solid var(--cz-verde)!important;border-radius:999px!important;background:var(--cz-verde)!important;box-shadow:0 6px 16px rgba(47,96,72,.3)!important; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-submit:not(:disabled):hover { background:#26503c!important;box-shadow:0 8px 20px rgba(47,96,72,.36)!important; }
+
+/* 3 · «Historial de cuidados» */
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters { display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters>div:not(.app-actions) { flex:1 1 150px;min-width:min(150px,100%);gap:6px; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters :is(label,.maint-date-control>label) { margin:0;color:var(--cz-texto);font-size:13px;font-weight:700; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters>.care-range[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .maint-date-field input[readonly] { cursor:pointer; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .maint-date-field input[readonly]::placeholder { color:var(--cz-suave);opacity:1; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions { display:flex;flex-wrap:wrap;gap:10px;margin:0 0 0 auto; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions .button { height:44px;min-height:44px!important;padding:0 22px!important;font-size:15px;font-weight:700;border-radius:999px!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-submit { color:#fff!important;border:1px solid var(--cz-verde)!important;background:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-submit:not(:disabled):hover { background:#26503c!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-clear { color:var(--cz-texto)!important;border:1px solid var(--cz-control)!important;background:#fff!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-clear:hover { border-color:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .user-history-list { display:grid;gap:10px; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row {
+  display:grid;grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"icon main marks" ". reason reason";align-items:center;gap:0 16px;
+  padding:14px 16px;border:1px solid var(--cz-ficha-borde);border-radius:18px;background:#fff;box-shadow:none;
+}
+html body[data-private=true][data-role=user] #app-page .care-history .care-row>.care-row-icon { grid-area:icon;display:grid;place-items:center;width:44px;height:44px;border-radius:14px;color:var(--cz-verde);background:var(--cz-tinte); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row>.care-row-icon .icon { width:22px;height:22px; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row>.care-row-main { grid-area:main;display:grid;gap:2px;min-width:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row h3 { margin:0;color:var(--cz-texto);font-size:16px;font-weight:800;line-height:1.35;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row .care-row-main>p { margin:0;color:var(--cz-suave)!important;font-size:14px;line-height:1.45;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks { grid-area:marks;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks .badge { margin:0;padding:6px 14px;font-size:13px;font-weight:800;line-height:1.2;border:0;border-radius:999px;white-space:nowrap; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks .badge.tone-rojo { color:var(--cz-rojo-texto);background:var(--cz-rojo-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks .badge.tone-ambar { color:var(--cz-ambar-texto);background:var(--cz-ambar-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row.is-corrected>.care-row-icon { color:var(--cz-ambar-texto);background:var(--cz-ambar-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row.is-voided>.care-row-icon { color:var(--cz-rojo-texto);background:var(--cz-rojo-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row.is-voided h3,html body[data-private=true][data-role=user] #app-page .care-history .care-row h3 s { color:var(--cz-suave);text-decoration-thickness:2px; }
+/* «Motivo»: área de clic de 44 px y una flecha que gira al abrir. */
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-reason { grid-area:reason;min-width:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row details { margin:4px 0 0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary { display:inline-flex;align-items:center;gap:8px;width:fit-content;min-height:44px;padding:0 10px;margin-left:-10px;color:var(--cz-verde);font-size:14px;font-weight:700;border-radius:14px;list-style:none;cursor:pointer; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary::-webkit-details-marker { display:none; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary::after { content:"";width:7px;height:7px;margin-top:-4px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row details[open]>summary::after { margin-top:3px;transform:rotate(-135deg); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary:hover { background:var(--cz-tinte); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row details>p { margin:4px 0 0;padding:12px 14px;color:var(--cz-texto)!important;font-size:14px;line-height:1.5;border-radius:14px;background:var(--cz-ficha);overflow-wrap:anywhere; }
+
+@media (max-width:640px) {
+  html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) { padding:20px; }
+  html body[data-private=true][data-role=user] #app-page .care-fields>* { flex-basis:100%;max-width:none; }
+  html body[data-private=true][data-role=user] #app-page .care-register-actions { width:100%; }
+  html body[data-private=true][data-role=user] #app-page .care-register-actions>.button { flex:1 1 100%;justify-content:center;width:100%; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions { flex:1 1 100%;margin:0; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions .button { flex:1 1 0; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-row { grid-template-columns:44px minmax(0,1fr);grid-template-areas:"icon main" ". marks" ". reason"; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks { justify-content:flex-start;margin-top:8px; }
+}
+@media (max-width:420px) {
+  html body[data-private=true][data-role=user] #app-page .care-chips .care-chip { flex:1 1 auto;justify-content:center; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-row { padding:12px; gap:0 12px; }
+}
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list details p { margin-top:var(--esp-1);color:var(--claro-tinta); }
 
 /* Soporte: los dos pasos lado a lado, cada uno con su número en una marca verde. */

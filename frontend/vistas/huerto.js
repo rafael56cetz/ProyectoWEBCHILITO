@@ -390,32 +390,76 @@ const TechnicalViews = (() => {
 const CareViews = (() => {
   const {tag, button, selector, screenTitle, noGarden, loading, failed} = GardenViews;
   const TYPES = {rellenar_deposito:'Rellenar depósito', sustrato:'Revisar sustrato', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
+  // Solo presentación: el ícono de cada tipo en los chips y en el historial.
+  const CARE_ICONS = {rellenar_deposito:'drop', sustrato:'layers', germinacion:'sprout', cosecha:'leaf', inspeccion:'eye'};
   const PAGE_SIZE = 25;
-  const dateField = (name, label, hint = '') => `<div class="maint-date-control"><label for="care-${name}">${label}</label>
-    <div class="maint-date-field"><input type="text" name="${name}" id="care-${name}" placeholder="aaaa-mm-dd" maxlength="10" autocomplete="off" spellcheck="false"${hint ? ' aria-describedby="care-when-hint"' : ''}>
+  const dateField = (name, label, hint = '', pickOnly = false) => `<div class="maint-date-control"><label for="care-${name}">${label}</label>
+    <div class="maint-date-field"><input type="text" name="${name}" id="care-${name}" placeholder="${pickOnly ? 'Elegir en el calendario' : 'aaaa-mm-dd'}" maxlength="10" autocomplete="off" spellcheck="false"${hint ? ' aria-describedby="care-when-hint"' : ''}${pickOnly ? ` readonly data-garden-action="care-date" data-date="${name}"` : ''}>
     <button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div>${hint ? `<p id="care-when-hint" class="user-small-copy">${hint}</p>` : ''}</div>`;
   const plantOptions = (plants, whole) => `<option value="">${whole ? 'Todo el huerto' : '—'}</option>${plants.map(plant => `<option value="${plant.number}">${escaparHTML(plant.name)}</option>`).join('')}`;
   const typeOptions = selected => Object.entries(TYPES).map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
+  // Chips del tipo: muestran el <select id="care-type"> (que sigue en el formulario) y lo cambian con su mismo evento «change».
+  const chip = (action, content, attrs) => button(action, content, 'light', attrs).replace('class="button ', 'class="button care-chip ');
+  const typeChips = selected => `<div class="care-chips care-type-chips" role="group" aria-labelledby="care-type-label">${Object.entries(TYPES).map(([value, label]) => chip('care-type', `${icon(CARE_ICONS[value])}<span>${label}</span>`, `data-type="${value}" aria-pressed="${value === selected}"`)).join('')}</div>`;
+  // Planta como botones: cada uno pone su valor en el <select id="care-plant"> (que sigue en el formulario). «Todo el huerto» solo en inspección.
+  const plantName = plant => escaparHTML(plant.name || `Planta ${plant.number}`);
+  const plantChips = plants => `<div class="care-chips care-plant-chips" role="group" aria-labelledby="care-plant-label">${chip('care-plant', '<span>Todo el huerto</span>', 'data-plant="" data-whole aria-pressed="false" hidden')}${plants.map(plant => chip('care-plant', `<span>${plantName(plant)}</span>`, `data-plant="${escaparHTML(String(plant.number))}" aria-pressed="false"`)).join('')}</div>`;
+  // «¿Cuándo?» en pestañas: Ahora deja el campo vacío, Ayer escribe la fecha de ayer y Elegir día abre el calendario del mismo campo.
+  const WHEN = [['now', 'Ahora', 'clock'], ['yesterday', 'Ayer', 'refresh'], ['pick', 'Elegir día', 'calendar']];
+  const whenTabs = () => `<div class="care-chips care-when-chips" role="group" aria-labelledby="care-when-label">${WHEN.map(([value, label, mark]) => chip('care-when', `${icon(mark)}<span>${label}</span>`, `data-when="${value}" aria-pressed="${value === 'now'}"`)).join('')}</div>`;
+  const WHEN_HINT = {field:'Déjalo vacío para registrar ahora, o escribe un día de hasta 7 días atrás.', pick:'Puedes elegir un día de hasta 7 días atrás.'};
 
   function form(plants) {
     return `<section class="bento-panel garden-form care-register" aria-labelledby="care-title"><h2 id="care-title">Registrar un cuidado</h2>
       <form data-garden-form="care" novalidate>
-        <label for="care-type">¿Qué hiciste?</label><select id="care-type" name="type">${typeOptions('rellenar_deposito')}</select>
-        <div data-care-plant hidden><label for="care-plant">¿En qué planta?</label><select id="care-plant" name="plant">${plantOptions(plants, false)}</select></div>
-        ${dateField('when', '¿Cuándo?', 'Déjalo vacío para registrar ahora, o escribe un día de hasta 7 días atrás.')}
-        <div data-care-chiles hidden><label for="care-chiles">Chiles cosechados (opcional)</label><input id="care-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric"></div>
-        <button class="button btn-liquid-brand" type="submit">Registrar</button></form>
-      <div class="user-quick-actions care-actions" aria-label="Accesos rápidos">${button('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, 'light', 'data-type="rellenar_deposito"')}${button('care-quick', `${icon('leaf')}<span>Registrar cosecha</span>`, 'light', 'data-type="cosecha"')}${button('care-quick', `${icon('drop')}<span>Revisé el sustrato</span>`, 'light', 'data-type="sustrato"')}
-        <a class="button btn-liquid-light user-care-guide-link" href="#mantenimiento/sustrato" data-care-guide-link="${CareGuideService.SUBSTRATE_KEY}">${icon('book')}<span>Ver guía de sustrato</span></a></div></section>`;
+        <div class="care-type-field"><label for="care-type" id="care-type-label">¿Qué hiciste?</label>${typeChips('rellenar_deposito')}<select id="care-type" name="type" class="care-hidden-select" tabindex="-1" aria-hidden="true">${typeOptions('rellenar_deposito')}</select></div>
+        <div class="care-field care-plant-field" data-care-plant hidden><span class="care-label" id="care-plant-label">¿En qué planta?</span>${plantChips(plants)}<select id="care-plant" name="plant" class="care-hidden-select" tabindex="-1" aria-hidden="true">${plantOptions(plants, false)}</select></div>
+        <div class="care-fields">
+          <div class="care-when" data-care-when data-when-mode="field"><span class="care-label care-when-label" id="care-when-label">¿Cuándo?</span>${whenTabs()}
+            <div class="care-when-date" data-care-when-date>${dateField('when', '¿Cuándo?', WHEN_HINT.field)}</div></div>
+          <div class="care-field" data-care-chiles hidden><label for="care-chiles">Chiles cosechados (opcional)</label>
+            <div class="care-stepper">${button('care-chiles', icon('minus'), 'light', 'data-step="-1" aria-label="Quitar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}<input id="care-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric" placeholder="0" readonly>${button('care-chiles', icon('plus'), 'light', 'data-step="1" aria-label="Agregar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}</div>
+            <p class="care-stepper-live sr-only" aria-live="polite" data-care-chiles-live></p></div>
+        </div>
+        <div class="care-register-footer">
+          <p class="care-register-help">¿Dudas sobre cómo revisar el sustrato? <a class="care-guide-link" href="#mantenimiento/sustrato" data-care-guide-link="${CareGuideService.SUBSTRATE_KEY}">Ver guía de sustrato</a></p>
+          <div class="care-register-actions">${button('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, 'light', 'data-type="rellenar_deposito"').replace('class="button ', 'class="button care-quick-refill ')}<button class="button btn-liquid-brand care-submit" type="submit">Registrar</button></div>
+        </div></form></section>`;
+  }
+
+  // Fila de estado (solo lectura): el último registro no anulado de cada tipo, tomado del historial ya cargado.
+  const STATUS_CARDS = [['rellenar_deposito', 'Último relleno de depósito'], ['cosecha', 'Última cosecha'], ['sustrato', 'Última revisión de sustrato'], ['inspeccion', 'Última inspección']];
+  const plain = text => String(text).replace(/[\u00a0\u202f]/g, ' ');
+  function stamp(value) {
+    const moment = new Date(value);
+    if(!Number.isFinite(moment.getTime())) return '—';
+    const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(), now = new Date();
+    const diff = Math.round((day(now) - day(moment)) / 864e5);
+    const hour = plain(moment.toLocaleTimeString('es-MX', {hour:'numeric', minute:'2-digit', hour12:true})).replace(/\s*([ap])\.?\s?m\.?$/i, (_, x) => ` ${x.toLowerCase()}. m.`);
+    const date = diff === 0 ? 'Hoy' : diff === 1 ? 'Ayer'
+      : plain(moment.toLocaleDateString('es-MX', {day:'numeric', month:'short', ...(moment.getFullYear() !== now.getFullYear() ? {year:'numeric'} : {})})).replace(/\./g, '');
+    return `<time datetime="${escaparHTML(moment.toISOString())}">${escaparHTML(`${date}, ${hour}`)}</time>`;
+  }
+  function status(cares = null, plants = []) {
+    const ready = cares?.status === 'ready';
+    const plantName = number => { const found = plants.find(plant => Number(plant.number) === Number(number)); return found ? escaparHTML(found.name) : `Planta ${escaparHTML(String(number))}`; };
+    const card = ([type, label]) => {
+      const last = ready ? cares.items.filter(item => item.type === type && !item.voided).sort((a, b) => new Date(b.doneAt) - new Date(a.doneAt))[0] : null;
+      const value = !cares ? 'Cargando…' : !ready ? 'No disponible' : last ? stamp(last.doneAt) : 'Sin registros';
+      const detail = last ? `${last.plant ? plantName(last.plant) : 'Todo el huerto'}${last.chiles != null ? ` · ${escaparHTML(String(last.chiles))} chiles` : ''}` : '';
+      return `<li class="care-status-card"><p class="care-status-label">${label}</p><p class="care-status-value">${value}</p>${detail ? `<p class="care-status-detail">${detail}</p>` : ''}</li>`;
+    };
+    return `<ul class="care-status-grid">${STATUS_CARDS.map(card).join('')}</ul>`;
   }
 
   function filters(plants) {
-    return `<section class="bento-panel" aria-labelledby="care-history-title"><h2 id="care-history-title">Historial de cuidados</h2>
+    return `<section class="bento-panel care-history" aria-labelledby="care-history-title"><h2 id="care-history-title">Historial de cuidados</h2>
       <form class="care-filters" data-garden-form="care-filter" novalidate>
         <div><label for="filter-plant">Planta</label><select id="filter-plant" name="planta"><option value="">Todas</option><option value="huerto">Todo el huerto</option>${plants.map(plant => `<option value="${plant.number}">${escaparHTML(plant.name)}</option>`).join('')}</select></div>
         <div><label for="filter-type">Tipo</label><select id="filter-type" name="tipo"><option value="">Todos</option>${typeOptions('')}</select></div>
-        ${dateField('since', 'Desde')}${dateField('until', 'Hasta')}
-        <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${button('care-clear', 'Limpiar')}</div></form>
+        <div><label for="filter-period">Periodo</label><select id="filter-period" data-care-period><option value="">Todo el historial</option><option value="hoy">Hoy</option><option value="7d">Últimos 7 días</option><option value="rango">Elegir fechas</option></select></div>
+        <div class="care-range" data-care-range hidden>${dateField('since', 'Desde', '', true)}</div><div class="care-range" data-care-range hidden>${dateField('until', 'Hasta', '', true)}</div>
+        <div class="app-actions"><button class="button btn-liquid-brand care-filter-submit" type="submit">Filtrar</button>${button('care-clear', 'Limpiar').replace('class="button ', 'class="button care-filter-clear ')}</div></form>
       <div data-care-list></div></section>`;
   }
 
@@ -425,7 +469,8 @@ const CareViews = (() => {
     const title = TYPES[item.type] || escaparHTML(item.type);
     const marks = `${item.voided ? tag('Anulado', 'rojo') : ''}${item.corrected ? tag('Corregido por soporte', 'ambar') : ''}`;
     const reason = item.reason ? `<details><summary>Motivo</summary><p>${escaparHTML(item.reason)}</p></details>` : '';
-    return `<li class="care-row${item.voided ? ' is-voided' : ''}"><span>${icon('check')}</span><div><h3>${item.voided ? `<s>${title}</s>` : title}</h3><p>${when(item.doneAt)} · ${where}${detail}</p>${marks ? `<div class="care-row-marks">${marks}</div>` : ''}${reason}</div></li>`;
+    const mark = item.voided ? 'close' : item.corrected ? 'pencil' : CARE_ICONS[item.type] || 'check';
+    return `<li class="care-row${item.voided ? ' is-voided' : ''}${item.corrected ? ' is-corrected' : ''}"><span class="care-row-icon">${icon(mark)}</span><div class="care-row-main"><h3>${item.voided ? `<s>${title}</s>` : title}</h3><p>${when(item.doneAt)} · ${where}${detail}</p></div>${marks ? `<div class="care-row-marks">${marks}</div>` : ''}${reason ? `<div class="care-row-reason">${reason}</div>` : ''}</li>`;
   }
   const when = value => AppViews.date(value);
 
@@ -442,10 +487,11 @@ const CareViews = (() => {
     if(state.status === 'error') return failed;
     if(!state.gardens.length) return noGarden('Mantenimiento');
     const {garden, plants} = state;
-    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}${form(plants)}${filters(plants)}${CareGuideViews.slot()}`;
+    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}<section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section>${form(plants)}${filters(plants)}${CareGuideViews.slot()}`;
   }
 
   // Reglas del formulario: depósito sin planta; sustrato, germinación y cosecha con planta; inspección, de una planta o de todo el huerto.
+  // (También la usa el formulario de administración: lo que no exista allí se omite.)
   function adjust(root, type) {
     const plant = root.querySelector('[data-care-plant]'), chiles = root.querySelector('[data-care-chiles]'), select = plant.querySelector('select');
     plant.hidden = type === 'rellenar_deposito';
@@ -453,6 +499,78 @@ const CareViews = (() => {
     const first = select.options[0];
     first.textContent = type === 'inspeccion' ? 'Todo el huerto' : '—';
     if(type === 'rellenar_deposito') select.value = '';
+    root.querySelectorAll('.care-type-chips [data-type]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.type === type)));
+    syncPlants(root, type);
+    syncWhen(root, type);
+  }
+  function syncPlants(root, type = root.querySelector('#care-type')?.value) {
+    const select = root.querySelector('#care-plant');
+    root.querySelectorAll('.care-plant-chips [data-plant]').forEach(chip => {
+      if(chip.hasAttribute('data-whole')) chip.hidden = type !== 'inspeccion';
+      chip.setAttribute('aria-pressed', String(!chip.hidden && !!select && select.value === chip.dataset.plant));
+    });
+  }
+  // Un chip pone su tipo en el <select> y lanza el mismo «change» que ya escucha el controlador.
+  function pickType(root, type) {
+    const select = root.querySelector('#care-type');
+    if(!select || !(type in TYPES)) return;
+    select.value = type;
+    select.dispatchEvent(new Event('change', {bubbles:true}));
+  }
+  function pickPlant(root, value) {
+    const select = root.querySelector('#care-plant');
+    if(!select) return;
+    select.value = value;
+    syncPlants(root);
+  }
+  // «¿Cuándo?»: el depósito conserva el campo de fecha de siempre; los demás tipos usan Ahora / Ayer / Elegir día sobre el mismo campo.
+  const dayText = (offset = 0) => MaintenanceDates.format(MaintenanceDates.shift(MaintenanceDates.today(), offset));
+  function syncWhen(root, type = root.querySelector('#care-type')?.value) {
+    const box = root.querySelector('[data-care-when]');
+    if(!box) return;
+    const value = box.querySelector('#care-when').value.trim();
+    const mode = type === 'rellenar_deposito' ? 'field'
+      : box.dataset.whenMode === 'pick' ? 'pick' : !value || value === dayText() ? 'now' : value === dayText(-1) ? 'yesterday' : 'pick';
+    box.dataset.whenMode = mode;
+    box.querySelector('[data-care-when-date]').hidden = !['field', 'pick'].includes(mode);
+    box.querySelectorAll('.care-when-chips [data-when]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.when === mode)));
+    const hint = box.querySelector('#care-when-hint');
+    if(hint) hint.textContent = mode === 'field' ? WHEN_HINT.field : WHEN_HINT.pick;
+  }
+  function pickWhen(root, which) {
+    const box = root.querySelector('[data-care-when]');
+    if(!box) return;
+    const input = box.querySelector('#care-when');
+    if(which === 'now') input.value = '';
+    else if(which === 'yesterday') input.value = dayText(-1);
+    box.dataset.whenMode = which;
+    input.dispatchEvent(new Event('input', {bubbles:true}));
+    syncWhen(root);
+    if(which === 'pick') box.querySelector('[data-date-open="when"]')?.click();
+  }
+  // Chiles con − y +: sin número es «sin contar» (no se envía), igual que el campo vacío de antes.
+  function stepChiles(root, step) {
+    const input = root.querySelector('#care-chiles');
+    if(!input) return;
+    const next = Math.min(999, Math.max(0, (Number(input.value) || 0) + Number(step)));
+    input.value = next ? String(next) : '';
+    const live = root.querySelector('[data-care-chiles-live]');
+    if(live) live.textContent = `${next} ${next === 1 ? 'chile' : 'chiles'}`;
+  }
+  // Campos de fecha de solo lectura: tocarlos abre su calendario.
+  function openDate(root, name) {
+    root.querySelector(`[data-date-open="${name}"]`)?.click();
+  }
+  // Periodo del historial: llena Desde y Hasta (los mismos campos que envía «Filtrar»); «Elegir fechas» los muestra para el calendario.
+  function period(root, value) {
+    const form = root.querySelector('[data-garden-form="care-filter"]');
+    if(!form) return;
+    const since = form.elements.since, until = form.elements.until;
+    if(value === 'hoy') { since.value = dayText(); until.value = dayText(); }
+    else if(value === '7d') { since.value = dayText(-6); until.value = dayText(); }
+    else if(value === '') { since.value = ''; until.value = ''; }
+    form.querySelectorAll('[data-care-range]').forEach(field => { field.hidden = value !== 'rango'; });
+    [since, until].forEach(field => field.dispatchEvent(new Event('input', {bubbles:true})));
   }
   function prepare(root, type) {
     const form = root.querySelector('[data-garden-form="care"]');
@@ -463,11 +581,16 @@ const CareViews = (() => {
 
   function reset(root) {
     root.querySelector('[data-garden-form="care"]').reset();
+    const box = root.querySelector('[data-care-when]');
+    if(box) box.dataset.whenMode = 'field';
     adjust(root, 'rellenar_deposito');
   }
-  const resetFilters = root => root.querySelector('[data-garden-form="care-filter"]').reset();
+  function resetFilters(root) {
+    root.querySelector('[data-garden-form="care-filter"]').reset();
+    period(root, '');
+  }
 
-  return Object.freeze({screen, list, adjust, prepare, reset, resetFilters, types:TYPES});
+  return Object.freeze({screen, list, status, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, prepare, reset, resetFilters, types:TYPES});
 })();
 
 const SupportViews = (() => {
