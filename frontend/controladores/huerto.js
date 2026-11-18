@@ -99,6 +99,23 @@ const GardenSummaryController = (() => {
       state = {...state, detail};
       paint();
     }
+    // Recarga detectada: confirmarla o descartarla (con confirmación) y volver a pintar la tarjeta Depósito.
+    async function decideRefill(action, detectionId) {
+      const discard = action === 'refill-discard';
+      if(discard && !await confirmar(GardenViews.confirmations['refill-discard'])) return;
+      working = true;
+      try {
+        const id = state.detail.garden.id;
+        const result = await (discard ? service.discardRefill(id, detectionId) : service.confirmRefill(id, detectionId));
+        if(life.signal.aborted) return;
+        const ok = result.status === 'accepted';
+        mostrarAviso(ok ? 'exito' : 'error', ok ? (discard ? 'Listo: no registramos ninguna recarga.' : 'Recarga confirmada.') : GardenViews.errorText(result.code));
+        const detail = await service.detail(id, life.signal);
+        if(life.signal.aborted || detail.status !== 'ready') return;
+        state = {...state, detail};
+        paint();
+      } finally { working = false; }
+    }
     async function showSummaries() {
       const result = await service.summaries(state.detail.garden.id, 1);
       if(life.signal.aborted) return;
@@ -112,6 +129,7 @@ const GardenSummaryController = (() => {
       if(action === 'reload') await load();
       else if(action === 'summaries') await showSummaries();
       else if(action === 'refill') await recordRefill();
+      else if((action === 'refill-confirm' || action === 'refill-discard') && !working) await decideRefill(action, trigger.dataset.detection);
       else if(action === 'order' && !working) await runOrder({type});
       else if(action === 'order-confirm' && !working) await confirmOrder(type);
     }, {signal:life.signal});

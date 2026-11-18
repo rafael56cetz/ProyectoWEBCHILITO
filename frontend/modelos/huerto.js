@@ -40,6 +40,9 @@ const GardenService = (() => {
     log: (id, type, page) => get(garden(id, `/bitacora${query({tipo:type, page:Number(page) || 1})}`)),
     cares: (id, filters, page) => get(garden(id, `/cuidados${query({...filters, page:Number(page) || 1})}`)),
     tank: (id, signal) => get(garden(id, '/deposito'), {signal}),
+    // Recarga detectada por el flotador: la confirma o la descarta el dueño (solo una pendiente por huerto).
+    confirmRefill: (id, detectionId) => post(validUuid(detectionId) ? garden(id, `/deposito/detecciones/${detectionId}/confirmar`) : null),
+    discardRefill: (id, detectionId) => post(validUuid(detectionId) ? garden(id, `/deposito/detecciones/${detectionId}/descartar`) : null),
     support: (id, {signal, quiet = false} = {}) => get(garden(id, '/soporte'), {signal, headers:quiet ? background : undefined}),
     openCase: (id, values) => post(garden(id, '/soporte'), values),
     revokeCase: caseId => post(validUuid(caseId) ? `/api/soporte/${caseId}/revocar` : null),
@@ -131,7 +134,11 @@ const GardenModel = (() => {
     if(!days) return plural(hours, 'hora', 'horas');
     return rest ? `${plural(days, 'día', 'días')} y ${plural(rest, 'hora', 'horas')}` : plural(days, 'día', 'días');
   }
-  const REFILL_AUTHOR = refill => refill.origin === 'equipo' ? 'detectada por tu equipo' : refill.byOwner ? 'registrada por ti' : 'registrada por soporte';
+  // Una recarga del equipo confirmada dice quién la confirmó; las automáticas anteriores (sin autor), solo que la detectó el equipo.
+  const DETECTED = item => item.confirmed ? `Detectada por tu equipo · confirmada por ${item.byOwner ? 'ti' : 'soporte'}` : 'Detectada por tu equipo';
+  const REFILL_AUTHOR = refill => refill.origin === 'equipo' ? DETECTED(refill).replace(/^D/, 'd') : refill.byOwner ? 'registrada por ti' : 'registrada por soporte';
+  // «Detectamos una recarga hoy a las 10:05»: solo mientras espera la confirmación.
+  const pendingRefill = (tank, now = Date.now()) => tank?.pendingRefill ? `Detectamos una recarga ${meridaWhen(tank.pendingRefill.detectedAt, now)}` : '';
   // ¿Se puede registrar una recarga a mano? Si no, el motivo que se muestra junto al botón.
   function refillState(tank, now = Date.now()) {
     if(!tank || tank.canRefill) return {allowed:true, reason:''};
@@ -140,7 +147,7 @@ const GardenModel = (() => {
       const next = meridaWhen(tank.nextRefillAt, now);
       return {allowed:false, reason:`Podrás registrar otra recarga ${next.startsWith('hoy ') ? next.slice(4) : next}.`};
     }
-    if(tank.refillBlock === 'repetida') return {allowed:false, reason:`Ya registraste esta recarga (${last}): tu equipo la confirmará cuando el flotador detecte agua.`};
+    if(tank.refillBlock === 'repetida') return {allowed:false, reason:`Ya registraste esta recarga (${last}): no hace falta registrar otra.`};
     return {allowed:false, reason:last ? `Tu depósito tiene agua desde tu última recarga (${last}).` : 'Tu depósito tiene agua: podrás registrar una recarga cuando el flotador marque nivel bajo.'};
   }
   // Textos de la tarjeta Depósito: estado, desde cuándo, última recarga y duración (o frecuencia sin equipo).
@@ -163,7 +170,7 @@ const GardenModel = (() => {
   }
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
     pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
-    meridaWhen, meridaDay, humanDuration, refillState, tankSummary});
+    meridaWhen, meridaDay, humanDuration, refillState, tankSummary, pendingRefill, detectedLabel:DETECTED});
 })();
 
 // ── Guias ──

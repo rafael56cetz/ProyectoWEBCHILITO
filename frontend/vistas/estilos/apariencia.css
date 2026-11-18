@@ -1397,3 +1397,8 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [d
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .refill-reason { margin:var(--esp-2) 0 0;color:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history { display:flex;flex-direction:column;gap:var(--esp-3); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history .tank-load.is-open h3 { color:var(--claro-verde); }
+/* Recarga detectada por confirmar: aviso dentro de la tarjeta Depósito con «Confirmar recarga» (primario) y «No fue una recarga». */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending { display:flex;flex-direction:column;gap:var(--esp-2);margin:var(--esp-3) 0;padding:var(--esp-3);border:1px solid var(--claro-verde);border-radius:var(--radio-campo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending-title { display:flex;align-items:center;gap:var(--esp-2);margin:0;font-weight:600;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending-copy { margin:0;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-pending-actions { display:flex;flex-wrap:wrap;gap:var(--esp-2); }

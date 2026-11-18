@@ -15,7 +15,8 @@ const GardenViews = (() => {
     'huerto-con-equipo':'Desvincula el equipo antes de archivar este huerto.',
     'equipo-no-vinculado':'Este huerto no tiene un equipo vinculado.',
     'deposito-con-agua':'Tu depósito tiene agua desde tu última recarga. Podrás registrar otra cuando el flotador marque nivel bajo.',
-    'deposito-repetida':'Ya registraste esta recarga: tu equipo la confirmará cuando el flotador detecte agua.',
+    'deposito-repetida':'Ya registraste esta recarga: no hace falta registrar otra.',
+    'deposito-resuelta':'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.',
     'deposito-espera':'Ya registraste una recarga hace menos de 12 horas.',
     'rate-limited':'Demasiados intentos. Espera un momento.'};
   const errorText = (code, fallback = 'No se pudo completar la solicitud. Inténtalo de nuevo.') => ERRORS[code] || fallback;
@@ -92,7 +93,16 @@ const GardenViews = (() => {
     const info = GardenModel.tankSummary(tank || (fallbackHasWater == null ? null : {hasWater:fallbackHasWater}));
     const main = `${info.status}${info.lowSince ? ` <small>desde ${escaparHTML(info.lowSince)}</small>` : ''}`;
     return `<div class="garden-stat garden-tank${info.tone}"><h2>${icon('tank')}Depósito de agua</h2><strong>${main}</strong>
-      ${info.lines.map(text => `<p class="garden-tank-line">${escaparHTML(text)}</p>`).join('')}<p>Depósito de 19 L · el flotador solo detecta nivel bajo</p></div>`;
+      ${info.lines.map(text => `<p class="garden-tank-line">${escaparHTML(text)}</p>`).join('')}${pendingRefill(tank)}<p>Depósito de 19 L · el flotador solo detecta nivel bajo</p></div>`;
+  }
+  // Recarga detectada por el flotador que espera al dueño: confirmarla (crea el cuidado) o decir que no fue una recarga.
+  function pendingRefill(tank) {
+    const text = GardenModel.pendingRefill(tank);
+    if(!text) return '';
+    const id = escaparHTML(tank.pendingRefill.id);
+    return `<div class="tank-pending" role="group" aria-labelledby="tank-pending-title"><p class="tank-pending-title" id="tank-pending-title">${icon('drop')}<span>${escaparHTML(text)}</span></p>
+      <p class="tank-pending-copy">¿La confirmas? Solo las recargas confirmadas cuentan para calcular cuánto dura tu depósito.</p>
+      <div class="tank-pending-actions">${button('refill-confirm', `${icon('check')}<span>Confirmar recarga</span>`, 'brand', `data-detection="${id}"`)}${button('refill-discard', 'No fue una recarga', 'light', `data-detection="${id}"`)}</div></div>`;
   }
   // Botón de recarga manual: desactivado cuando el servidor no la permite, con el motivo a la vista.
   function refillButton(action, content, tank, extraClass = '', attrs = '') {
@@ -310,7 +320,8 @@ const GardenViews = (() => {
     lampara_apagar:{titulo:'¿Apagar la lámpara?', texto:'Se enviará la orden a tu equipo. Volverá a encenderse según su horario cuando restaures el modo automático.', accion:'Apagar lámpara'},
     lampara_automatico:{titulo:'¿Restaurar el modo automático?', texto:'Se enviará la orden a tu equipo. La lámpara volverá a seguir su horario.', accion:'Restaurar automático'},
     desvincular: identifier => ({titulo:`¿Desvincular el equipo ${identifier}?`, texto:'Dejará de enviar lecturas a este huerto. Para volver a usarlo tendrás que vincularlo de nuevo.', accion:'Desvincular equipo', peligro:true}),
-    archivar: name => ({titulo:`¿Archivar ${name}?`, texto:'Dejarás de verlo. Su historial se conserva.', accion:'Archivar huerto', peligro:true})};
+    archivar: name => ({titulo:`¿Archivar ${name}?`, texto:'Dejarás de verlo. Su historial se conserva.', accion:'Archivar huerto', peligro:true}),
+    'refill-discard':{titulo:'¿No fue una recarga?', texto:'Descartaremos esta detección y no se registrará ninguna recarga. No se puede deshacer.', accion:'No fue una recarga', peligro:true}};
 
   return Object.freeze({
     tag, button, stat, selector, screenTitle, statusLine, loading, noGarden, codeBox, noDevice, orderTitle, orderStateTag, lineChart, chart,
@@ -491,7 +502,7 @@ const CareViews = (() => {
     const detail = item.chiles != null ? ` · ${item.chiles} chiles` : '';
     const where = item.plant ? `planta ${item.plant}` : 'todo el huerto';
     const title = TYPES[item.type] || escaparHTML(item.type);
-    const marks = `${item.origin === 'equipo' ? tag('Detectada por tu equipo', 'verde') : ''}${item.voided ? tag('Anulado', 'rojo') : ''}${item.corrected ? tag('Corregido por soporte', 'ambar') : ''}`;
+    const marks = `${item.origin === 'equipo' ? tag(GardenModel.detectedLabel(item), 'verde') : ''}${item.voided ? tag('Anulado', 'rojo') : ''}${item.corrected ? tag('Corregido por soporte', 'ambar') : ''}`;
     const reason = item.reason ? `<details><summary>Motivo</summary><p>${escaparHTML(item.reason)}</p></details>` : '';
     const mark = item.voided ? 'close' : item.corrected ? 'pencil' : CARE_ICONS[item.type] || 'check';
     return `<li class="care-row${item.voided ? ' is-voided' : ''}${item.corrected ? ' is-corrected' : ''}"><span class="care-row-icon">${icon(mark)}</span><div class="care-row-main"><h3>${item.voided ? `<s>${title}</s>` : title}</h3><p>${when(item.doneAt)} · ${where}${detail}</p></div>${marks ? `<div class="care-row-marks">${marks}</div>` : ''}${reason ? `<div class="care-row-reason">${reason}</div>` : ''}</li>`;
@@ -523,7 +534,7 @@ const CareViews = (() => {
     const head = '<h2 id="tank-history-title">Historial del depósito</h2>';
     if(!tank.hasDevice) return `<section class="bento-panel tank-history" aria-labelledby="tank-history-title">${head}${summary || '<p>Registra tus recargas para saber cada cuánto rellenas tu depósito.</p>'}</section>`;
     const item = load => `<li class="tank-load${load.lowAt ? '' : ' is-open'}"><span class="care-row-icon">${icon('tank')}</span><div class="care-row-main"><h3>Recarga ${escaparHTML(when(load.refilledAt))}</h3>
-      <p>${load.lowAt ? `Se quedó sin agua ${escaparHTML(when(load.lowAt))} · Duró ${escaparHTML(GardenModel.humanDuration(load.seconds))}` : 'En curso'}</p></div>${load.origin === 'equipo' ? `<div class="care-row-marks">${tag('Detectada por tu equipo', 'verde')}</div>` : ''}</li>`;
+      <p>${load.lowAt ? `Se quedó sin agua ${escaparHTML(when(load.lowAt))} · Duró ${escaparHTML(GardenModel.humanDuration(load.seconds))}` : 'En curso'}</p></div>${load.origin === 'equipo' ? `<div class="care-row-marks">${tag(GardenModel.detectedLabel(load), 'verde')}</div>` : ''}</li>`;
     const list = loads.length ? `<ol class="user-history-list">${loads.map(item).join('')}</ol>` : '<p>Aún no hay recargas registradas.</p>';
     return `<section class="bento-panel tank-history" aria-labelledby="tank-history-title">${head}${summary}${list}<p class="user-small-copy">${TANK_NOTE}</p></section>`;
   }
