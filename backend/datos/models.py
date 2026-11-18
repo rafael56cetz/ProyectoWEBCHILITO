@@ -257,6 +257,22 @@ class Cuidado(Base):
         db_table = "cuidado"
 
 
+class DepositoDeteccion(Base):
+    """El flotador pasó de nivel bajo a con agua: la recarga espera a que el dueño la confirme (web.0005).
+
+    estado: pendiente | confirmada | descartada | sin_confirmar. Solo la confirmada tiene cuidado."""
+    id = uuid_pk()
+    huerto = fk(Huerto)
+    detectada_en = models.DateTimeField()
+    estado = models.CharField(max_length=13, db_default="pendiente")
+    cuidado = fk(Cuidado, null=True)
+    decidida_por = fk(USUARIO, null=True)    # vacío si sigue pendiente o quedó sin confirmar
+    decidida_en = models.DateTimeField(null=True)
+
+    class Meta(Base.Meta):
+        db_table = "deposito_deteccion"
+
+
 class CuidadoRevision(Base):
     id = uuid_pk()
     cuidado = fk(Cuidado)

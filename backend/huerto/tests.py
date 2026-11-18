@@ -17,8 +17,8 @@ import psycopg
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
 from django.utils import timezone
 
-from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, Dispositivo, DispositivoEvento, Medicion,
-                          MedicionPlanta, Notificacion)
+from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, DepositoDeteccion, Dispositivo,
+                          DispositivoEvento, Medicion, MedicionPlanta, Notificacion)
 from huerto.models import Huerto, Planta, PlantaEtapa
 from privacidad.models import Decision
 from tests import aceptar_vigentes, cuenta, publicar_textos
@@ -540,7 +540,7 @@ class Cuidados(BaseHuerto):
 
 
 class Deposito(BaseHuerto):
-    """El flotador: nivel bajo y recargas detectadas en la base, límites de la recarga manual y duración de cada carga."""
+    """El flotador: nivel bajo y recargas detectadas (por confirmar) en la base, límites de la recarga manual y duración de cada carga."""
     HORA = 60
 
     def setUp(self):
@@ -548,10 +548,21 @@ class Deposito(BaseHuerto):
         self.editor = cuenta('deposito-editor@example.test', 'gestionar_mantenimientos')
         self.huerto_id = self.huerto_con_equipo()
 
-    def flotador(self, *lecturas, huerto_id=None):
-        """Mediciones en orden: (horas atrás, con agua)."""
+    def flotador(self, *lecturas, huerto_id=None, confirmar=False):
+        """Mediciones en orden: (horas atrás, con agua). Con `confirmar`, el dueño confirma cada recarga detectada."""
         for horas, con_agua in lecturas:
             medir(huerto_id or self.huerto_id, horas * self.HORA, deposito_con_agua=con_agua)
+            if confirmar and (pendiente := self.pendiente()):
+                self.assertEqual(self.confirmar(pendiente).status_code, 200)
+
+    def pendiente(self):
+        return DepositoDeteccion.objects.filter(huerto_id=self.huerto_id, estado='pendiente').first()
+
+    def confirmar(self, deteccion, cliente=None):
+        return self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/confirmar', cliente=cliente)
+
+    def descartar(self, deteccion, cliente=None):
+        return self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/descartar', cliente=cliente)
 
     def recargas(self, origen=None):
         filas = Cuidado.objects.filter(huerto_id=self.huerto_id, tipo='rellenar_deposito')
@@ -591,29 +602,137 @@ class Deposito(BaseHuerto):
         bajo = DispositivoEvento.objects.get(huerto_id=self.huerto_id, tipo='deposito_bajo').ocurrido_en
         self.assertEqual(tanque['lowSince'], bajo.isoformat())
 
-    def test_recarga_detectada_crea_una_sola_recarga_del_equipo(self):
+    def test_deteccion_queda_pendiente_sin_cuidado(self):
         self.flotador((4, True), (3, False), (2, True), (1, True))
-        recarga = self.recargas().get()
-        self.assertEqual((recarga.origen, recarga.registrado_por_id), ('equipo', None))
+        self.assertFalse(self.recargas().exists())
+        deteccion = DepositoDeteccion.objects.get(huerto_id=self.huerto_id)
+        medida = Medicion.objects.filter(huerto_id=self.huerto_id).order_by('medida_en')[2].medida_en
+        self.assertEqual((deteccion.estado, deteccion.detectada_en, deteccion.cuidado_id, deteccion.decidida_por_id), ('pendiente', medida, None, None))
         self.assertEqual(DispositivoEvento.objects.filter(huerto_id=self.huerto_id, tipo='deposito_recargado').count(), 1)
         self.assertIsNotNone(Notificacion.objects.get(titulo='Tu depósito necesita agua').resuelta_en)
-        fila = self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'][0]
-        self.assertEqual((fila['type'], fila['origin']), ('rellenar_deposito', 'equipo'))
-        ultima = self.deposito()['tank']['lastRefill']
-        self.assertEqual((ultima['origin'], ultima['byOwner']), ('equipo', False))
+        aviso = Notificacion.objects.get(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito')
+        hora = medida.astimezone(ZoneInfo('America/Merida')).strftime('%d/%m/%Y a las %H:%M')
+        self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), (f'Detectamos que rellenaste tu depósito el {hora}. ¿Lo confirmas?', '#huerto', None))
+        tanque = self.deposito()['tank']
+        self.assertEqual(tanque['pendingRefill'], {'id': str(deteccion.pk), 'detectedAt': medida.isoformat()})
+        self.assertEqual((tanque['lastRefill'], tanque['canRefill'], tanque['completedLoads']), (None, True, 0))
+        self.assertEqual(self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']['pendingRefill']['id'], str(deteccion.pk))
+        self.assertEqual(self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'], [])
 
-    def test_recarga_manual_reciente_no_se_duplica(self):
+    def test_confirmar_crea_un_solo_cuidado_con_la_hora_detectada(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.confirmar(deteccion)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        recarga = self.recargas().get()
+        self.assertEqual((recarga.origen, recarga.registrado_por_id, recarga.realizado_en), ('equipo', self.dueña.pk, deteccion.detectada_en))
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.cuidado_id, deteccion.decidida_por_id), ('confirmada', recarga.pk, self.dueña.pk))
+        self.assertIsNotNone(deteccion.decidida_en)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Confirma la recarga de tu depósito').resuelta_en)
+        cuerpo = respuesta.json()
+        self.assertEqual((cuerpo['care']['origin'], cuerpo['care']['confirmed'], cuerpo['care']['byOwner']), ('equipo', True, True))
+        self.assertIsNone(cuerpo['tank']['pendingRefill'])
+        ultima = self.deposito()['tank']['lastRefill']
+        self.assertEqual((ultima['origin'], ultima['confirmed'], ultima['byOwner'], ultima['at']), ('equipo', True, True, deteccion.detectada_en.isoformat()))
+        fila = self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'][0]
+        self.assertEqual((fila['origin'], fila['confirmed'], fila['byOwner']), ('equipo', True, True))
+        otra = self.confirmar(deteccion)                     # repetir el clic no duplica
+        self.assertEqual((otra.status_code, otra.json()['code']), (409, 'deposito-resuelta'))
+        self.assertEqual(self.registrar().json()['code'], 'deposito-con-agua')
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_descartar_no_crea_nada(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.descartar(deteccion)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.cuidado_id, deteccion.decidida_por_id), ('descartada', None, self.dueña.pk))
+        self.assertFalse(self.recargas().exists())
+        self.assertIsNone(respuesta.json()['tank']['pendingRefill'])
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Confirma la recarga de tu depósito').resuelta_en)
+        self.assertEqual(self.confirmar(deteccion).json()['code'], 'deposito-resuelta')
+        self.assertFalse(self.recargas().exists())
+
+    def test_nivel_bajo_con_pendiente_la_deja_sin_confirmar(self):
+        self.flotador((4, True), (3, False), (2, True))
+        deteccion = self.pendiente()
+        self.flotador((1, False))
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.decidida_por_id, deteccion.cuidado_id), ('sin_confirmar', None, None))
+        self.assertIsNotNone(deteccion.decidida_en)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Confirma la recarga de tu depósito').resuelta_en)
+        self.assertEqual(self.confirmar(deteccion).json()['code'], 'deposito-resuelta')
+        self.assertFalse(self.recargas().exists())
+        self.assertIsNone(self.deposito()['tank']['pendingRefill'])
+        self.flotador((0.5, True))                           # la siguiente recarga se detecta de nuevo
+        self.assertEqual(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id, estado='pendiente').count(), 1)
+
+    def test_manual_con_pendiente_confirma_sin_duplicar(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.registrar(doneAt=self.hace(0.1))
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        recarga = self.recargas().get()
+        self.assertEqual((recarga.origen, recarga.registrado_por_id, recarga.realizado_en), ('equipo', self.dueña.pk, deteccion.detectada_en))
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.cuidado_id), ('confirmada', recarga.pk))
+        self.assertEqual(respuesta.json()['care']['confirmed'], True)
+        self.assertEqual(self.registrar().json()['code'], 'deposito-con-agua')
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_solo_el_dueno_confirma_o_descarta(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        otra = self.cliente(self.otra)
+        self.assertEqual(self.confirmar(deteccion, otra).status_code, 404)
+        self.assertEqual(self.descartar(deteccion, otra).status_code, 404)
+        self.assertEqual(self.confirmar(deteccion, self.cliente(self.editor)).status_code, 404)
+        self.assertEqual(self.client.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/confirmar').status_code, 400)  # sin recibo
+        ajena = self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{uuid.uuid4()}/confirmar')
+        self.assertEqual(ajena.status_code, 404)
+        # La base lo exige también: nadie más descarta, nadie la cierra a mano ni la crea.
+        for cambios in ({'estado': 'descartada', 'decidida_por': self.otra, 'decidida_en': timezone.now()},
+                        {'estado': 'sin_confirmar', 'decidida_en': timezone.now()}):
+            with self.subTest(cambios=cambios), self.assertRaises(IntegrityError), transaction.atomic():
+                DepositoDeteccion.objects.filter(pk=deteccion.pk).update(**cambios)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            DepositoDeteccion.objects.create(huerto_id=self.huerto_id, detectada_en=timezone.now())
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            DepositoDeteccion.objects.filter(pk=deteccion.pk).delete()
+        self.assertEqual((self.pendiente(), self.recargas().count()), (deteccion, 0))
+
+    def test_recarga_manual_reciente_no_pide_confirmacion(self):
         self.flotador((2, True), (1, False))
         self.assertEqual(self.registrar(doneAt=self.hace(0.5)).status_code, 200)
         self.flotador((0.2, True))
         self.assertEqual([(r.origen, r.registrado_por_id) for r in self.recargas()], [('persona', self.dueña.pk)])
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).exists())
         self.assertTrue(self.deposito()['tank']['lastRefill']['byOwner'])
 
-    def test_recarga_manual_antigua_si_se_complementa_con_la_del_equipo(self):
+    def test_recarga_manual_antigua_si_pide_confirmar_la_detectada(self):
         self.flotador((5, True), (4, False))
         self.assertEqual(self.registrar(doneAt=self.hace(3)).status_code, 200)
         self.flotador((1, True))
-        self.assertEqual(sorted(self.recargas().values_list('origen', flat=True)), ['equipo', 'persona'])
+        self.assertEqual(list(self.recargas().values_list('origen', flat=True)), ['persona'])
+        self.assertIsNotNone(self.pendiente())
+
+    def test_recargas_automaticas_anteriores_siguen_contando(self):
+        """Las que creó la 0004 (origen equipo, sin autor) se quedan: cuentan como recargas y no como confirmadas."""
+        self.flotador((50, True), (49, False))
+        with connection.cursor() as cursor:
+            cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')     # sin eventos pendientes no se puede alterar la tabla
+            cursor.execute('ALTER TABLE cuidado DISABLE TRIGGER cuidado_reglas')
+            cursor.execute("INSERT INTO cuidado(huerto_id, tipo, origen, realizado_en) VALUES (%s, 'rellenar_deposito', 'equipo', %s)",
+                           [self.huerto_id, timezone.now() - timedelta(hours=40)])
+            cursor.execute('ALTER TABLE cuidado ENABLE TRIGGER cuidado_reglas')
+        self.flotador((30, True), (20, False))      # esta detección queda sin confirmar
+        tanque = self.deposito()['tank']
+        self.assertHoras(tanque['averageSeconds'], 20)
+        self.assertEqual((tanque['lastRefill']['origin'], tanque['lastRefill']['confirmed']), ('equipo', False))
+        fila = self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'][0]
+        self.assertEqual((fila['origin'], fila['confirmed']), ('equipo', False))
 
     def test_origen_equipo_no_se_registra_a_mano(self):
         self.flotador((1, False))
@@ -629,7 +748,7 @@ class Deposito(BaseHuerto):
         self.assertIn('Tu depósito tiene agua: podrás registrar una recarga', self.assertRechazoBase())
         tanque = self.deposito()['tank']
         self.assertEqual((tanque['canRefill'], tanque['refillBlock']), (False, 'con-agua'))
-        self.flotador((0.5, False), (0.2, True))            # la recarga del equipo tampoco deja registrar otra
+        self.flotador((0.5, False), (0.2, True), confirmar=True)   # la recarga confirmada tampoco deja registrar otra
         self.assertEqual(self.registrar().json()['code'], 'deposito-con-agua')
         self.assertIn('Tu depósito tiene agua desde tu última recarga', self.assertRechazoBase())
         self.assertEqual(self.recargas().count(), 1)
@@ -643,12 +762,21 @@ class Deposito(BaseHuerto):
 
     def test_admin_tambien_respeta_la_regla_y_anula_la_del_equipo(self):
         admin = self.cliente(self.editor)
-        self.flotador((3, True), (2, False), (1, True))
+        self.flotador((3, True), (2, False), (1, True), confirmar=True)
         respuesta = self.post('/api/admin/mantenimientos', {'garden': self.huerto_id, 'type': 'rellenar_deposito'}, admin)
         self.assertEqual(respuesta.json().get('code'), 'deposito-con-agua')
         self.anular(self.recargas('equipo').get(), 'El flotador rebotó')
         tanque = self.deposito()['tank']
         self.assertEqual((tanque['lastRefill'], tanque['canRefill']), (None, True))
+
+    def test_registro_del_admin_con_pendiente_tambien_la_confirma(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.post('/api/admin/mantenimientos', {'garden': self.huerto_id, 'type': 'rellenar_deposito'}, self.cliente(self.editor))
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.decidida_por_id), ('confirmada', self.editor.pk))
+        self.assertEqual(self.deposito()['tank']['lastRefill']['byOwner'], False)
 
     # ── Huerto sin equipo ──
     def test_sin_equipo_una_recarga_cada_12_horas(self):
@@ -678,7 +806,7 @@ class Deposito(BaseHuerto):
     # ── Duración del depósito ──
     def test_duracion_promedio_y_descarte_de_rebotes(self):
         self.flotador((150, True), (149, False), (140, True), (100, False), (99, True), (79, False),
-                      (78, True), (77.5, False), (70, True), (40, False), (10, True))
+                      (78, True), (77.5, False), (70, True), (40, False), (10, True), confirmar=True)
         datos = self.deposito()
         tanque, cargas = datos['tank'], datos['loads']
         self.assertEqual(tanque['completedLoads'], 3)                        # la de media hora es rebote
@@ -695,13 +823,13 @@ class Deposito(BaseHuerto):
         for duracion in (2, 10, 10, 10, 10, 10):
             lecturas += [(hora, True), (hora - duracion, False)]
             hora -= duracion + 1
-        self.flotador(*lecturas)
+        self.flotador(*lecturas, confirmar=True)
         tanque = self.deposito()['tank']
         self.assertEqual(tanque['completedLoads'], 6)
         self.assertHoras(tanque['averageSeconds'], 10)
 
     def test_anuladas_no_cuentan(self):
-        self.flotador((50, True), (49, False), (40, True), (20, False), (10, True))
+        self.flotador((50, True), (49, False), (40, True), (20, False), (10, True), confirmar=True)
         self.assertHoras(self.deposito()['tank']['averageSeconds'], 20)
         primera = self.recargas().order_by('realizado_en').first()
         self.anular(primera)
@@ -709,18 +837,30 @@ class Deposito(BaseHuerto):
         self.assertEqual((tanque['completedLoads'], tanque['averageSeconds'], tanque['estimatedLowAt']), (0, None, None))
 
     def test_sin_cargas_completas(self):
-        self.flotador((3, True), (2, False), (1, True))
+        self.flotador((3, True), (2, False), (1, True), confirmar=True)
         datos = self.deposito()
         self.assertEqual((datos['tank']['completedLoads'], datos['tank']['averageSeconds'], datos['tank']['estimatedLowAt']), (0, None, None))
         self.assertEqual([(c['origin'], c['lowAt'], c['seconds']) for c in datos['loads']], [('equipo', None, None)])
 
     def test_estimacion_solo_con_la_carga_abierta(self):
-        self.flotador((50, True), (49, False), (40, True), (20, False))
+        self.flotador((50, True), (49, False), (40, True), (20, False), confirmar=True)
         tanque = self.deposito()['tank']
         self.assertHoras(tanque['averageSeconds'], 20)
         self.assertIsNone(tanque['estimatedLowAt'])
-        self.flotador((1, True))
+        self.flotador((1, True), confirmar=True)
         self.assertIsNotNone(self.deposito()['tank']['estimatedLowAt'])
+
+    def test_promedio_ignora_las_no_confirmadas(self):
+        self.flotador((60, True), (59, False), (50, True), confirmar=True)
+        self.flotador((30, False), (20, True), (15, False), (10, True))     # una queda sin confirmar
+        self.assertEqual(self.descartar(self.pendiente()).status_code, 200)  # y otra no fue una recarga
+        datos = self.deposito()
+        tanque = datos['tank']
+        self.assertEqual((tanque['completedLoads'], tanque['estimatedLowAt'], tanque['lastRefill']['confirmed']), (1, None, True))
+        self.assertHoras(tanque['averageSeconds'], 20)
+        self.assertEqual([(c['origin'], c['confirmed']) for c in datos['loads']], [('equipo', True)])
+        self.assertEqual(sorted(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).values_list('estado', flat=True)),
+                         ['confirmada', 'descartada', 'sin_confirmar'])
 
     def test_otra_cuenta(self):
         self.assertEqual(self.cliente(self.otra).get(f'/api/huertos/{self.huerto_id}/deposito').status_code, 404)
@@ -1017,8 +1157,10 @@ class SimuladorDeEquipo(AyudasHuerto, TransactionTestCase):
             simular_equipo.medir(con, dispositivo, hace=3)
             simular_equipo.medir(con, dispositivo, sin_agua=True, hace=2)
             simular_equipo.medir(con, dispositivo)
-        self.assertEqual(list(Cuidado.objects.filter(huerto_id=huerto_id).values_list('origen', 'registrado_por_id')), [('equipo', None)])
+        self.assertFalse(Cuidado.objects.filter(huerto_id=huerto_id).exists())      # la recarga espera la confirmación
+        self.assertEqual(DepositoDeteccion.objects.get(huerto_id=huerto_id).estado, 'pendiente')
         self.assertTrue(Notificacion.objects.filter(destinatario=self.dueña, titulo='Tu depósito necesita agua').exists())
+        self.assertTrue(Notificacion.objects.filter(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito').exists())
         medida = Medicion.objects.filter(huerto_id=huerto_id, deposito_con_agua=False).get().medida_en
         self.assertAlmostEqual((timezone.now() - medida).total_seconds(), 2 * 3600, delta=60)
 

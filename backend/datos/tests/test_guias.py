@@ -405,6 +405,7 @@ class CargaInicial(TestCase):
         self.assertIn('El flotador solo detecta nivel bajo', textos['deposito-recarga'])
         self.assertIn('Detectada por tu equipo', textos['deposito-recarga'])
         self.assertIn('cada 12 horas', textos['deposito-recarga'])
+        self.assertIn('«Confirmar recarga» y «No fue una recarga»', textos['deposito-recarga'])
         self.assertIn('Sin lecturas válidas no puede deducirse el estado de la planta', textos['sin-lecturas'])
         for guia in GuiaCuidado.objects.all():
             with self.subTest(guia.clave):

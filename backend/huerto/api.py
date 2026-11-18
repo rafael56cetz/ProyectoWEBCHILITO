@@ -78,6 +78,17 @@ def tank(request, data, huerto_id):
     return services.deposito(request.user, huerto_id)
 
 
+# Recarga detectada por el flotador: el dueño la confirma (crea el cuidado) o dice que no fue una recarga.
+@endpoint(('POST',))
+def tank_confirm(request, data, huerto_id, deteccion_id):
+    return services.confirmar_recarga(request.user, huerto_id, deteccion_id)
+
+
+@endpoint(('POST',))
+def tank_discard(request, data, huerto_id, deteccion_id):
+    return services.descartar_recarga(request.user, huerto_id, deteccion_id)
+
+
 @endpoint()
 def telemetry(request, data, huerto_id):
     bounds(request, allowed=('rango',))

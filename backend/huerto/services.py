@@ -12,13 +12,13 @@ from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
-from django.db.models import Case, CharField, F, OuterRef, Q, SmallIntegerField, Subquery, When
+from django.db.models import BooleanField, Case, CharField, F, OuterRef, Q, SmallIntegerField, Subquery, Value, When
 from django.http import Http404
 from django.utils import timezone
 
 from datos import services as s
-from datos.models import (Actuacion, Autodiagnostico, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, Dispositivo,
-                          DispositivoEvento, IaResumen, Medicion, MedicionPlanta, ResumenHoraHuerto, ResumenHoraPlanta)
+from datos.models import (Actuacion, Autodiagnostico, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, DepositoDeteccion,
+                          Dispositivo, DispositivoEvento, IaResumen, Medicion, MedicionPlanta, ResumenHoraHuerto, ResumenHoraPlanta)
 from datos.paginacion import paginar
 from web.respuestas import ReglaDeNegocio
 
@@ -204,11 +204,15 @@ def _cuidados_vigentes():
                       rev_planta=Subquery(ultima.values('planta_corregida')[:1]), rev_chiles=Subquery(ultima.values('chiles_corregidos')[:1]),
                       rev_motivo=Subquery(ultima.values('motivo')[:1]), rev_numero=Subquery(ultima.values('numero')[:1]))
             .annotate(tipo_vigente=vigente('tipo', 'rev_tipo_c', CharField()), planta_vigente=vigente('planta_numero', 'rev_planta', SmallIntegerField()),
-                      chiles_vigentes=vigente('chiles_cosechados', 'rev_chiles', SmallIntegerField())))
+                      chiles_vigentes=vigente('chiles_cosechados', 'rev_chiles', SmallIntegerField()),
+                      por_dueno=Case(When(registrado_por_id=F('huerto__propietario_id'), then=Value(True)), default=Value(False),
+                                     output_field=BooleanField())))
 
 
 def _cuidado_dto(cuidado):
+    # Recarga del equipo: «confirmed» si alguien la confirmó (las de la 0004 no tienen autor); «byOwner», si fue el dueño.
     return {'id': str(cuidado.pk), 'type': cuidado.tipo_vigente, 'plant': cuidado.planta_vigente, 'chiles': cuidado.chiles_vigentes, 'origin': cuidado.origen,
+            'confirmed': cuidado.origen == 'equipo' and cuidado.registrado_por_id is not None, 'byOwner': cuidado.por_dueno,
             'doneAt': _fecha(cuidado.realizado_en), 'voided': cuidado.rev_tipo == 'anulacion', 'corrected': cuidado.rev_tipo == 'correccion',
             'reason': cuidado.rev_motivo if cuidado.rev_tipo else None}
 
@@ -383,7 +387,9 @@ def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
 
 
 # ── Depósito: estado del flotador, reglas de la recarga manual y duración de cada carga ──
-# Las mismas reglas las impone la base (web.0004): aquí se calculan para mostrarlas y dar un mensaje claro antes de escribir.
+# Las mismas reglas las impone la base (web.0004 y web.0005): aquí se calculan para mostrarlas y dar un mensaje claro antes de escribir.
+# Una recarga que detecta el flotador queda pendiente (deposito_deteccion) hasta que el dueño la confirma: solo entonces
+# hay cuidado. Con una pendiente, registrar la recarga a mano es confirmarla, así que no se aplican las reglas manuales.
 ESPERA_SIN_EQUIPO = timedelta(hours=12)
 CARGA_MINIMA = timedelta(hours=1)        # menos que esto es rebote del flotador
 CARGAS_PARA_PROMEDIO = 5
@@ -401,12 +407,18 @@ def _recargas(huerto):
                 .order_by('realizado_en', 'registrado_en').values('realizado_en', 'origen', 'registrado_por_id'))
 
 
+def _deteccion_pendiente(huerto):
+    return DepositoDeteccion.objects.filter(huerto_id=huerto.pk, estado='pendiente').first()
+
+
 def _lecturas_flotador(huerto):
     return Medicion.objects.filter(huerto_id=huerto.pk, deposito_con_agua__isnull=False)
 
 
-def _bloqueo_recarga(huerto, equipo, recargas, momento):
+def _bloqueo_recarga(huerto, equipo, recargas, momento, pendiente=None):
     """None si se permite una recarga manual en `momento`; si no, (código, mensaje, próxima fecha permitida o None)."""
+    if pendiente is not None:
+        return None
     ultima = recargas[-1]['realizado_en'] if recargas else None
     lecturas = _lecturas_flotador(huerto)
     if equipo is not None and lecturas.exists():
@@ -418,7 +430,7 @@ def _bloqueo_recarga(huerto, equipo, recargas, momento):
         if lecturas.order_by('-medida_en').values_list('deposito_con_agua', flat=True).first():
             return ('deposito-con-agua', f'Tu depósito tiene agua desde tu última recarga ({_hora_merida(ultima)}). '
                     'Podrás registrar otra cuando el flotador marque nivel bajo.', None)
-        return ('deposito-repetida', f'Ya registraste esta recarga ({_hora_merida(ultima)}): tu equipo la confirmará cuando el flotador detecte agua.', None)
+        return ('deposito-repetida', f'Ya registraste esta recarga ({_hora_merida(ultima)}): no hace falta registrar otra.', None)
     cercanas = [r['realizado_en'] for r in recargas if abs(r['realizado_en'] - momento) < ESPERA_SIN_EQUIPO]
     if not cercanas:
         return None
@@ -427,7 +439,7 @@ def _bloqueo_recarga(huerto, equipo, recargas, momento):
 
 
 def _exigir_recarga_permitida(huerto, momento):
-    bloqueo = _bloqueo_recarga(huerto, _equipo_de(huerto), _recargas(huerto), momento)
+    bloqueo = _bloqueo_recarga(huerto, _equipo_de(huerto), _recargas(huerto), momento, _deteccion_pendiente(huerto))
     if bloqueo:
         raise ReglaDeNegocio(bloqueo[0], bloqueo[1])
 
@@ -446,9 +458,10 @@ def _cargas(recargas, bajos):
     return completas, (abiertas[-1] if abiertas else None)
 
 
-def _carga_dto(carga):
+def _carga_dto(carga, dueno_id):
     duracion = carga['bajo'] - carga['realizado_en'] if carga.get('bajo') else None
-    return {'refilledAt': _fecha(carga['realizado_en']), 'origin': carga['origen'], 'lowAt': _fecha(carga.get('bajo')),
+    return {'refilledAt': _fecha(carga['realizado_en']), 'origin': carga['origen'], 'confirmed': carga['origen'] == 'equipo' and carga['registrado_por_id'] is not None,
+            'byOwner': carga['registrado_por_id'] == dueno_id, 'lowAt': _fecha(carga.get('bajo')),
             'seconds': int(duracion.total_seconds()) if duracion else None}
 
 
@@ -463,9 +476,12 @@ def _deposito(huerto, equipo):
         evento = (DispositivoEvento.objects.filter(huerto_id=huerto.pk, tipo='deposito_bajo').order_by('-ocurrido_en')
                   .values_list('ocurrido_en', flat=True).first())
         bajo_desde = evento or lectura.medida_en
-    bloqueo = _bloqueo_recarga(huerto, equipo, recargas, ahora)
+    pendiente = _deteccion_pendiente(huerto)
+    bloqueo = _bloqueo_recarga(huerto, equipo, recargas, ahora, pendiente)
     estado = {'hasDevice': equipo is not None, 'hasWater': lectura.deposito_con_agua if lectura else None, 'lowSince': _fecha(bajo_desde),
+              'pendingRefill': {'id': str(pendiente.pk), 'detectedAt': _fecha(pendiente.detectada_en)} if pendiente else None,
               'lastRefill': {'at': _fecha(ultima['realizado_en']), 'origin': ultima['origen'],
+                             'confirmed': ultima['origen'] == 'equipo' and ultima['registrado_por_id'] is not None,
                              'byOwner': ultima['registrado_por_id'] == huerto.propietario_id} if ultima else None,
               'canRefill': bloqueo is None, 'refillBlock': bloqueo[0].removeprefix('deposito-') if bloqueo else None,
               'nextRefillAt': _fecha(bloqueo[2]) if bloqueo else None,
@@ -492,7 +508,37 @@ def _deposito(huerto, equipo):
 def deposito(actor, huerto_id):
     huerto = s.huerto_propio(actor, huerto_id)
     estado, cargas = _deposito(huerto, _equipo_de(huerto))
-    return {'status': 'ready', 'tank': estado, 'loads': [_carga_dto(carga) for carga in cargas]}
+    return {'status': 'ready', 'tank': estado, 'loads': [_carga_dto(carga, huerto.propietario_id) for carga in cargas]}
+
+
+def _deteccion_a_decidir(actor, huerto_id, deteccion_id):
+    """La detección pendiente del huerto propio, con el huerto y la detección bloqueados (en ese orden, como la base)."""
+    huerto = s.huerto_propio(actor, huerto_id, bloquear=True)
+    deteccion = DepositoDeteccion.objects.select_for_update().filter(pk=deteccion_id, huerto_id=huerto.pk).first()
+    if deteccion is None:
+        raise Http404
+    if deteccion.estado != 'pendiente':
+        raise ReglaDeNegocio('deposito-resuelta', 'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.')
+    return huerto, deteccion
+
+
+@transaction.atomic
+def confirmar_recarga(actor, huerto_id, deteccion_id):
+    """Solo el dueño: registra la recarga, que la base convierte en la detectada (su hora, origen «equipo»)."""
+    huerto, deteccion = _deteccion_a_decidir(actor, huerto_id, deteccion_id)
+    cuidado = Cuidado.objects.create(huerto=huerto, tipo='rellenar_deposito', registrado_por_id=actor.pk)
+    s.auditar(actor, 'confirmar_recarga', entidad='deposito_deteccion', entidad_id=deteccion.pk, detalle={'cuidado': str(cuidado.pk)})
+    return {'status': 'accepted', 'care': _cuidado_dto(_cuidados_vigentes().get(pk=cuidado.pk)), 'tank': _deposito(huerto, _equipo_de(huerto))[0]}
+
+
+@transaction.atomic
+def descartar_recarga(actor, huerto_id, deteccion_id):
+    """Solo el dueño: «No fue una recarga». No crea cuidado."""
+    huerto, deteccion = _deteccion_a_decidir(actor, huerto_id, deteccion_id)
+    DepositoDeteccion.objects.filter(pk=deteccion.pk, estado='pendiente').update(estado='descartada', decidida_por_id=actor.pk,
+                                                                               decidida_en=timezone.now())
+    s.auditar(actor, 'descartar_recarga', entidad='deposito_deteccion', entidad_id=deteccion.pk)
+    return {'status': 'accepted', 'tank': _deposito(huerto, _equipo_de(huerto))[0]}
 
 
 # ── Mantenimientos de todos los huertos (`gestionar_mantenimientos`) ──
