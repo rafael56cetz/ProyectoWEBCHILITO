@@ -249,8 +249,9 @@ class Cuidado(Base):
     tipo = models.CharField(max_length=18)
     chiles_cosechados = models.SmallIntegerField(null=True)
     realizado_en = models.DateTimeField(db_default=AHORA)
-    registrado_por = fk(USUARIO)
+    registrado_por = fk(USUARIO, null=True)     # vacío solo en las recargas que detecta el equipo
     registrado_en = models.DateTimeField(db_default=AHORA)
+    origen = models.CharField(max_length=7, db_default="persona")     # persona | equipo
 
     class Meta(Base.Meta):
         db_table = "cuidado"

@@ -73,6 +73,12 @@ def cares(request, data, huerto_id):
 
 
 @endpoint()
+def tank(request, data, huerto_id):
+    bounds(request, allowed=())
+    return services.deposito(request.user, huerto_id)
+
+
+@endpoint()
 def telemetry(request, data, huerto_id):
     bounds(request, allowed=('rango',))
     return services.telemetria(request.user, huerto_id, request.GET.get('rango', '24h'))

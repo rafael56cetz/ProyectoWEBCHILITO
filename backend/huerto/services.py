@@ -163,7 +163,7 @@ def detalle(actor, huerto_id):
     return {'status': 'ready', 'garden': _huerto_dto(huerto, equipo),
             'plants': [_planta_dto(planta, _ultima_lectura_planta(huerto, planta.numero)) for planta in plantas],
             'metrics': _metricas(huerto) if equipo else None, 'lamp': _lampara(huerto) if equipo else None,
-            'summary': _resumen_ia_dto(resumen) if resumen else None}
+            'summary': _resumen_ia_dto(resumen) if resumen else None, 'tank': _deposito(huerto, equipo)[0]}
 
 
 def resumenes_ia(actor, huerto_id, pagina):
@@ -208,7 +208,7 @@ def _cuidados_vigentes():
 
 
 def _cuidado_dto(cuidado):
-    return {'id': str(cuidado.pk), 'type': cuidado.tipo_vigente, 'plant': cuidado.planta_vigente, 'chiles': cuidado.chiles_vigentes,
+    return {'id': str(cuidado.pk), 'type': cuidado.tipo_vigente, 'plant': cuidado.planta_vigente, 'chiles': cuidado.chiles_vigentes, 'origin': cuidado.origen,
             'doneAt': _fecha(cuidado.realizado_en), 'voided': cuidado.rev_tipo == 'anulacion', 'corrected': cuidado.rev_tipo == 'correccion',
             'reason': cuidado.rev_motivo if cuidado.rev_tipo else None}
 
@@ -336,6 +336,8 @@ def _validar_cuidado(tipo, planta, chiles):
 def _crear_cuidado(actor, huerto, tipo, planta, chiles, realizado_en):
     _validar_cuidado(tipo, planta, chiles)
     momento = _momento_cuidado(realizado_en)
+    if tipo == 'rellenar_deposito':
+        _exigir_recarga_permitida(huerto, momento or timezone.now())
     cuidado = Cuidado.objects.create(huerto=huerto, tipo=tipo, planta_numero=planta, chiles_cosechados=chiles,
                                      registrado_por_id=actor.pk, **({'realizado_en': momento} if momento else {}))
     s.auditar(actor, 'registrar_cuidado', entidad='cuidado', entidad_id=cuidado.pk, detalle={'tipo': tipo})
@@ -378,6 +380,119 @@ def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
     huerto = s.huerto_propio(actor, huerto_id)
     consulta = _filtrar_cuidados(_cuidados_vigentes().filter(huerto_id=huerto.pk), planta, tipo, desde, hasta)
     return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en'), pagina, _cuidado_dto)}
+
+
+# ── Depósito: estado del flotador, reglas de la recarga manual y duración de cada carga ──
+# Las mismas reglas las impone la base (web.0004): aquí se calculan para mostrarlas y dar un mensaje claro antes de escribir.
+ESPERA_SIN_EQUIPO = timedelta(hours=12)
+CARGA_MINIMA = timedelta(hours=1)        # menos que esto es rebote del flotador
+CARGAS_PARA_PROMEDIO = 5
+CARGAS_EN_HISTORIAL = 10
+
+
+def _hora_merida(momento):
+    return momento.astimezone(ZONA_MERIDA).strftime('%d/%m/%Y a las %H:%M')
+
+
+def _recargas(huerto):
+    """Recargas vigentes (no anuladas y con tipo vigente rellenar_deposito), de la más antigua a la más reciente."""
+    return list(_cuidados_vigentes().filter(huerto_id=huerto.pk, tipo_vigente='rellenar_deposito')
+                .filter(Q(rev_tipo__isnull=True) | Q(rev_tipo='correccion'))
+                .order_by('realizado_en', 'registrado_en').values('realizado_en', 'origen', 'registrado_por_id'))
+
+
+def _lecturas_flotador(huerto):
+    return Medicion.objects.filter(huerto_id=huerto.pk, deposito_con_agua__isnull=False)
+
+
+def _bloqueo_recarga(huerto, equipo, recargas, momento):
+    """None si se permite una recarga manual en `momento`; si no, (código, mensaje, próxima fecha permitida o None)."""
+    ultima = recargas[-1]['realizado_en'] if recargas else None
+    lecturas = _lecturas_flotador(huerto)
+    if equipo is not None and lecturas.exists():
+        bajos = lecturas.filter(deposito_con_agua=False)
+        if (bajos if ultima is None else bajos.filter(medida_en__gt=ultima)).exists():
+            return None
+        if ultima is None:
+            return ('deposito-con-agua', 'Tu depósito tiene agua: podrás registrar una recarga cuando el flotador marque nivel bajo.', None)
+        if lecturas.order_by('-medida_en').values_list('deposito_con_agua', flat=True).first():
+            return ('deposito-con-agua', f'Tu depósito tiene agua desde tu última recarga ({_hora_merida(ultima)}). '
+                    'Podrás registrar otra cuando el flotador marque nivel bajo.', None)
+        return ('deposito-repetida', f'Ya registraste esta recarga ({_hora_merida(ultima)}): tu equipo la confirmará cuando el flotador detecte agua.', None)
+    cercanas = [r['realizado_en'] for r in recargas if abs(r['realizado_en'] - momento) < ESPERA_SIN_EQUIPO]
+    if not cercanas:
+        return None
+    proxima = max(cercanas) + ESPERA_SIN_EQUIPO
+    return ('deposito-espera', f'Ya registraste una recarga hace menos de 12 horas: podrás registrar otra a partir del {_hora_merida(proxima)}.', proxima)
+
+
+def _exigir_recarga_permitida(huerto, momento):
+    bloqueo = _bloqueo_recarga(huerto, _equipo_de(huerto), _recargas(huerto), momento)
+    if bloqueo:
+        raise ReglaDeNegocio(bloqueo[0], bloqueo[1])
+
+
+def _cargas(recargas, bajos):
+    """Una carga va de la última recarga vigente antes de un «deposito_bajo» (y después del anterior) a ese evento.
+
+    Devuelve (completas de la más antigua a la más reciente, sin las de menos de 1 hora; recarga de la carga abierta o None)."""
+    completas, anterior = [], None
+    for bajo in bajos:
+        candidatas = [r for r in recargas if r['realizado_en'] < bajo and (anterior is None or r['realizado_en'] > anterior)]
+        if candidatas and bajo - candidatas[-1]['realizado_en'] >= CARGA_MINIMA:
+            completas.append({**candidatas[-1], 'bajo': bajo})
+        anterior = bajo
+    abiertas = [r for r in recargas if anterior is None or r['realizado_en'] > anterior]
+    return completas, (abiertas[-1] if abiertas else None)
+
+
+def _carga_dto(carga):
+    duracion = carga['bajo'] - carga['realizado_en'] if carga.get('bajo') else None
+    return {'refilledAt': _fecha(carga['realizado_en']), 'origin': carga['origen'], 'lowAt': _fecha(carga.get('bajo')),
+            'seconds': int(duracion.total_seconds()) if duracion else None}
+
+
+def _deposito(huerto, equipo):
+    """(estado del depósito para la interfaz, cargas para el historial: la abierta primero y luego las completas, recientes primero)."""
+    ahora = timezone.now()
+    recargas = _recargas(huerto)
+    ultima = recargas[-1] if recargas else None
+    lectura = _lecturas_flotador(huerto).order_by('-medida_en').first() if equipo else None
+    bajo_desde = None
+    if lectura is not None and lectura.deposito_con_agua is False:
+        evento = (DispositivoEvento.objects.filter(huerto_id=huerto.pk, tipo='deposito_bajo').order_by('-ocurrido_en')
+                  .values_list('ocurrido_en', flat=True).first())
+        bajo_desde = evento or lectura.medida_en
+    bloqueo = _bloqueo_recarga(huerto, equipo, recargas, ahora)
+    estado = {'hasDevice': equipo is not None, 'hasWater': lectura.deposito_con_agua if lectura else None, 'lowSince': _fecha(bajo_desde),
+              'lastRefill': {'at': _fecha(ultima['realizado_en']), 'origin': ultima['origen'],
+                             'byOwner': ultima['registrado_por_id'] == huerto.propietario_id} if ultima else None,
+              'canRefill': bloqueo is None, 'refillBlock': bloqueo[0].removeprefix('deposito-') if bloqueo else None,
+              'nextRefillAt': _fecha(bloqueo[2]) if bloqueo else None,
+              'averageSeconds': None, 'estimatedLowAt': None, 'completedLoads': 0, 'refillEverySeconds': None}
+    if equipo is None:
+        ultimas = [r['realizado_en'] for r in recargas[-CARGAS_PARA_PROMEDIO:]]
+        if len(ultimas) >= 2:
+            estado['refillEverySeconds'] = int((ultimas[-1] - ultimas[0]).total_seconds() / (len(ultimas) - 1))
+        return estado, []
+    bajos = list(DispositivoEvento.objects.filter(huerto_id=huerto.pk, tipo='deposito_bajo').order_by('ocurrido_en')
+                 .values_list('ocurrido_en', flat=True))
+    completas, abierta = _cargas(recargas, bajos)
+    estado['completedLoads'] = len(completas)
+    if completas:
+        recientes = completas[-CARGAS_PARA_PROMEDIO:]
+        promedio = sum(((c['bajo'] - c['realizado_en']) for c in recientes), timedelta()) / len(recientes)
+        estado['averageSeconds'] = int(promedio.total_seconds())
+        if abierta is not None and lectura is not None and lectura.deposito_con_agua:
+            estado['estimatedLowAt'] = _fecha(ultima['realizado_en'] + promedio)
+    historial = ([abierta] if abierta else []) + completas[::-1]
+    return estado, historial[:CARGAS_EN_HISTORIAL]
+
+
+def deposito(actor, huerto_id):
+    huerto = s.huerto_propio(actor, huerto_id)
+    estado, cargas = _deposito(huerto, _equipo_de(huerto))
+    return {'status': 'ready', 'tank': estado, 'loads': [_carga_dto(carga) for carga in cargas]}
 
 
 # ── Mantenimientos de todos los huertos (`gestionar_mantenimientos`) ──

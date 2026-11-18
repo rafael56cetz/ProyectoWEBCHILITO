@@ -656,8 +656,8 @@ class Mantenimientos(BaseAdmin):
         return self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/corregir', datos)
 
     def test_lista_todos_los_huertos_con_paginacion_busqueda_y_filtros(self):
-        for _ in range(27):
-            self.cuidado()
+        for _ in range(27):     # inspecciones de todo el huerto: las recargas tienen su propio límite
+            self.cuidado('inspeccion')
         self.cuidado('sustrato', 1)
         pagina1 = self.admin.get('/api/admin/mantenimientos').json()
         self.assertEqual((pagina1['total'], len(pagina1['items']), pagina1['page']), (28, 25, 1))

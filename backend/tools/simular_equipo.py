@@ -17,6 +17,13 @@ Uso (salvo «vincular», el equipo debe estar vinculado a un huerto):
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 atender --falla bomba_2
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 correr --cada 10
   python backend/tools/simular_equipo.py CHI-PRUEBA-0001 desconectar
+
+Ciclo del depósito (el flotador lo interpreta la base: aviso, eventos y recarga «Detectada por tu equipo»):
+  medir --sin-agua                     el flotador marca nivel bajo: evento deposito_bajo y aviso «Tu depósito necesita agua»
+  medir                                vuelve a detectar agua: evento deposito_recargado y una recarga del equipo
+Cargas completas con duración (en orden cronológico; --hace desplaza la medición N horas hacia atrás, hasta 7 días):
+  medir --hace 120 --sin-agua  →  medir --hace 119  →  medir --hace 48 --sin-agua  →  medir
+  (deja una carga de ~71 h y otra abierta con su estimación; las mediciones atrasadas respecto a otra más nueva no cuentan)
 """
 import argparse
 import getpass
@@ -111,11 +118,12 @@ def conexion(con, dispositivo, estado):
         con.execute('UPDATE dispositivo SET firmware_version = %s WHERE id = %s', [FIRMWARE, dispositivo['id']])
 
 
-def medir(con, dispositivo, cuantas=1, intervalo=60, luz=False, sin_agua=False, azar=None):
-    """Inserta `cuantas` mediciones con sus 3 plantas; la última es de ahora y las anteriores, hacia atrás cada `intervalo` s."""
+def medir(con, dispositivo, cuantas=1, intervalo=60, luz=False, sin_agua=False, azar=None, hace=0.0):
+    """Inserta `cuantas` mediciones con sus 3 plantas; la última es de hace `hace` horas (0: ahora) y las anteriores,
+    hacia atrás cada `intervalo` s."""
     azar = azar or random.Random()
     for indice in range(cuantas):
-        atras = (cuantas - 1 - indice) * intervalo
+        atras = round(hace * 3600) + (cuantas - 1 - indice) * intervalo
         medicion = con.execute(
             'INSERT INTO medicion (dispositivo_id, huerto_id, medida_en, temperatura_c, humedad_aire_pct, luz_lux, deposito_con_agua) '
             "VALUES (%s, %s, now() - make_interval(secs => %s), %s, %s, %s, %s) RETURNING id",
@@ -178,7 +186,7 @@ def correr(con, dispositivo, cada=10.0, ciclos=None, **opciones):
     conexion(con, dispositivo, 'en_linea')
     hechos = 0
     while ciclos is None or hechos < ciclos:
-        medir(con, dispositivo, luz=opciones.get('luz', False))
+        medir(con, dispositivo, luz=opciones.get('luz', False), sin_agua=opciones.get('sin_agua', False))
         atender(con, dispositivo, pausa=opciones.get('pausa', 2.0), falla=opciones.get('falla'), fallar=opciones.get('fallar', ()))
         hechos += 1
         if ciclos is None or hechos < ciclos:
@@ -192,7 +200,8 @@ def leer_argumentos(argv=None):
     analizador.add_argument('--n', type=int, default=1, help='mediciones a insertar (medir)')
     analizador.add_argument('--intervalo', type=int, default=60, help='segundos entre mediciones hacia atrás (medir)')
     analizador.add_argument('--luz', action='store_true', help='incluye lecturas del sensor de luz')
-    analizador.add_argument('--sin-agua', action='store_true', help='el flotador marca nivel bajo')
+    analizador.add_argument('--sin-agua', action='store_true', help='el flotador marca nivel bajo (medir y correr)')
+    analizador.add_argument('--hace', type=float, default=0.0, help='horas hacia atrás de la última medición (medir; máximo 168)')
     analizador.add_argument('--pausa', type=float, default=2.0, help='segundos en «enviada» antes de responder')
     analizador.add_argument('--falla', choices=COMPONENTES, help='componente que falla en el autodiagnóstico')
     analizador.add_argument('--fallar', action='append', default=[], help='tipo de orden que se responde como fallida')
@@ -212,12 +221,14 @@ def main(argv=None):
         if argumentos.accion in ('conectar', 'desconectar'):
             conexion(con, dispositivo, 'en_linea' if argumentos.accion == 'conectar' else 'desconectado')
         elif argumentos.accion == 'medir':
-            medir(con, dispositivo, argumentos.n, argumentos.intervalo, argumentos.luz, argumentos.sin_agua)
+            if not 0 <= argumentos.hace <= 168:
+                sys.exit('--hace va de 0 a 168 horas (7 días).')
+            medir(con, dispositivo, argumentos.n, argumentos.intervalo, argumentos.luz, argumentos.sin_agua, hace=argumentos.hace)
         elif argumentos.accion == 'atender':
             print(f'Órdenes atendidas: {atender(con, dispositivo, argumentos.pausa, argumentos.falla, tuple(argumentos.fallar))}')
         else:
             try:
-                correr(con, dispositivo, argumentos.cada, argumentos.ciclos, luz=argumentos.luz, pausa=argumentos.pausa,
+                correr(con, dispositivo, argumentos.cada, argumentos.ciclos, luz=argumentos.luz, sin_agua=argumentos.sin_agua, pausa=argumentos.pausa,
                        falla=argumentos.falla, fallar=tuple(argumentos.fallar))
             except KeyboardInterrupt:
                 print('Simulación detenida.')

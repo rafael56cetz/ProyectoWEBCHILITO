@@ -402,7 +402,9 @@ class CargaInicial(TestCase):
     def test_aclaraciones_y_limites_del_contenido(self):
         textos = {g.clave: g.respuesta for g in GuiaCuidado.objects.all()}
         self.assertIn('declara una acción que ya realizaste físicamente', textos['deposito-recarga'])
-        self.assertIn('El flotador detecta nivel bajo', textos['deposito-recarga'])
+        self.assertIn('El flotador solo detecta nivel bajo', textos['deposito-recarga'])
+        self.assertIn('Detectada por tu equipo', textos['deposito-recarga'])
+        self.assertIn('cada 12 horas', textos['deposito-recarga'])
         self.assertIn('Sin lecturas válidas no puede deducirse el estado de la planta', textos['sin-lecturas'])
         for guia in GuiaCuidado.objects.all():
             with self.subTest(guia.clave):
