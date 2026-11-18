@@ -23,7 +23,7 @@ from datos.paginacion import paginar
 from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
-from .models import Huerto, Planta, PlantaEtapa
+from .models import Huerto, Planta, PlantaCiclo, PlantaEtapa
 
 ALFABETO_CODIGO = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 LARGO_CODIGO = 8
@@ -148,6 +148,7 @@ def _resumen_ia_dto(resumen):
 
 def detalle(actor, huerto_id):
     huerto = s.huerto_propio(actor, huerto_id)
+    _revisar_recomendaciones(huerto)
     equipo = _equipo_de(huerto)
     plantas = Planta.objects.filter(huerto_id=huerto.pk).order_by('numero')
     resumen = IaResumen.objects.filter(huerto_id=huerto.pk).order_by('-generado_en').first()
@@ -214,17 +215,78 @@ def _ultimo_riego(huerto, numero):
     return {'at': _fecha(riego.ocurrido_en), 'origin': riego.origen, 'duration': riego.duracion_s} if riego else None
 
 
+# ── Ciclos de la planta ──
+# Siempre hay un ciclo abierto (web.0007). La línea de vida y los cuidados no se borran al terminar un ciclo: cada etapa
+# guarda su ciclo (lo fija la base) y los cuidados se reparten por fecha: lo anterior al fin de un ciclo es de ese ciclo.
+MOTIVOS_FIN_CICLO = ('cosecha_terminada', 'planta_murio', 'no_germino', 'pudricion_plaga', 'otro')
+MAXIMO_NOTA_CICLO = 500
+CUIDADOS_POR_CICLO = 50
+
+
+def _ciclos(planta):
+    return list(PlantaCiclo.objects.filter(planta_id=planta.pk).order_by('numero'))
+
+
+def _del_ciclo(filas, campo, ciclos, indice):
+    """Las filas (ya ordenadas) cuyo `campo` cae en el ciclo `indice`: desde el fin del anterior y antes de su propio fin."""
+    desde = ciclos[indice - 1].fin if indice else None
+    hasta = ciclos[indice].fin
+    return [fila for fila in filas if (desde is None or getattr(fila, campo) >= desde) and (hasta is None or getattr(fila, campo) < hasta)]
+
+
+def _etapa_dto(fila):
+    return {'stage': fila.etapa, 'since': _fecha(fila.desde)}
+
+
+def _ciclo_dto(ciclo):
+    return {'number': ciclo.numero, 'startedAt': _fecha(ciclo.inicio), 'endedAt': _fecha(ciclo.fin), 'reason': ciclo.motivo,
+            'note': ciclo.nota or None}
+
+
 def detalle_planta(actor, huerto_id, numero, rango):
     if rango not in RANGOS:
         raise ValidationError('Rango no válido')
     huerto = s.huerto_propio(actor, huerto_id)
     planta = _planta(huerto, numero)
-    historial = PlantaEtapa.objects.filter(planta_id=planta.pk).order_by('desde', 'id')
-    cuidados = _cuidados_vigentes().filter(huerto_id=huerto.pk, planta_vigente=numero).order_by('-realizado_en')[:10]
+    ciclos = _ciclos(planta)
+    etapas = list(PlantaEtapa.objects.filter(planta_id=planta.pk).order_by('desde', 'id'))
+    cuidados = list(_cuidados_vigentes().filter(huerto_id=huerto.pk, planta_vigente=numero).order_by('-realizado_en'))
+    actual = len(ciclos) - 1
+    etapas_de = lambda i: [_etapa_dto(f) for f in etapas if f.ciclo_id == ciclos[i].pk]   # noqa: E731
+    anteriores = [{**_ciclo_dto(ciclos[i]), 'stages': etapas_de(i),
+                   'care': [_cuidado_dto(c) for c in _del_ciclo(cuidados, 'realizado_en', ciclos, i)[:CUIDADOS_POR_CICLO]]}
+                  for i in range(actual - 1, -1, -1)]
     return {'status': 'ready', 'plant': _planta_dto(planta, _ultima_lectura_planta(huerto, numero)),
-            'stages': [{'stage': fila.etapa, 'since': _fecha(fila.desde)} for fila in historial],
-            'series': _serie(huerto, numero, rango), 'range': rango, 'care': [_cuidado_dto(c) for c in cuidados],
+            'cycle': _ciclo_dto(ciclos[actual]), 'pastCycles': anteriores,
+            'stages': etapas_de(actual),
+            'series': _serie(huerto, numero, rango), 'range': rango,
+            'care': [_cuidado_dto(c) for c in _del_ciclo(cuidados, 'realizado_en', ciclos, actual)[:10]],
             'lastWatering': _ultimo_riego(huerto, numero), 'hasDevice': _equipo_de(huerto) is not None}
+
+
+@transaction.atomic
+def terminar_ciclo(actor, huerto_id, numero, motivo, nota):
+    """Solo el dueño: cierra el ciclo con su motivo y abre el siguiente (la base lo hace en chilito_terminar_ciclo).
+    La planta vuelve a «sin_sembrar» sin fecha de siembra y conserva su nombre; no se borra nada."""
+    huerto = s.huerto_propio(actor, huerto_id)
+    planta = _planta(huerto, numero, bloquear=True)
+    if motivo not in MOTIVOS_FIN_CICLO:
+        raise v.CampoInvalido('reason', 'motivo-no-valido', 'Elige por qué termina el ciclo.')
+    nota = v.texto_libre(nota, 'note', maximo=MAXIMO_NOTA_CICLO, multilinea=True)
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT chilito_terminar_ciclo(%s, %s, %s)', [planta.pk, motivo, nota])
+    ciclos = _ciclos(planta)
+    s.auditar(actor, 'terminar_ciclo', entidad='planta', entidad_id=planta.pk, detalle={'ciclo': ciclos[-2].numero, 'motivo': motivo})
+    planta.refresh_from_db()
+    return {'status': 'accepted', 'plant': _planta_dto(planta, _ultima_lectura_planta(huerto, numero)),
+            'cycle': _ciclo_dto(ciclos[-1]), 'ended': _ciclo_dto(ciclos[-2])}
+
+
+def _revisar_recomendaciones(huerto):
+    """Al abrir Mi huerto: la base avisa al dueño de lo que encuentre (una vez por ciclo y situación)."""
+    with connection.cursor() as cursor:
+        for planta_id in Planta.objects.filter(huerto_id=huerto.pk).exclude(etapa='sin_sembrar').values_list('pk', flat=True):
+            cursor.execute('SELECT chilito_recomendaciones_planta(%s)', [planta_id])
 
 
 def _nombre_planta(nombre):

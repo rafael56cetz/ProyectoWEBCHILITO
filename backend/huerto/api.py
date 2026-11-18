@@ -58,6 +58,11 @@ def plant(request, data, huerto_id, numero):
     return services.detalle_planta(request.user, huerto_id, numero, request.GET.get('rango', '24h'))
 
 
+@endpoint(('POST',), ('reason', 'note'))
+def plant_end_cycle(request, data, huerto_id, numero):
+    return services.terminar_ciclo(request.user, huerto_id, numero, data.get('reason'), data.get('note'))
+
+
 @endpoint(('POST',), ('type', 'plant', 'duration'))
 def commands(request, data, huerto_id):
     return services.crear_comando(request.user, huerto_id, data.get('type'), data.get('plant'), data.get('duration'))

@@ -542,6 +542,9 @@ AVISOS_DEL_DEPOSITO = frozenset({'Tu depósito necesita agua', 'Confirma la reca
 def _enlace_aviso(aviso):
     if aviso.origen == 'dispositivo' and aviso.titulo in AVISOS_DEL_DEPOSITO and aviso.enlace == '#huerto':
         return '#mantenimiento'
+    # Las recomendaciones de una planta (web.0007) guardan «#huerto/plantas/N»; el huerto viaja en ?h= (la base no admite «?»).
+    if aviso.enlace.startswith('#huerto/plantas/') and aviso.huerto_id:
+        return f'{aviso.enlace}?h={aviso.huerto_id}'
     return aviso.enlace or None
 
 

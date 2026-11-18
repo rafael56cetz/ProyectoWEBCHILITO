@@ -28,6 +28,8 @@ REGLAS_CON_CODIGO = (('Máximo 3 huertos activos', 'huerto-limite', 'Ya tienes 3
                      ('Esta recarga detectada ya se resolvió', 'deposito-resuelta', 'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.'),
                      ('No hay una recarga detectada que confirmar', 'deposito-resuelta', 'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.'),
                      ('Ya registraste una recarga hace menos de 12 horas', 'deposito-espera', 'Ya registraste una recarga hace menos de 12 horas.'),
+                     ('La fecha del cuidado es anterior al ciclo actual', 'cuidado-ciclo-anterior',
+                      'Esa fecha es de un ciclo que ya terminaste. Elige una fecha desde que empezó el ciclo actual.'),
                      ('Un cuidado anulado no admite revisiones', 'cuidado-anulado', 'Este registro ya está anulado y no admite más cambios.'),
                      ('Orden fuera de una sesión técnica autorizada', 'sesion-cerrada', 'La sesión técnica ya se cerró o la persona retiró su autorización.'),
                      ('No hay autorización vigente para conectar', 'autorizacion-no-vigente', 'La persona ya no autoriza el acceso o la autorización venció.'),
