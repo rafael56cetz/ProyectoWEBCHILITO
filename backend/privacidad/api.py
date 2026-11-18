@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from privacidad import consentimientos, legales, politicas, services
 from web.api import InputError, body, bounds, endpoint, failure
 from web.respuestas import respuesta_de_base
+from web.validacion import CampoInvalido
 
 logger = logging.getLogger(__name__)
 CAMPOS_PERFIL = tuple(services.CAMPOS)
@@ -27,6 +28,8 @@ def _publica(vista):
     def envuelta(request, *args, **kwargs):
         try:
             return vista(request, *args, **kwargs)
+        except CampoInvalido as campo:
+            return JsonResponse(campo.respuesta(), status=400)
         except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
             return failure(400, 'invalid-input')
         except DatabaseError as fallo:

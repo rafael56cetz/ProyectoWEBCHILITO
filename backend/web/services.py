@@ -11,6 +11,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from datos import services as s
+from web import validacion as v
 
 from .models import Idempotencia
 
@@ -67,23 +68,14 @@ def huella_de(datos):
 
 
 
-def _texto_contacto(valor, maximo, *, multilinea=False):
-    if not isinstance(valor, str):
-        raise ValidationError('Texto no válido')
-    limpio = valor.strip()
-    permitido = limpio.replace('\n', '').replace('\r', '') if multilinea else limpio
-    if len(limpio) > maximo or (permitido and not permitido.isprintable()):
-        raise ValidationError('Texto no válido')
-    return limpio
-
-
 def enviar_contacto(datos):
     """Consulta del producto: se guarda en el buzón administrativo; el aviso por correo lo encola la base.
     Un fallo del correo no pierde la consulta: el aviso queda como fallido y se reintenta."""
-    nombre = _texto_contacto(datos.get('name', ''), 100)
-    correo = _texto_contacto(datos.get('email'), 254)
-    mensaje = _texto_contacto(datos.get('message'), 2000, multilinea=True)
-    validate_email(correo)
-    if not mensaje:
-        raise ValidationError('Mensaje requerido')
+    nombre = v.nombre_persona(datos.get('name', ''), 'name', requerido=False)
+    correo = v.texto_libre(datos.get('email'), 'email', maximo=254, requerido=True)
+    try:
+        validate_email(correo)
+    except ValidationError:
+        raise v.CampoInvalido('email', 'correo-no-valido', 'Escribe un correo como nombre@dominio.com.') from None
+    mensaje = v.texto_libre(datos.get('message'), 'message', maximo=2000, multilinea=True, requerido=True)
     return s.record_inquiry(nombre, correo, mensaje)

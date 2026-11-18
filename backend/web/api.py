@@ -15,6 +15,7 @@ from datos import services as s
 from datos.paginacion import paginar
 
 from . import services as operacion
+from .validacion import CampoInvalido
 from .respuestas import EntradaInvalida as InputError, ReglaDeNegocio, error as failure, leer_json as body, respuesta_de_base
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,8 @@ def endpoint(methods=('GET',), fields=(), cap=None, archivo=None):
                 key = uuid.UUID(request.headers.get('Idempotency-Key', ''))
                 return JsonResponse(operacion.ejecutar_idempotente(request.user, key, request.path, operacion.huella_de(data),
                                                                    lambda: func(request, data, *args, **kwargs)))
+            except CampoInvalido as campo:
+                return JsonResponse(campo.respuesta(), status=400)
             except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
                 return failure(400, 'invalid-input')
             except RequestDataTooBig:
@@ -161,6 +164,8 @@ def contact(request):
         data = body(request, ('name', 'email', 'message', 'website'))
         if not data.get('website'):
             operacion.enviar_contacto(data)
+    except CampoInvalido as campo:
+        return JsonResponse(campo.respuesta(), status=400)
     except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
         return failure(400, 'invalid-input')
     except RequestDataTooBig:

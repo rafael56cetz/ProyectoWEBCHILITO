@@ -16,6 +16,8 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
+from web import validacion as v
+
 from . import services as s
 from .models import GuiaCuidado
 
@@ -31,16 +33,11 @@ URL_ESQUEMA_RE = re.compile(r'https?://')
 
 
 # --- Validación ---------------------------------------------------------------------------------
-def _texto(valor, maximo, *, multilinea=False, requerido=True):
+def _texto(valor, maximo, campo, *, multilinea=False, requerido=True):
+    """Texto libre: el tabulador y el espacio duro pasan a espacio; sin caracteres de control y con largo máximo."""
     if not isinstance(valor, str):
-        raise ValidationError('Texto no válido')
-    limpio = valor.replace('\r\n', '\n').replace('\r', '\n').replace('\t', ' ').replace(' ', ' ').strip()
-    if len(limpio) > maximo or (requerido and not limpio):
-        raise ValidationError('Texto no válido')
-    revisable = limpio.replace('\n', '') if multilinea else limpio
-    if revisable and not revisable.isprintable():
-        raise ValidationError('Texto no válido')
-    return limpio
+        raise v.CampoInvalido(campo, 'texto-no-valido', 'Escribe un texto.')
+    return v.texto_libre(valor.replace('\t', ' ').replace('\u00a0', ' '), campo, maximo=maximo, multilinea=multilinea, requerido=requerido)
 
 
 def _entero(valor, minimo, maximo):
@@ -52,19 +49,21 @@ def _entero(valor, minimo, maximo):
 
 def _fuente(nombre, url):
     """Solo http y https, con servidor y sin credenciales. Sin enlace, el nombre es opcional."""
-    nombre = _texto(nombre, MAX_FUENTE_NOMBRE, requerido=False)
-    url = _texto(url, MAX_FUENTE_URL, requerido=False)
+    nombre = _texto(nombre, MAX_FUENTE_NOMBRE, 'sourceName', requerido=False)
+    url = _texto(url, MAX_FUENTE_URL, 'sourceUrl', requerido=False)
     if not url:
         return nombre, ''
-    if not nombre or not URL_ESQUEMA_RE.match(url) or not URL_RE.fullmatch(url):
-        raise ValidationError('Fuente no válida')
+    if not nombre:
+        raise v.CampoInvalido('sourceName', 'campo-requerido', 'Escribe el nombre de la fuente.')
+    if not URL_ESQUEMA_RE.match(url) or not URL_RE.fullmatch(url):
+        raise v.CampoInvalido('sourceUrl', 'formato-no-valido', 'Escribe un enlace que empiece con https:// o http://.')
     return nombre, url
 
 
 def _contenido(pregunta, respuesta, orden, fuente_nombre, fuente_url):
     nombre, url = _fuente(fuente_nombre, fuente_url)
-    return {'pregunta': _texto(pregunta, MAX_PREGUNTA), 'respuesta': _texto(respuesta, MAX_RESPUESTA, multilinea=True),
-            'orden': _entero(orden, 1, MAX_ORDEN), 'fuente_nombre': nombre, 'fuente_url': url}
+    return {'pregunta': _texto(pregunta, MAX_PREGUNTA, 'question'), 'respuesta': _texto(respuesta, MAX_RESPUESTA, 'answer', multilinea=True),
+            'orden': v.entero(orden, 'order', 1, MAX_ORDEN), 'fuente_nombre': nombre, 'fuente_url': url}
 
 
 def _clave_nueva(pregunta):

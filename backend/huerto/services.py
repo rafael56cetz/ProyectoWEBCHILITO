@@ -20,6 +20,7 @@ from datos import services as s
 from datos.models import (Actuacion, Autodiagnostico, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, DepositoDeteccion,
                           Dispositivo, DispositivoEvento, IaResumen, Medicion, MedicionPlanta, ResumenHoraHuerto, ResumenHoraPlanta)
 from datos.paginacion import paginar
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
 from .models import Huerto, Planta, PlantaEtapa
@@ -52,12 +53,6 @@ def _fecha(valor):
     return valor.isoformat() if valor else None
 
 
-def _entero(valor, minimo, maximo):
-    if type(valor) is not int or not minimo <= valor <= maximo:
-        raise ValidationError('Número no válido')
-    return valor
-
-
 def _equipo_de(huerto):
     return Dispositivo.objects.filter(huerto_id=huerto.pk).first()
 
@@ -76,11 +71,9 @@ def _huerto_dto(huerto, equipo):
 
 
 def _nombre_huerto(nombre):
-    if nombre is None:
-        return None
-    if not isinstance(nombre, str) or not nombre.isprintable() or not 1 <= len(nombre.strip()) <= 60:
-        raise ValidationError('Nombre no válido')
-    return nombre.strip()
+    """Nombre de cosa: letras, números, espacios y guion (1 a 60). Al crear se puede omitir (la base pone «Mi huerto»),
+    pero si llega, no puede estar vacío."""
+    return None if nombre is None else v.nombre_cosa(nombre, 'name', maximo=60)
 
 
 def listar(actor):
@@ -100,9 +93,7 @@ def crear(actor, nombre):
 @transaction.atomic
 def renombrar(actor, huerto_id, nombre):
     huerto = s.huerto_propio(actor, huerto_id, bloquear=True)
-    huerto.nombre = _nombre_huerto(nombre)
-    if huerto.nombre is None:
-        raise ValidationError('Nombre no válido')
+    huerto.nombre = v.nombre_cosa(nombre, 'name', maximo=60)
     huerto.save(update_fields=['nombre'])
     s.auditar(actor, 'renombrar_huerto', entidad='huerto', entidad_id=huerto.pk)
     return {'status': 'accepted', 'garden': _huerto_dto(huerto, _equipo_de(huerto))}
@@ -237,9 +228,8 @@ def detalle_planta(actor, huerto_id, numero, rango):
 
 
 def _nombre_planta(nombre):
-    if not isinstance(nombre, str) or not nombre.isprintable() or not 1 <= len(nombre.strip()) <= 40:
-        raise ValidationError('Nombre no válido')
-    return nombre.strip()
+    """Nombre de cosa (1 a 40): «Planta 1», el de fábrica, sigue siendo válido."""
+    return v.nombre_cosa(nombre, 'name', maximo=40)
 
 
 def _fecha_siembra(valor):
@@ -291,7 +281,7 @@ def crear_comando(actor, huerto_id, tipo, planta, duracion):
     if tipo not in TIPOS_COMANDO:
         raise ValidationError('Orden no válida')
     if tipo == 'regar':
-        _entero(planta, 1, 3)
+        v.entero(planta, 'plant', 1, 3)
         if duracion not in DURACIONES_RIEGO or type(duracion) is not int:
             raise ValidationError('Duración no válida')
     elif planta is not None or duracion is not None:
@@ -332,9 +322,11 @@ def _validar_cuidado(tipo, planta, chiles):
     if tipo == 'rellenar_deposito' and planta is not None:
         raise ValidationError('Datos que sobran')
     if tipo in TIPOS_CUIDADO_DE_PLANTA or (tipo == 'inspeccion' and planta is not None):
-        _entero(planta, 1, 3)
-    if chiles is not None and (tipo != 'cosecha' or type(chiles) is not int or not 0 <= chiles <= 999):
-        raise ValidationError('Cantidad no válida')
+        v.entero(planta, 'plant', 1, 3)
+    if chiles is not None:
+        if tipo != 'cosecha':
+            raise ValidationError('Datos que sobran')
+        v.entero(chiles, 'chiles', 0, 999)
 
 
 def _crear_cuidado(actor, huerto, tipo, planta, chiles, realizado_en):
@@ -543,7 +535,7 @@ def _deposito(huerto, equipo):
                              'byOwner': ultima['registrado_por_id'] == huerto.propietario_id} if ultima else None,
               'canRefill': bloqueo is None, 'refillBlock': bloqueo[0].removeprefix('deposito-') if bloqueo else None,
               'nextRefillAt': _fecha(bloqueo[2]) if bloqueo else None,
-              'averageSeconds': None, 'estimatedLowAt': None, 'completedLoads': 0, 'refillEverySeconds': None}
+              'averageSeconds': None, 'averageLoads': 0, 'estimatedLowAt': None, 'completedLoads': 0, 'refillEverySeconds': None}
     if equipo is None:
         ultimas = [r['realizado_en'] for r in recargas[-CARGAS_PARA_PROMEDIO:]]
         if len(ultimas) >= 2:
@@ -557,6 +549,7 @@ def _deposito(huerto, equipo):
         recientes = completas[-CARGAS_PARA_PROMEDIO:]
         promedio = sum(((c['bajo'] - c['realizado_en']) for c in recientes), timedelta()) / len(recientes)
         estado['averageSeconds'] = int(promedio.total_seconds())
+        estado['averageLoads'] = len(recientes)
         if abierta is not None and lectura is not None and lectura.deposito_con_agua:
             estado['estimatedLowAt'] = _fecha(ultima['realizado_en'] + promedio)
     historial = ([abierta] if abierta else []) + completas[::-1]
@@ -615,18 +608,15 @@ def _mantenimiento_dto(cuidado):
             'owner': cuidado.huerto.propietario.email, 'revision': cuidado.rev_numero or 0, 'registeredAt': _fecha(cuidado.registrado_en)}
 
 
-def _id_numerico(valor):
+def _id_numerico(valor, campo='garden'):
+    """N.º de huerto: entero positivo o solo dígitos (hasta 18)."""
     if type(valor) is int and valor > 0:
         return valor
-    if isinstance(valor, str) and valor.isascii() and valor.isdecimal() and len(valor) <= 18:
-        return int(valor)
-    raise ValidationError('Identificador no válido')
+    return int(v.entero_texto(valor, campo, maximo_digitos=18))
 
 
 def _busqueda(texto):
-    if texto is not None and (not isinstance(texto, str) or len(texto) > MAXIMO_BUSQUEDA or not texto.isprintable()):
-        raise ValidationError('Búsqueda no válida')
-    return texto.strip() if texto else None
+    return v.texto_libre(texto, 'busqueda', maximo=MAXIMO_BUSQUEDA) or None
 
 
 def mantenimientos(actor, busqueda, huerto, planta, tipo, estado, desde, hasta, pagina):
@@ -637,7 +627,7 @@ def mantenimientos(actor, busqueda, huerto, planta, tipo, estado, desde, hasta, 
     if busqueda := _busqueda(busqueda):
         consulta = consulta.filter(Q(huerto__nombre__icontains=busqueda) | Q(huerto__propietario__email__icontains=busqueda))
     if huerto:
-        consulta = consulta.filter(huerto_id=_id_numerico(huerto))
+        consulta = consulta.filter(huerto_id=_id_numerico(huerto, 'huerto'))
     if estado:
         consulta = consulta.filter(rev_tipo=ESTADOS_CUIDADO[estado]) if ESTADOS_CUIDADO[estado] else consulta.filter(rev_tipo__isnull=True)
     return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en', 'id'), pagina, _mantenimiento_dto)}
@@ -673,9 +663,7 @@ def registrar_mantenimiento(actor, huerto_id, tipo, planta, chiles, realizado_en
 
 
 def _motivo_de_revision(motivo):
-    if not isinstance(motivo, str) or not motivo.replace('\n', ' ').isprintable() or not 1 <= len(motivo.strip()) <= MAXIMO_MOTIVO:
-        raise ValidationError('Motivo no válido')
-    return motivo.strip()
+    return v.texto_libre(motivo, 'reason', maximo=MAXIMO_MOTIVO, multilinea=True, requerido=True)
 
 
 def _revisar(editor, cuidado_id, revision, motivo, accion, **campos):

@@ -16,6 +16,7 @@ from django.http import Http404
 from django.utils import timezone
 
 from huerto.models import Huerto
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
 from . import avisos_correo
@@ -237,11 +238,7 @@ def soporte(actor, huerto_id):
 
 
 def _nota_de_caso(nota):
-    if nota is None:
-        return ''
-    if not isinstance(nota, str) or len(nota) > 500 or not nota.replace('\n', ' ').isprintable():
-        raise ValidationError('Nota no válida')
-    return nota.strip()
+    return v.texto_libre(nota, 'note', maximo=500, multilinea=True)
 
 
 def _diagnostico_adjunto(actor, huerto, valor):
@@ -467,8 +464,8 @@ def _orden_de_soporte_valida(tipo, planta, duracion):
         raise ValidationError('Orden no válida')
     if tipo == 'probar_bomba':
         minimo, maximo = SEGUNDOS_PRUEBA_BOMBA
-        if type(planta) is not int or not 1 <= planta <= 3 or type(duracion) is not int or not minimo <= duracion <= maximo:
-            raise ValidationError('Planta o duración no válidas')
+        v.entero(planta, 'plant', 1, 3)
+        v.entero(duracion, 'duration', minimo, maximo)
     elif planta is not None or duracion is not None:
         raise ValidationError('Datos que sobran')
 

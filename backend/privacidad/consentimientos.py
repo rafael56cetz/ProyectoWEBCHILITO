@@ -12,6 +12,7 @@ from django.http import HttpResponse
 from datos import services as s
 from datos.paginacion import paginar_sql
 from web.respuestas import ReglaDeNegocio
+from web import validacion as v
 
 from . import politicas, services
 from .models import Decision, Preferencia
@@ -46,10 +47,8 @@ def _like(texto):
 def _filtros(documento, decision, desde, hasta, cuenta, version):
     if documento not in (None, '', *DOCUMENTOS) or decision not in (None, '', *DECISIONES):
         raise ValidationError('Filtro no válido')
-    if cuenta and (not isinstance(cuenta, str) or len(cuenta) > 60 or not cuenta.isprintable()):
-        raise ValidationError('Búsqueda no válida')
-    if version and (not isinstance(version, str) or not VERSION.match(version)):
-        raise ValidationError('Versión no válida')
+    cuenta = v.texto_libre(cuenta, 'cuenta', maximo=60)
+    version = v.formato(version, 'version', VERSION, 'Escribe la versión como 1.2 o 1.2.3.', requerido=False)
     desde, hasta = _dia(desde), _dia(hasta)
     if desde and hasta and desde > hasta:
         raise ValidationError('Rango de fechas no válido')

@@ -22,6 +22,7 @@ from django.utils import timezone
 
 from datos.services import DIAS_PARA_ELIMINAR, aceptaciones_pendientes, auditar, identity
 from huerto.models import Huerto
+from web import validacion as v
 
 from . import politicas
 from .documentos_html import sanear_html
@@ -34,7 +35,7 @@ SAL_ESTADISTICA = 'privacidad.estadistica'
 SECCIONES = frozenset(('inicio', 'proyecto', 'prototipo', 'funcionamiento', 'huerto', 'panel_tecnico',
                        'mantenimiento', 'soporte', 'avisos', 'cuenta', 'privacidad'))
 DOCUMENTOS_PUBLICOS = {'privacidad': 'aviso_privacidad', 'terminos': 'terminos', 'cookies': 'politica_cookies'}
-CAMPOS = {'firstName': ('first_name', 150), 'lastName': ('last_name', 150), 'alias': ('alias', 64)}
+CAMPOS = {'firstName': ('first_name', 60), 'lastName': ('last_name', 60), 'alias': ('alias', 64)}
 NAVEGADORES = (('Edge', r'Edg(?:e|A|iOS)?/(\d+)'), ('Opera', r'OPR/(\d+)'), ('Firefox', r'(?:Firefox|FxiOS)/(\d+)'),
                ('Chrome', r'(?:Chrome|CriOS)/(\d+)'), ('Safari', r'Version/(\d+)[^ ]* (?:Mobile/\S+ )?Safari'))
 SISTEMAS = (('Android', 'Android'), ('iOS', 'iPhone|iPad'), ('Windows', 'Windows'), ('macOS', 'Macintosh'),
@@ -276,14 +277,16 @@ def cancelar_eliminacion(actor):
 
 
 def _limpiar(datos):
+    """Nombre y apellido: nombre de persona (2 a 60, o vacío para borrarlo). Alias: nombre de cosa (hasta 64, o vacío)."""
     limpios = {}
     for clave, (campo, maximo) in CAMPOS.items():
         if clave not in datos:
             continue
         valor = datos[clave]
-        if not isinstance(valor, str) or len(valor) > maximo or not valor.isprintable():
-            raise ValidationError('Texto no válido')
-        limpios[campo] = valor.strip()
+        if not isinstance(valor, str):
+            raise v.CampoInvalido(clave, 'texto-no-valido', 'Escribe un texto.')
+        limpios[campo] = (v.nombre_cosa(valor, clave, maximo=maximo, requerido=False) if clave == 'alias'
+                          else v.nombre_persona(valor, clave, requerido=False, maximo=maximo))
     return limpios
 
 

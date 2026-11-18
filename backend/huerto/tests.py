@@ -925,6 +925,7 @@ class Deposito(BaseHuerto):
         tanque = self.deposito()['tank']
         self.assertEqual(tanque['completedLoads'], 6)
         self.assertHoras(tanque['averageSeconds'], 10)
+        self.assertEqual(tanque['averageLoads'], 5)                          # el promedio usa las últimas 5
 
     def test_anuladas_no_cuentan(self):
         self.flotador((50, True), (49, False), (40, True), (20, False), (10, True), confirmar=True)
