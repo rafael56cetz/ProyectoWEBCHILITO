@@ -597,6 +597,7 @@ class Deposito(BaseHuerto):
         self.assertEqual(DispositivoEvento.objects.filter(huerto_id=self.huerto_id, tipo='deposito_bajo').count(), 1)
         avisos = Notificacion.objects.filter(destinatario=self.dueña, titulo='Tu depósito necesita agua')
         self.assertEqual((avisos.count(), avisos.first().severidad, avisos.first().enlace), (1, 'advertencia', '#huerto'))
+        self.assertEqual(avisos.first().texto, 'Tu depósito se quedó sin agua. Rellénalo y avísanos.')
         tanque = self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']
         self.assertEqual((tanque['hasWater'], tanque['canRefill']), (False, True))
         bajo = DispositivoEvento.objects.get(huerto_id=self.huerto_id, tipo='deposito_bajo').ocurrido_en
@@ -612,8 +613,9 @@ class Deposito(BaseHuerto):
         self.assertIsNotNone(Notificacion.objects.get(titulo='Tu depósito necesita agua').resuelta_en)
         aviso = Notificacion.objects.get(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito')
         hora = medida.astimezone(ZoneInfo('America/Merida')).strftime('%d/%m/%Y a las %H:%M')
-        self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), (f'Detectamos que rellenaste tu depósito el {hora}. ¿Lo confirmas?', '#huerto', None))
+        self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), (f'Tu equipo detectó agua en el depósito el {hora}. ¿Ya lo rellenaste?', '#huerto', None))
         tanque = self.deposito()['tank']
+        self.assertEqual(tanque['state'], 'detectada')
         self.assertEqual(tanque['pendingRefill'], {'id': str(deteccion.pk), 'detectedAt': medida.isoformat()})
         self.assertEqual((tanque['lastRefill'], tanque['canRefill'], tanque['completedLoads']), (None, True, 0))
         self.assertEqual(self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']['pendingRefill']['id'], str(deteccion.pk))
@@ -711,12 +713,14 @@ class Deposito(BaseHuerto):
         self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).exists())
         self.assertTrue(self.deposito()['tank']['lastRefill']['byOwner'])
 
-    def test_recarga_manual_antigua_si_pide_confirmar_la_detectada(self):
+    def test_recarga_registrada_en_el_nivel_bajo_no_pide_confirmacion(self):
+        """Más allá de los 30 minutos: si la persona ya avisó en este nivel bajo, el agua detectada es esa recarga."""
         self.flotador((5, True), (4, False))
         self.assertEqual(self.registrar(doneAt=self.hace(3)).status_code, 200)
         self.flotador((1, True))
         self.assertEqual(list(self.recargas().values_list('origen', flat=True)), ['persona'])
-        self.assertIsNotNone(self.pendiente())
+        self.assertIsNone(self.pendiente())
+        self.assertEqual(self.deposito()['tank']['state'], 'con_agua')
 
     def test_recargas_automaticas_anteriores_siguen_contando(self):
         """Las que creó la 0004 (origen equipo, sin autor) se quedan: cuentan como recargas y no como confirmadas."""
@@ -739,6 +743,73 @@ class Deposito(BaseHuerto):
         for campos in ({'origen': 'equipo', 'registrado_por': None}, {'origen': 'equipo'}):
             with self.subTest(campos=campos), self.assertRaises(IntegrityError), transaction.atomic():
                 Cuidado.objects.create(huerto_id=self.huerto_id, tipo='rellenar_deposito', **{'registrado_por': self.dueña, **campos})
+
+    # ── Estados de la tarjeta Depósito (1 a 6) ──
+    def estado(self):
+        return self.deposito()['tank']
+
+    def test_estado_1_con_agua_tras_registrar_o_confirmar(self):
+        self.flotador((5, True), (4, False))
+        self.assertEqual(self.registrar().status_code, 200)
+        self.flotador((0, True))
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill'], tanque['canRefill'], tanque['lastRefill']['byOwner'], tanque['lastRefill']['origin']),
+                         ('con_agua', None, False, True, 'persona'))
+
+    def test_estado_2_nivel_bajo_pide_rellenar_con_un_solo_aviso(self):
+        self.flotador((3, True), (2, False), (1, False))
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill'], tanque['canRefill']), ('rellenar', None, True))
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).exists())
+        aviso = Notificacion.objects.get(destinatario=self.dueña, origen='dispositivo', titulo='Tu depósito necesita agua')
+        self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), ('Tu depósito se quedó sin agua. Rellénalo y avísanos.', '#huerto', None))
+        self.assertFalse(Notificacion.objects.filter(titulo='Confirma la recarga de tu depósito').exists())
+
+    def test_estado_3_ya_lo_rellene_registra_con_la_hora_de_confirmacion(self):
+        self.flotador((2, True), (1, False))
+        respuesta = self.registrar()                          # «Sí, ya lo rellené»: sin fecha, la hora de confirmación
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        recarga = self.recargas().get()
+        self.assertEqual((recarga.origen, recarga.registrado_por_id), ('persona', self.dueña.pk))
+        self.assertAlmostEqual((timezone.now() - recarga.realizado_en).total_seconds(), 0, delta=60)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Tu depósito necesita agua').resuelta_en)
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['canRefill'], tanque['refillBlock']), ('esperando_lectura', False, 'repetida'))
+        self.assertEqual(self.registrar().json()['code'], 'deposito-repetida')
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_estado_4_agua_sin_aviso_pregunta_y_registra_con_la_hora_detectada(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill']['id']), ('detectada', str(deteccion.pk)))
+        self.assertEqual(self.confirmar(deteccion).status_code, 200)
+        self.assertEqual(self.recargas().get().realizado_en, deteccion.detectada_en)
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill'], tanque['lastRefill']['origin'], tanque['lastRefill']['confirmed']),
+                         ('con_agua', None, 'equipo', True))
+
+    def test_estado_5_registrada_pero_sigue_en_nivel_bajo(self):
+        self.flotador((2, True), (1, False))
+        self.assertEqual(self.registrar().status_code, 200)
+        medir(self.huerto_id, 0, deposito_con_agua=False)      # la siguiente lectura sigue baja
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['canRefill'], tanque['refillBlock'], tanque['lastRefill']['byOwner']), ('sigue_bajo', False, 'repetida', True))
+        self.assertEqual(self.recargas().count(), 1)              # el registro no se borra
+        self.assertEqual(Notificacion.objects.filter(titulo='Tu depósito necesita agua').count(), 1)
+        self.assertEqual(self.registrar().json()['code'], 'deposito-repetida')
+        self.assertIn('Ya registraste esta recarga', self.assertRechazoBase())
+        medir(self.huerto_id, -1, deposito_con_agua=True)      # cuando por fin detecta agua, es esa recarga
+        self.assertIsNone(self.pendiente())
+        self.assertEqual((self.estado()['state'], self.recargas().count()), ('con_agua', 1))
+
+    def test_estado_6_sin_deteccion_real_no_hay_pregunta(self):
+        self.flotador((1, False))                               # solo «medir --sin-agua»
+        tanque = self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']
+        self.assertEqual((tanque['state'], tanque['pendingRefill']), ('rellenar', None))
+        self.flotador((0.5, True), (0.2, False))                # la detección quedó sin confirmar
+        self.assertEqual(DepositoDeteccion.objects.get(huerto_id=self.huerto_id).estado, 'sin_confirmar')
+        self.assertEqual((self.estado()['state'], self.estado()['pendingRefill']), ('rellenar', None))
 
     # ── Recarga manual con equipo ──
     def test_manual_rechazado_con_agua_y_sin_nivel_bajo_previo(self):
@@ -767,7 +838,7 @@ class Deposito(BaseHuerto):
         self.assertEqual(respuesta.json().get('code'), 'deposito-con-agua')
         self.anular(self.recargas('equipo').get(), 'El flotador rebotó')
         tanque = self.deposito()['tank']
-        self.assertEqual((tanque['lastRefill'], tanque['canRefill']), (None, True))
+        self.assertEqual((tanque['lastRefill'], tanque['canRefill'], tanque['refillBlock']), (None, False, 'con-agua'))  # hay agua
 
     def test_registro_del_admin_con_pendiente_tambien_la_confirma(self):
         self.flotador((3, True), (2, False), (1, True))
@@ -1164,7 +1235,20 @@ class SimuladorDeEquipo(AyudasHuerto, TransactionTestCase):
         medida = Medicion.objects.filter(huerto_id=huerto_id, deposito_con_agua=False).get().medida_en
         self.assertAlmostEqual((timezone.now() - medida).total_seconds(), 2 * 3600, delta=60)
 
+    def test_solo_medir_sin_agua_pide_rellenar(self):
+        """El error reportado: tras un solo «medir --sin-agua», la tarjeta pide rellenar y no pregunta por una recarga."""
+        huerto_id = self.huerto_con_equipo()
+        with self.conexion_iot() as con:
+            simular_equipo.medir(con, simular_equipo.equipo(con, 'CHI-0001'), sin_agua=True)
+        tanque = self.client.get(f'/api/huertos/{huerto_id}').json()['tank']
+        self.assertEqual((tanque['state'], tanque['hasWater'], tanque['pendingRefill'], tanque['canRefill']), ('rellenar', False, None, True))
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=huerto_id).exists())
+        avisos = Notificacion.objects.filter(destinatario=self.dueña, origen='dispositivo')
+        self.assertEqual([(a.titulo, a.texto, a.enlace) for a in avisos],
+                         [('Tu depósito necesita agua', 'Tu depósito se quedó sin agua. Rellénalo y avísanos.', '#huerto')])
+
     def test_solo_equipos_vinculados(self):
         equipo('CHI-0009', '02:00:00:00:00:09')
         with self.conexion_iot() as con, self.assertRaises(SystemExit):
             simular_equipo.equipo(con, 'CHI-0009')
+

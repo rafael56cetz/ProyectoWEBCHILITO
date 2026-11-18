@@ -387,9 +387,10 @@ def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
 
 
 # ── Depósito: estado del flotador, reglas de la recarga manual y duración de cada carga ──
-# Las mismas reglas las impone la base (web.0004 y web.0005): aquí se calculan para mostrarlas y dar un mensaje claro antes de escribir.
-# Una recarga que detecta el flotador queda pendiente (deposito_deteccion) hasta que el dueño la confirma: solo entonces
-# hay cuidado. Con una pendiente, registrar la recarga a mano es confirmarla, así que no se aplican las reglas manuales.
+# Las mismas reglas las impone la base (web.0004, web.0005 y web.0006): aquí se calculan para mostrarlas y dar un mensaje claro
+# antes de escribir. Una recarga que detecta el flotador queda pendiente (deposito_deteccion) hasta que el dueño la confirma:
+# solo entonces hay cuidado. Con una pendiente, registrar la recarga a mano es confirmarla, así que no se aplican las reglas
+# manuales. Con equipo, la recarga manual exige nivel bajo y cuenta una sola vez por cada nivel bajo (web.0006).
 ESPERA_SIN_EQUIPO = timedelta(hours=12)
 CARGA_MINIMA = timedelta(hours=1)        # menos que esto es rebote del flotador
 CARGAS_PARA_PROMEDIO = 5
@@ -404,7 +405,7 @@ def _recargas(huerto):
     """Recargas vigentes (no anuladas y con tipo vigente rellenar_deposito), de la más antigua a la más reciente."""
     return list(_cuidados_vigentes().filter(huerto_id=huerto.pk, tipo_vigente='rellenar_deposito')
                 .filter(Q(rev_tipo__isnull=True) | Q(rev_tipo='correccion'))
-                .order_by('realizado_en', 'registrado_en').values('realizado_en', 'origen', 'registrado_por_id'))
+                .order_by('realizado_en', 'registrado_en').values('realizado_en', 'registrado_en', 'origen', 'registrado_por_id'))
 
 
 def _deteccion_pendiente(huerto):
@@ -415,22 +416,41 @@ def _lecturas_flotador(huerto):
     return Medicion.objects.filter(huerto_id=huerto.pk, deposito_con_agua__isnull=False)
 
 
+def _bajo_desde(huerto):
+    """Inicio del nivel bajo en curso: la primera lectura baja después de la última con agua (None si la última tiene agua)."""
+    lecturas = _lecturas_flotador(huerto)
+    con_agua = lecturas.filter(deposito_con_agua=True).order_by('-medida_en').values_list('medida_en', flat=True).first()
+    bajas = lecturas.filter(deposito_con_agua=False)
+    if con_agua is not None:
+        bajas = bajas.filter(medida_en__gt=con_agua)
+    return bajas.order_by('medida_en').values_list('medida_en', flat=True).first()
+
+
+def _recarga_desde(recargas, desde):
+    """La recarga vigente más reciente hecha desde `desde`; la de una persona también si la registró desde entonces
+    (como chilito_recarga_desde)."""
+    if desde is None:
+        return None
+    dentro = [r for r in recargas if r['realizado_en'] >= desde or (r['origen'] == 'persona' and r['registrado_en'] >= desde)]
+    return max(dentro, key=lambda r: r['realizado_en']) if dentro else None
+
+
 def _bloqueo_recarga(huerto, equipo, recargas, momento, pendiente=None):
     """None si se permite una recarga manual en `momento`; si no, (código, mensaje, próxima fecha permitida o None)."""
     if pendiente is not None:
         return None
     ultima = recargas[-1]['realizado_en'] if recargas else None
-    lecturas = _lecturas_flotador(huerto)
-    if equipo is not None and lecturas.exists():
-        bajos = lecturas.filter(deposito_con_agua=False)
-        if (bajos if ultima is None else bajos.filter(medida_en__gt=ultima)).exists():
-            return None
-        if ultima is None:
-            return ('deposito-con-agua', 'Tu depósito tiene agua: podrás registrar una recarga cuando el flotador marque nivel bajo.', None)
-        if lecturas.order_by('-medida_en').values_list('deposito_con_agua', flat=True).first():
+    if equipo is not None and _lecturas_flotador(huerto).exists():
+        bajo_desde = _bajo_desde(huerto)
+        if bajo_desde is None:
+            if ultima is None:
+                return ('deposito-con-agua', 'Tu depósito tiene agua: podrás registrar una recarga cuando el flotador marque nivel bajo.', None)
             return ('deposito-con-agua', f'Tu depósito tiene agua desde tu última recarga ({_hora_merida(ultima)}). '
                     'Podrás registrar otra cuando el flotador marque nivel bajo.', None)
-        return ('deposito-repetida', f'Ya registraste esta recarga ({_hora_merida(ultima)}): no hace falta registrar otra.', None)
+        registrada = _recarga_desde(recargas, bajo_desde)
+        if registrada is not None:
+            return ('deposito-repetida', f'Ya registraste esta recarga ({_hora_merida(registrada["realizado_en"])}): no hace falta registrar otra.', None)
+        return None
     cercanas = [r['realizado_en'] for r in recargas if abs(r['realizado_en'] - momento) < ESPERA_SIN_EQUIPO]
     if not cercanas:
         return None
@@ -465,6 +485,22 @@ def _carga_dto(carga, dueno_id):
             'seconds': int(duracion.total_seconds()) if duracion else None}
 
 
+def _fase_deposito(huerto, equipo, lectura, recargas, pendiente):
+    """Qué muestra la tarjeta Depósito: con_agua | rellenar | detectada | esperando_lectura | sigue_bajo | sin_lectura | sin_equipo."""
+    if equipo is None:
+        return 'sin_equipo'
+    if lectura is None:
+        return 'sin_lectura'
+    if lectura.deposito_con_agua:
+        return 'detectada' if pendiente is not None and pendiente.detectada_en <= lectura.medida_en else 'con_agua'
+    registrada = _recarga_desde(recargas, _bajo_desde(huerto))
+    if registrada is None:
+        return 'rellenar'
+    # Registró la recarga en este nivel bajo: ¿llegó otra lectura (baja) después de registrarla?
+    despues = max(registrada['realizado_en'], registrada['registrado_en']) if registrada['origen'] == 'persona' else registrada['realizado_en']
+    return 'sigue_bajo' if lectura.medida_en > despues else 'esperando_lectura'
+
+
 def _deposito(huerto, equipo):
     """(estado del depósito para la interfaz, cargas para el historial: la abierta primero y luego las completas, recientes primero)."""
     ahora = timezone.now()
@@ -478,8 +514,11 @@ def _deposito(huerto, equipo):
         bajo_desde = evento or lectura.medida_en
     pendiente = _deteccion_pendiente(huerto)
     bloqueo = _bloqueo_recarga(huerto, equipo, recargas, ahora, pendiente)
+    fase = _fase_deposito(huerto, equipo, lectura, recargas, pendiente)
     estado = {'hasDevice': equipo is not None, 'hasWater': lectura.deposito_con_agua if lectura else None, 'lowSince': _fecha(bajo_desde),
-              'pendingRefill': {'id': str(pendiente.pk), 'detectedAt': _fecha(pendiente.detectada_en)} if pendiente else None,
+              'state': fase,
+              # La pregunta «¿Ya lo rellenaste?» solo con una detección real: pendiente y la última lectura con agua.
+              'pendingRefill': {'id': str(pendiente.pk), 'detectedAt': _fecha(pendiente.detectada_en)} if fase == 'detectada' else None,
               'lastRefill': {'at': _fecha(ultima['realizado_en']), 'origin': ultima['origen'],
                              'confirmed': ultima['origen'] == 'equipo' and ultima['registrado_por_id'] is not None,
                              'byOwner': ultima['registrado_por_id'] == huerto.propietario_id} if ultima else None,
