@@ -221,7 +221,7 @@ const MfaViews = Object.freeze({
   step(kind) {
     const byMail = kind === 'login_by_code';
     return `<form data-step class="login-form" novalidate><div class="field"><label for="code">${byMail?'Código de 6 dígitos':'Código de tu app o de recuperación'}</label>
-      <input id="code" name="code" autocomplete="one-time-code" required ${byMail?'inputmode="numeric" maxlength="6"':'maxlength="64"'}></div>
+      <input id="code" name="code" autocomplete="one-time-code" required ${byMail?'inputmode="numeric" maxlength="6" data-campo="digitos"':'maxlength="64"'}></div>
       <p class="auth-help">${byMail?'Te lo enviamos por correo. Vence en 5 minutos.':'Si perdiste tu app, usa uno de tus códigos de recuperación.'}</p>
       ${byMail?'':'<a class="auth-text-link" href="#sin-acceso">No tengo mi app ni mis códigos</a>'}
       <div data-step-feedback class="auth-feedback is-error" role="alert" hidden></div>
@@ -241,9 +241,9 @@ const MfaViews = Object.freeze({
         <div class="app-actions"><button class="button btn-liquid-brand" type="button" data-mfa="totp-start" hidden>Activar</button>
         <button class="button btn-liquid-light" type="button" data-mfa="totp-disable" hidden>Desactivar</button></div>
         <form data-totp-form class="maint-form" hidden><img data-totp-image alt="Código QR para tu app autenticadora" width="200" height="200"><p>Clave manual: <code data-totp-secret></code></p>
-        <label>Código de la app<input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label><button class="button btn-liquid-brand" type="submit">Confirmar</button></form></section>
+        <label>Código de la app<input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required data-campo="digitos"></label><button class="button btn-liquid-brand" type="submit">Confirmar</button></form></section>
       <section class="bento-panel security-card"><h2>Llaves de acceso</h2><p>Usa la huella, el rostro o el PIN de tu dispositivo. Tu PIN y tu biometría nunca salen de él.</p><ul class="security-keys" data-keys aria-label="Llaves registradas"></ul>
-        <form data-key-form class="key-form"><label for="key-name">Nombre de la llave</label><div class="key-form-row"><span class="key-form-icon">${icon('key')}</span><input id="key-name" name="name" maxlength="100" required placeholder="Ej. Teléfono personal" autocomplete="off"><button class="button btn-liquid-brand" type="submit">${icon('plus')}<span>Agregar llave</span></button></div></form></section>
+        <form data-key-form class="key-form"><label for="key-name">Nombre de la llave</label><div class="key-form-row"><span class="key-form-icon">${icon('key')}</span><input id="key-name" name="name" maxlength="100" required placeholder="Ej. Teléfono personal" autocomplete="off" data-campo="cosa"><button class="button btn-liquid-brand" type="submit">${icon('plus')}<span>Agregar llave</span></button></div></form></section>
       <section class="bento-panel security-card"><h2>Códigos de recuperación</h2><p data-recovery-state></p>
         <div class="app-actions"><button class="button btn-liquid-light" type="button" data-mfa="recovery-regenerate" hidden>Generar códigos nuevos</button></div>
         <div data-recovery-new hidden><p>Guárdalos ahora: no se volverán a mostrar. Cada uno sirve una sola vez.</p><ol data-recovery-list></ol></div></section>
@@ -330,9 +330,9 @@ const MfaViews = Object.freeze({
 
 // ── Perfil ──
 const ProfileViews = (() => {
-  const fields = `<label>Nombre<input name="firstName" maxlength="150" autocomplete="given-name"></label>
-    <label>Apellido<input name="lastName" maxlength="150" autocomplete="family-name"></label>
-    <label>Alias<input name="alias" maxlength="64" autocomplete="nickname" aria-describedby="alias-ayuda"><small id="alias-ayuda">Lo usaremos para dirigirnos a ti.</small></label>`;
+  const fields = `<label>Nombre<input name="firstName" maxlength="60" autocomplete="given-name" data-campo="persona"></label>
+    <label>Apellido<input name="lastName" maxlength="60" autocomplete="family-name" data-campo="persona"></label>
+    <label>Alias<input name="alias" maxlength="64" autocomplete="nickname" data-campo="cosa" aria-describedby="alias-ayuda"><small id="alias-ayuda">Lo usaremos para dirigirnos a ti.</small></label>`;
   const labels = Object.freeze({firstName:'Nombre',lastName:'Apellido',alias:'Alias'});
   return Object.freeze({
     form: `<section class="bento-panel account-profile" aria-labelledby="perfil-titulo"><h2 id="perfil-titulo">Datos personales</h2>

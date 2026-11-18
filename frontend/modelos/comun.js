@@ -187,3 +187,68 @@ const AvisoModel = Object.freeze({
     error:Object.freeze({icono:'alert',rol:'alert',ms:0})
   })
 });
+
+// ── Campos ──
+// Reglas de los campos de entrada. Son las mismas que exige el servidor (backend/web/validacion.py), que no confía en el navegador.
+// Cada campo declara la suya con data-campo; los límites salen de data-min/data-max (números) y de minlength/maxlength (texto).
+const Campos = (() => {
+  // Caracteres que se pueden escribir o pegar. Solo filtran los números, los importes, los nombres de persona y la MAC.
+  const PERMITIDOS = Object.freeze({
+    persona:/[\p{L}\p{M} '’-]/u, entero:/[0-9]/, digitos:/[0-9]/, dinero:/[0-9.]/, mac:/[0-9A-Fa-f:]/
+  });
+  const PERSONA = /^\p{L}[\p{L}\p{M} '’-]*$/u, COSA = /^[\p{L}\p{M}\p{N} -]+$/u, IMPORTE = /^[0-9]{1,8}(\.[0-9]{1,2})?$/;
+  // Formatos fijos: el patrón completo y el mensaje.
+  const FORMATOS = Object.freeze({
+    identificador:[/^[A-Za-z0-9][A-Za-z0-9-]{3,31}$/, 'De 4 a 32 letras, números o guiones; empieza con letra o número.'],
+    mac:[/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/, 'Escribe la MAC como AA:BB:CC:DD:EE:FF.'],
+    firmware:[/^[A-Za-z0-9._-]{1,32}$/, 'Solo letras, números, punto, guion y guion bajo.'],
+    version:[/^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?$/, 'Escribe la versión como 1.2 o 1.2.3.']
+  });
+  // Caracteres de control (sin el salto de línea ni el tabulador de un texto de varias líneas).
+  const CONTROL = /[\p{Cc}\p{Cf}]/gu, CONTROL_MULTILINEA = /(?![\n\t])[\p{Cc}\p{Cf}]/gu, HAY_CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}]/u;
+  // Espacios raros (duro, fino…) pasan a espacio normal y los separadores de línea a salto: el servidor solo admite esos.
+  const espacios = (texto, multilinea) => texto.replace(/(?! )\p{Zs}/gu, ' ').replace(/[\p{Zl}\p{Zp}]/gu, multilinea ? '\n' : ' ');
+  const filtra = regla => Boolean(PERMITIDOS[regla]);
+  // Deja solo los caracteres permitidos (en los demás campos, quita los de control).
+  function filtrar(regla, texto, {multilinea = false} = {}) {
+    const original = String(texto ?? '');
+    const permitido = PERMITIDOS[regla], normal = espacios(original, multilinea);
+    let limpio = permitido ? Array.from(normal).filter(c => permitido.test(c)).join('') : normal.replace(multilinea ? CONTROL_MULTILINEA : CONTROL, '');
+    if(regla === 'dinero') {
+      const [entero, ...resto] = limpio.split('.');
+      limpio = resto.length ? `${entero}.${resto.join('').slice(0, 2)}` : entero;
+    }
+    // «quitado»: se descartó algún carácter (merece aviso); «cambiado»: el texto ya no es el original (también por espacios raros).
+    return {limpio, quitado:limpio !== normal, cambiado:limpio !== original};
+  }
+  // Mensaje de un carácter no permitido (al escribir o pegar).
+  function bloqueo(regla, {min = 0, max = 999} = {}) {
+    return {persona:'Solo letras', entero:`Solo números entre ${min} y ${max}`, digitos:'Solo números', dinero:'Solo números y un punto decimal',
+      mac:'Solo dígitos hexadecimales y dos puntos'}[regla] || 'Se quitaron caracteres no permitidos';
+  }
+  const cuenta = texto => Array.from(texto).length;
+  // ¿Cumple el valor completo su regla? null si sí; si no, el mensaje que va junto al campo.
+  function validar(regla, valor, {min, max, minimo, maximo, requerido = false} = {}) {
+    const texto = String(valor ?? '').trim();
+    if(!texto) return requerido ? 'Este campo es obligatorio' : null;
+    if(regla === 'persona') {
+      const desde = minimo ?? 2, hasta = maximo ?? 60;
+      if(!PERSONA.test(texto)) return 'Solo letras, espacios, apóstrofo y guion';
+      return cuenta(texto) < desde || cuenta(texto) > hasta ? `Escribe entre ${desde} y ${hasta} letras` : null;
+    }
+    if(regla === 'cosa') {
+      if(!COSA.test(texto)) return 'Solo letras, números, espacios y guion';
+      return maximo && cuenta(texto) > maximo ? `Escribe como máximo ${maximo} caracteres` : null;
+    }
+    if(regla === 'entero') {
+      const numero = Number(texto);
+      return /^[0-9]+$/.test(texto) && numero >= (min ?? 0) && numero <= (max ?? 999) ? null : `Solo números entre ${min ?? 0} y ${max ?? 999}`;
+    }
+    if(regla === 'digitos') return /^[0-9]+$/.test(texto) && (!maximo || texto.length <= maximo) ? null : 'Solo números';
+    if(regla === 'dinero') return IMPORTE.test(texto) ? null : 'Escribe un importe como 3500 o 3500.50';
+    if(regla in FORMATOS) return FORMATOS[regla][0].test(texto) ? null : FORMATOS[regla][1];
+    if(regla === 'libre') return HAY_CONTROL.test(texto) ? 'El texto tiene caracteres no permitidos' : maximo && cuenta(texto) > maximo ? `Escribe como máximo ${maximo} caracteres` : null;
+    return null;
+  }
+  return Object.freeze({filtra, filtrar, bloqueo, validar, REGLAS:Object.freeze(['persona', 'cosa', 'entero', 'digitos', 'dinero', 'libre', ...Object.keys(FORMATOS)])});
+})();

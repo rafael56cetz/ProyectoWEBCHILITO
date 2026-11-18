@@ -516,7 +516,8 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.equal((careScreen.match(/data-garden-action="care-type"[^>]*aria-pressed="true"/g) || []).length, 1, 'un solo tipo elegido al abrir');
   assert.ok(/<select id="care-plant" name="plant"[^>]*>/.test(careScreen) && (careScreen.match(/data-garden-action="care-plant"/g) || []).length === data.plants.length + 1, 'un botón por planta más «Todo el huerto»');
   assert.ok(careScreen.includes('data-when="now"') && careScreen.includes('data-when="yesterday"') && careScreen.includes('data-when="pick"'), 'Ahora, Ayer y Elegir día');
-  assert.ok(careScreen.includes('data-step="-1"') && careScreen.includes('data-step="1"') && /id="care-chiles" name="chiles"[^>]*readonly/.test(careScreen), 'chiles con − y +');
+  assert.ok(careScreen.includes('data-step="-1"') && careScreen.includes('data-step="1"') && /id="care-chiles" name="chiles" type="text" inputmode="numeric" maxlength="3"[^>]*data-campo="entero" data-min="0" data-max="999"/.test(careScreen)
+    && !/id="care-chiles"[^>]*readonly/.test(careScreen), 'chiles con − y +, y también se pueden escribir (solo dígitos, 0 a 999)');
   assert.ok(careScreen.includes('id="filter-period"') && careScreen.includes('Últimos 7 días'), 'periodo en el historial');
   assert.ok(careScreen.includes('data-type="sustrato" aria-pressed="true"'), 'el elegido es el del select');
   assert.ok(/<select id="care-type" name="type"[^>]*>/.test(careScreen), 'el select del tipo sigue en el formulario');
@@ -681,14 +682,49 @@ suite('depósito con flotador', async () => {
     assert.ok(html.indexOf('data-care-status') > 0 && html.indexOf('data-care-status') < html.indexOf('tank-section') && html.indexOf('tank-section') < html.indexOf('care-register'), `sección después de los últimos cuidados (${key})`);
     assert.equal(html.split('Historial del depósito').length - 1, STATES[key].hasDevice ? 1 : 0, `un solo historial (${key})`);
     assert.equal((html.match(/aria-labelledby="tank-section-title"/g) || []).length, 1, `una sola sección (${key})`);
-    assert.ok(section(html).includes(STATES[key].hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : '>Depósito de 19 L<'), `capacidad (${key})`);
+    const info = section(html).match(/<details class="tank-info">[\s\S]*?<\/details>/)?.[0] || '';
+    assert.ok(info.includes(STATES[key].hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : '<p>Depósito de 19 L</p>'), `capacidad dentro del botón ⓘ (${key})`);
+    assert.ok(/<summary aria-label="Sobre el depósito" title="Sobre el depósito">/.test(info), `ⓘ con nombre accesible (${key})`);
+    assert.equal(info.includes('cambia con el calor'), STATES[key].hasDevice, `nota del calor en ⓘ solo con equipo (${key})`);
+    assert.ok(!/tank-capacity|cambia con el calor/.test(section(html).replace(info, '')), `capacidad y nota solo en ⓘ (${key})`);
+    assert.equal((section(html).match(/<li class="tank-fact/g) || []).length, 3, `tres fichas (${key})`);
+    assert.match(section(html), /<div class="tank-head"><h2 id="tank-section-title">[\s\S]*?<\/h2>\s*<span class="badge tone-(verde|ambar|gris) tank-state">/, `estado como insignia junto al título (${key})`);
   }
+  // Insignia: «Con agua» verde, «Nivel bajo» ámbar.
+  assert.ok(section(care(STATES.con_agua)).includes('<span class="badge tone-verde tank-state">Con agua</span>'));
+  assert.ok(section(care(STATES.rellenar)).includes('<span class="badge tone-ambar tank-state">Nivel bajo</span>'));
+  // Fichas: fecha corta, promedio con sus cargas y «Necesitará agua» (hoy, mañana o el día corto); sin datos, «—».
+  const facts = (extra, now = NOW) => M.tankFacts(tank(extra), now);
+  assert.equal(facts({lastRefill:refill('2026-11-18T14:00:00Z')}).last.value, 'Hoy, 08:00');
+  assert.equal(facts({lastRefill:refill('2026-11-14T14:00:00Z')}).last.value, '14 nov');
+  assert.deepEqual([...facts({lastRefill:{...refill('2026-11-14T14:00:00Z'), confirmed:true, byOwner:true}}).last.marks.map(m => m.label)], ['Detectada por tu equipo', 'Confirmada por ti']);
+  assert.deepEqual([...facts({lastRefill:refill('2026-11-14T14:00:00Z', 'persona', true)}).last.marks.map(m => m.label)], ['Registrada por ti']);
+  assert.deepEqual({...facts({averageSeconds:3 * 86400, averageLoads:4, completedLoads:7}).average}, {label:'Dura en promedio', value:'3 días', text:'últimas 4 cargas'});
+  assert.equal(facts({averageSeconds:86400, completedLoads:1}).average.text, 'última carga', 'sin averageLoads usa las completas');
+  assert.equal(facts({averageSeconds:86400, completedLoads:9}).average.text, 'últimas 5 cargas', 'como mucho 5');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-18T22:10:00Z'}).next.value, 'Hoy, ~16:10');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-19T14:00:00Z'}).next.value, 'Mañana, ~08:00');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-20T16:00:00Z'}).next.value, 'vie 20 nov');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-17T16:00:00Z'}).next.value, 'Pronto');
+  assert.equal(facts({hasWater:false}).next.value, 'Ahora');
+  const empty = facts({lastRefill:null});
+  assert.ok([empty.last, empty.average, empty.next].every(f => f.value === '—' && f.text), 'sin datos: «—» y un texto corto');
+  assert.deepEqual({...facts({hasDevice:false, hasWater:null, refillEverySeconds:3 * 86400}).average}, {label:'Sueles rellenar cada', value:'3 días', text:'entre tus recargas'});
   const s1 = section(care(STATES.con_agua));
-  assert.ok(s1.includes('Con agua') && s1.includes('Última recarga: hoy a las 11:00 (registrada por ti)') && s1.includes('Tu depósito dura en promedio 3 días.')
-    && s1.includes('Al ritmo actual, necesitará agua alrededor del viernes 20 de noviembre.') && s1.includes('Duró 3 días y 4 horas') && s1.includes('En curso'), 'con agua: recarga, duración, estimación e historial');
+  assert.ok(s1.includes('Con agua') && /Última recarga<\/span>\s*<strong class="tank-fact-value">Hoy, 11:00<span class="tank-fact-marks"><span class="tank-mark" role="img" aria-label="Registrada por ti" title="Registrada por ti">/.test(s1)
+    && /Dura en promedio<\/span>\s*<strong class="tank-fact-value">3 días<\/strong>/.test(s1) && /Necesitará agua<\/span>\s*<strong class="tank-fact-value">vie 20 nov<\/strong>/.test(s1)
+    && s1.includes('<span class="tank-load-length">3 días y 4 horas</span>') && s1.includes('<span class="tank-load-length">En curso</span>'), 'con agua: fichas e historial compacto');
+  // Historial: 3 filas visibles y «Ver todo» con el resto; los iconos llevan title y aria-label.
+  const many = Array.from({length:5}, (_, i) => ({refilledAt:`2026-11-1${i}T14:00:00Z`, origin:i % 2 ? 'persona' : 'equipo', confirmed:i === 2, byOwner:true, lowAt:'2026-11-18T10:00:00Z', seconds:86400}));
+  const s6 = section(care(STATES.con_agua, {loads:many}));
+  const visibles = s6.slice(0, s6.indexOf('<details class="tank-more">'));
+  assert.equal((visibles.match(/<li class="tank-load/g) || []).length, 3, 'solo las últimas 3 a la vista');
+  assert.match(s6, /<details class="tank-more"><summary>Ver todo <span class="tank-more-count">\(2 más\)<\/span><\/summary><ol class="tank-load-list">(\s*<li class="tank-load[\s\S]*?<\/li>){2}<\/ol><\/details>/);
+  assert.ok(s6.includes('aria-label="Detectada por tu equipo" title="Detectada por tu equipo"') && s6.includes('aria-label="Confirmada por ti" title="Confirmada por ti"'));
+  assert.ok(!section(care(STATES.con_agua)).includes('tank-more'), 'con 3 o menos, sin «Ver todo»');
   assert.ok(!/data-garden-action="refill/.test(s1), 'con agua: sin botones');
   const s2 = section(care(STATES.rellenar));
-  assert.ok(s2.includes('Nivel bajo <small>desde hoy a las 09:30</small>') && s2.includes('Es hora de rellenar tu depósito') && s2.includes('Ya lo rellené')
+  assert.ok(s2.includes('<p class="tank-since">Nivel bajo desde hoy a las 09:30</p>') && s2.includes('Es hora de rellenar tu depósito') && s2.includes('Ya lo rellené')
     && /class="button btn-liquid-brand" data-garden-action="refill"(?![^>]*disabled)/.test(s2) && s2.includes('class="tank-actions"'), 'rellenar: llamada y «Ya lo rellené» primario');
   const s4 = section(care(STATES.detectada));
   assert.ok(s4.includes('Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?') && /Detectada hoy a las \d\d:\d\d\./.test(s4), 'detectada: la pregunta');
@@ -696,12 +732,12 @@ suite('depósito con flotador', async () => {
   assert.ok(new RegExp(`class="button btn-liquid-light" data-garden-action="refill-discard" data-detection="${DETECTION}"`).test(s4), '«No fue una recarga» es el secundario');
   assert.ok(!s4.includes('Confirmar recarga') && !/data-garden-action="refill"/.test(s4));
   const s5 = section(care(STATES.sigue_bajo));
-  assert.ok(s5.includes('Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.') && s5.includes('(registrada por ti)'), 'sigue bajo: el aviso');
+  assert.ok(s5.includes('Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.') && s5.includes('aria-label="Registrada por ti"'), 'sigue bajo: el aviso');
   assert.ok(!/data-garden-action="refill/.test(s5) && !s5.includes('Es hora de rellenar'), 'sigue bajo: sin botón');
   const waitingSection = section(care(STATES.esperando_lectura));
   assert.ok(waitingSection.includes("Esperamos la siguiente lectura de tu equipo.") && !/data-garden-action="refill/.test(waitingSection), 'registrada, a la espera de lectura');
   const s0 = section(care(STATES.sin_equipo, {loads:[]}));
-  assert.ok(s0.includes('Sueles rellenar cada 3 días') && s0.includes('Podrás registrar otra recarga') && /data-garden-action="refill"[^>]*disabled/.test(s0) && !s0.includes('En curso'), 'sin equipo');
+  assert.ok(/Sueles rellenar cada<\/span>\s*<strong class="tank-fact-value">3 días<\/strong>/.test(s0) && s0.includes('Podrás registrar otra recarga') && /data-garden-action="refill"[^>]*disabled/.test(s0) && !s0.includes('En curso'), 'sin equipo');
   // Lo que devuelve la API tras un solo «medir --sin-agua» (y aunque llegara una detección con nivel bajo): pide rellenar, no pregunta.
   const onlyLow = {state:'rellenar', hasWater:false, lowSince:'2026-11-18T17:59:00Z', pendingRefill:null, lastRefill:null, canRefill:true, refillBlock:null};
   for(const data of [onlyLow, {...onlyLow, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:00:00Z'}}, {...onlyLow, state:undefined}]) {
@@ -730,7 +766,7 @@ suite('depósito con flotador', async () => {
   const discard = V.confirmations['refill-discard'];
   assert.ok(discard.peligro && discard.accion === 'No fue una recarga' && discard.texto.includes('no se registrará ninguna recarga'), '«No fue una recarga» pide confirmación');
   assert.ok(row({origin:'equipo', confirmed:true, byOwner:true}).includes('Detectada por tu equipo · confirmada por ti'), 'historial de mantenimiento');
-  assert.ok(Care.tankSection({status:'ready', tank:tank(), loads:[{...loads[0], confirmed:true, byOwner:true}]}).includes('Detectada por tu equipo · confirmada por ti'));
+  assert.ok(Care.tankSection({status:'ready', tank:tank(), loads:[{...loads[0], confirmed:true, byOwner:true}]}).includes('aria-label="Confirmada por ti"'));
   // Servicio: rutas de confirmar y descartar; un identificador inválido no llega al servidor.
   const calls = [];
   const http = vm.createContext({URL, URLSearchParams, ChilitoHTTP:{sessionExpired() {}, async request(path, options) { calls.push({path, method:options.method}); return {http:200, body:{status:'accepted'}}; }}});
@@ -757,7 +793,7 @@ suite('depósito con flotador', async () => {
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.39'], 'todos los estáticos en mvc.39');
+  assert.deepEqual([...versions], ['?v=mvc.40'], 'todos los estáticos en mvc.40');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 
@@ -920,6 +956,161 @@ suite('editor legal: autoguardado cada 10 s, pegado saneado en el servidor y .do
   await handlers.change({target:input([{name:'aviso.docx', size:10}])});
   assert.equal(llamadas.imported.length, 1); assert.deepEqual(llamadas.replaced, ['<h2>Doc</h2>']);
   console.log('PASS editor legal: autoguardado cada 10 s, pegado saneado en el servidor y .docx');
+});
+
+// ── Campos: reglas, filtro de teclado y pegado, mensajes en línea e inventario ───────────────
+suite('campos', async () => {
+  // DOM mínimo: lo que usa CamposVista de un campo, de su mensaje y del formulario.
+  class Elemento {
+    constructor(tag, attrs = {}) {
+      this.tagName = tag; this.attrs = {}; this.dataset = {}; this.value = attrs.value ?? ''; this.type = attrs.type || (tag === 'INPUT' ? 'text' : '');
+      this.readOnly = false; this.disabled = false; this.required = 'required' in attrs; this.eventos = []; this.siguiente = null; this.className = '';
+      for(const [k, v] of Object.entries(attrs)) if(k !== 'value') this.setAttribute(k, v);
+      this.selectionStart = this.selectionEnd = this.value.length;
+      this.classList = {contains:c => this.className.split(' ').includes(c)};
+    }
+    setAttribute(k, v) { this.attrs[k] = String(v); if(k.startsWith('data-')) this.dataset[k.slice(5).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = String(v); if(k === 'id') this.id = String(v); if(k === 'name') this.name = String(v); }
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+    removeAttribute(k) { delete this.attrs[k]; }
+    matches(selector) {
+      if(selector === 'form') return this.tagName === 'FORM';
+      if(selector.includes('textarea') && selector.includes('input[type=text]')) return this.tagName === 'TEXTAREA' || (this.tagName === 'INPUT' && ['text', 'search', 'email', 'url'].includes(this.type));
+      return ['INPUT', 'TEXTAREA', 'SELECT'].includes(this.tagName);
+    }
+    closest() { return null; }
+    get nextElementSibling() { return this.siguiente; }
+    insertAdjacentElement(_, el) { this.siguiente = el; el.dueno = this; }
+    remove() { if(this.dueno) this.dueno.siguiente = null; }
+    setRangeText(texto, inicio, fin) { this.value = this.value.slice(0, inicio) + texto + this.value.slice(fin); this.selectionStart = this.selectionEnd = inicio + texto.length; }
+    setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; }
+    dispatchEvent(evento) { this.eventos.push(evento.type); }
+    focus() { context.document.activeElement = this; }
+  }
+  const context = vm.createContext({Event:class { constructor(type, o = {}) { this.type = type; this.bubbles = o.bubbles; } }, Array, Number, String, RegExp, Object,
+    window:{addEventListener() {}}, document:{activeElement:null, createElement:tag => new Elemento(tag.toUpperCase())}});
+  vm.runInContext(bloque('modelos/comun.js', 'Campos'), context);
+  vm.runInContext(bloque('vistas/comun.js', 'Campos'), context);
+  const C = vm.runInContext('Campos', context), V = vm.runInContext('CamposVista', context);
+  const campo = (regla, attrs = {}) => new Elemento(attrs.tag || 'INPUT', {id:`c-${regla}`, name:regla, ...(regla === 'libre' ? {} : {'data-campo':regla}), ...attrs});
+  const evento = (target, extra = {}) => ({target, prevented:false, detenido:false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { this.detenido = true; }, ...extra});
+  const escribir = (el, data) => { const e = evento(el, {data, inputType:'insertText'}); V.alEscribir(e); if(!e.prevented) { el.setRangeText(data, el.selectionStart, el.selectionEnd); V.alCambiar(evento(el)); } return e; };
+  const pegar = (el, texto) => { const e = evento(el, {clipboardData:{getData:() => texto}}); V.alPegar(e); return e; };
+  const aviso = el => el.siguiente?.textContent ?? null;
+
+  // Reglas (las mismas que web/validacion.py).
+  for(const [regla, valor, limites, esperado] of [
+    ['persona', 'José María', {}, null], ['persona', "O'Connor-Peña", {}, null], ['persona', 'Zoë Müller', {}, null],
+    ['persona', 'Ana3', {}, 'Solo letras, espacios, apóstrofo y guion'], ['persona', '-Ana', {}, 'Solo letras, espacios, apóstrofo y guion'], ['persona', 'A', {}, 'Escribe entre 2 y 60 letras'],
+    ['cosa', 'Planta 1', {maximo:40}, null], ['cosa', 'Mi huerto', {maximo:60}, null], ['cosa', 'Huerto-Patio 3', {maximo:60}, null],
+    ['cosa', 'Planta #1', {maximo:40}, 'Solo letras, números, espacios y guion'], ['cosa', 'x'.repeat(41), {maximo:40}, 'Escribe como máximo 40 caracteres'],
+    ['entero', '0', {min:0, max:999}, null], ['entero', '999', {min:0, max:999}, null], ['entero', 'abc', {min:0, max:999}, 'Solo números entre 0 y 999'],
+    ['entero', '1000', {min:0, max:999}, 'Solo números entre 0 y 999'], ['entero', '7.5', {min:0, max:999}, 'Solo números entre 0 y 999'], ['entero', '0', {min:1, max:9999}, 'Solo números entre 1 y 9999'],
+    ['digitos', '12345', {}, null], ['digitos', '12a', {}, 'Solo números'],
+    ['dinero', '3500', {}, null], ['dinero', '3500.50', {}, null], ['dinero', '3500.505', {}, 'Escribe un importe como 3500 o 3500.50'], ['dinero', '-1', {}, 'Escribe un importe como 3500 o 3500.50'],
+    ['mac', 'AA:BB:CC:DD:EE:FF', {}, null], ['mac', 'AA:BB', {}, 'Escribe la MAC como AA:BB:CC:DD:EE:FF.'], ['identificador', 'ESP32-A1B2', {}, null], ['identificador', 'ES P32', {}, 'De 4 a 32 letras, números o guiones; empieza con letra o número.'],
+    ['version', '1.2', {}, null], ['version', '1.2.3', {}, null], ['version', 'v1', {}, 'Escribe la versión como 1.2 o 1.2.3.'],
+    ['libre', 'Nota <b>&</b> «ok»\nsegunda línea', {maximo:500}, null], ['libre', 'a\u0007b', {maximo:500}, 'El texto tiene caracteres no permitidos'],
+    ['persona', '', {requerido:true}, 'Este campo es obligatorio'], ['persona', '', {}, null]])
+    assert.equal(C.validar(regla, valor, limites), esperado, `${regla} «${valor}»`);
+
+  // Teclado: los números y los nombres de persona no dejan entrar caracteres no válidos, y dicen por qué.
+  const chiles = campo('entero', {id:'care-chiles', 'data-min':'0', 'data-max':'999', maxlength:'3', inputmode:'numeric'});
+  assert.ok(escribir(chiles, 'a').prevented, 'una letra no entra en chiles');
+  assert.equal(chiles.value, '');
+  assert.equal(aviso(chiles), 'Solo números entre 0 y 999');
+  assert.equal(chiles.getAttribute('aria-invalid'), 'true');
+  assert.equal(chiles.getAttribute('aria-describedby'), 'care-chiles-aviso', 'el mensaje se une al campo');
+  assert.ok(!escribir(chiles, '7').prevented && chiles.value === '7', 'un dígito sí entra');
+  assert.equal(aviso(chiles), null, 'el aviso se va al escribir algo válido');
+  assert.equal(chiles.getAttribute('aria-invalid'), null);
+  for(const tecla of ['-', '.', 'e', '+', ' ']) assert.ok(escribir(chiles, tecla).prevented, `«${tecla}» no entra en un entero`);
+  const nombre = campo('persona', {id:'sc-buyer', maxlength:'60'});
+  for(const letra of 'José Ñúñez-O\'Neil') escribir(nombre, letra);
+  assert.equal(nombre.value, "José Ñúñez-O'Neil", 'acentos, ñ, ü, apóstrofo, guion y espacio');
+  for(const tecla of ['3', '_', '@', '.', '<']) assert.ok(escribir(nombre, tecla).prevented, `«${tecla}» no entra en un nombre de persona`);
+  assert.equal(aviso(nombre), 'Solo letras');
+  const precio = campo('dinero', {id:'sc-price', maxlength:'11'});
+  for(const tecla of '3500.5') escribir(precio, tecla);
+  assert.ok(escribir(precio, '.').prevented, 'un segundo punto no entra');
+  assert.ok(!escribir(precio, '0').prevented && precio.value === '3500.50');
+  assert.ok(escribir(precio, '1').prevented, 'un tercer decimal no entra');
+  // Los demás campos no bloquean el teclado (su regla se revisa al salir y al enviar).
+  const planta = campo('cosa', {id:'plant-name', maxlength:'40'});
+  assert.ok(!escribir(planta, '#').prevented);
+
+  // Pegado: entra solo la parte válida (con aviso) y se avisa con «input» como si se hubiera escrito.
+  const comprador = campo('persona', {id:'sc-buyer-2', maxlength:'60'});
+  assert.ok(pegar(comprador, 'Ana3 López_2').prevented);
+  assert.deepEqual([comprador.value, aviso(comprador), comprador.eventos.includes('input')], ['Ana López', 'Solo letras', true]);
+  const limpio = campo('persona', {id:'c-limpio'});
+  assert.ok(!pegar(limpio, 'José').prevented, 'un pegado válido sigue su curso normal');
+  const importe = campo('dinero', {id:'sp-received', maxlength:'11'});
+  pegar(importe, '$3,500.507');
+  assert.equal(importe.value, '3500.50', 'sin signo ni comas y con 2 decimales');
+  const pocos = campo('entero', {id:'mant-chiles', 'data-min':'0', 'data-max':'999', maxlength:'3'});
+  pegar(pocos, '12a345');
+  assert.deepEqual([pocos.value, aviso(pocos)], ['123', 'Solo números entre 0 y 999'], 'respeta maxlength');
+  const nota = campo('libre', {tag:'TEXTAREA', id:'sc-note', maxlength:'500'});
+  pegar(nota, 'Hola\u0007 mundo bonito\ncon dos líneas');
+  assert.deepEqual([nota.value, aviso(nota)], ['Hola mundo bonito\ncon dos líneas', 'Se quitaron caracteres no permitidos'], 'texto libre: sin caracteres de control, el espacio duro pasa a espacio');
+  const espacio = campo('libre', {id:'mant-search', maxlength:'60'});
+  pegar(espacio, 'a b');
+  assert.deepEqual([espacio.value, aviso(espacio)], ['a b', null], 'un espacio raro se corrige sin aviso');
+  const leer = campo('entero', {id:'c-solo-lectura'}); leer.readOnly = true;
+  assert.ok(!pegar(leer, 'abc').prevented, 'un campo de solo lectura no se toca');
+
+  // Al salir del campo: rango, largo y formato completos.
+  const corto = campo('persona', {id:'c-corto'}); corto.value = 'A'; V.alSalir(evento(corto));
+  assert.equal(aviso(corto), 'Escribe entre 2 y 60 letras');
+  const fabrica = campo('cosa', {id:'c-fabrica', maxlength:'40'}); fabrica.value = 'Planta 1'; V.alSalir(evento(fabrica));
+  assert.equal(aviso(fabrica), null, '«Planta 1» es válido');
+  const mal = campo('cosa', {id:'c-mal', maxlength:'40'}); mal.value = 'Planta #1'; V.alSalir(evento(mal));
+  assert.equal(aviso(mal), 'Solo letras, números, espacios y guion');
+  const vacio = campo('entero', {id:'c-vacio', required:''}); V.alSalir(evento(vacio));
+  assert.equal(aviso(vacio), null, 'vacío no se marca al salir');
+
+  // Al enviar: un campo que no cumple detiene el envío antes del controlador y recibe el foco.
+  const mucho = campo('entero', {id:'c-mucho', name:'chiles', 'data-min':'0', 'data-max':'999'}); mucho.value = '1000';
+  const bien = campo('persona', {id:'c-bien', name:'buyer'}); bien.value = 'Ana';
+  const form = new Elemento('FORM'); form.querySelectorAll = () => [bien, mucho]; form.elements = {namedItem:n => [bien, mucho].find(el => el.name === n)};
+  const envio = evento(form); V.alEnviar(envio);
+  assert.deepEqual([envio.prevented, envio.detenido, context.document.activeElement === mucho, aviso(mucho)], [true, true, true, 'Solo números entre 0 y 999']);
+  mucho.value = '999'; const otro = evento(form); V.alEnviar(otro);
+  assert.deepEqual([otro.prevented, otro.detenido, aviso(mucho)], [false, false, null], 'con todo válido el controlador recibe el envío');
+  // El servidor rechaza un campo (400 con field y message): el mensaje va junto a ese campo del último formulario.
+  context.document.activeElement = null;
+  V.rechazo({detail:{field:'buyer', code:'solo-letras', message:'Solo letras, espacios, apóstrofo y guion.'}});
+  assert.equal(aviso(bien), 'Solo letras, espacios, apóstrofo y guion.');
+
+  // ChilitoHTTP avisa del 400 con campo para que la vista lo muestre.
+  const avisos = [];
+  const http = vm.createContext({console, crypto:webcrypto, JSON, URL, Map, Promise, CustomEvent:class { constructor(type, o) { this.type = type; this.detail = o.detail; } },
+    document:{cookie:'csrftoken=x'}, window:{dispatchEvent:e => avisos.push(e)},
+    fetch:async () => ({status:400, json:async () => ({status:400, code:'solo-numeros', field:'chiles', message:'Solo números entre 0 y 999.'})})});
+  vm.runInContext(bloque('modelos/cuenta.js', 'Acceso'), http);
+  const r = await vm.runInContext("ChilitoHTTP.request('/api/huertos/1/cuidados', {method:'POST', body:{type:'cosecha', plant:1, chiles:'abc'}})", http);
+  assert.equal(r.http, 400);
+  assert.deepEqual(avisos.map(e => [e.type, e.detail.field, e.detail.message]), [['chilito:campo', 'chiles', 'Solo números entre 0 y 999.']]);
+
+  // Inventario: cada campo de entrada declara su regla (los demás textos son libres: sin caracteres de control).
+  const tag = (archivo, id) => read(archivo).match(new RegExp(`<input[^>]*(id|name)="${id}"[^>]*>`))?.[0] || '';
+  for(const [archivo, id, regla, extra] of [
+    ['vistas/huerto.js', 'garden-name', 'cosa'], ['vistas/huerto.js', 'plant-name', 'cosa'], ['vistas/huerto.js', 'rename-name', 'cosa'],
+    ['vistas/huerto.js', 'care-chiles', 'entero', /inputmode="numeric"[^>]*data-min="0" data-max="999"/], ['vistas/huerto.js', 'mant-chiles', 'entero', /inputmode="numeric"[^>]*data-min="0" data-max="999"/],
+    ['vistas/huerto.js', 'care-order', 'entero', /inputmode="numeric"[^>]*data-min="1" data-max="9999"/], ['vistas/huerto.js', 'mant-garden', 'digitos', /inputmode="numeric"/],
+    ['vistas/huerto.js', 'mant-new-garden', 'digitos', /inputmode="numeric"/],
+    ['vistas/administracion.js', 'sc-buyer', 'persona'], ['vistas/administracion.js', 'sc-price', 'dinero', /inputmode="decimal"/], ['vistas/administracion.js', 'sc-received', 'dinero', /inputmode="decimal"/],
+    ['vistas/administracion.js', 'sp-received', 'dinero', /inputmode="decimal"/], ['vistas/administracion.js', 'lg-version', 'version'], ['vistas/administracion.js', 'cs-version', 'version'],
+    ['vistas/equipos.js', 'eq-identifier', 'identificador'], ['vistas/equipos.js', 'eq-mac', 'mac'], ['vistas/equipos.js', 'eq-firmware', 'firmware'],
+    ['vistas/cuenta.js', 'firstName', 'persona'], ['vistas/cuenta.js', 'lastName', 'persona'], ['vistas/cuenta.js', 'alias', 'cosa'], ['vistas/cuenta.js', 'key-name', 'cosa'],
+    ['vistas/publico.js', 'name', 'persona', /autocomplete="name"/]]) {
+    const html = tag(archivo, id);
+    assert.ok(html.includes(`data-campo="${regla}"`), `${archivo} #${id}: data-campo="${regla}"`);
+    if(extra) assert.match(html, extra, `${archivo} #${id}`);
+  }
+  assert.ok(!/type="number"[^>]*name="chiles"|name="chiles"[^>]*type="number"/.test(read('vistas/huerto.js')), 'chiles no usa type=number (admite e, + y -)');
+  assert.match(read('controladores/enrutador.js'), /CamposVista\.instalar\(document\);/, 'el filtro se instala una vez para toda la aplicación');
+  console.log('PASS campos: reglas, teclado y pegado filtrados, mensajes en línea, envío detenido, rechazo del servidor e inventario');
 });
 
 // ── Ejecución: una suite tras otra ────────────────────────────────────────────────────────────

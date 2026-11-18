@@ -125,6 +125,9 @@ const ChilitoHTTP = (() => {
     let data = {};
     try { data = await response.json(); } catch { /* Never interpret an HTML error as success. */ }
     if(write && response.status < 500 && response.status !== 429) pendingWrites.delete(fingerprint);
+    // 400 con «field» y «message» (reglas de los campos): la vista lo pone junto al campo.
+    if(response.status === 400 && typeof data?.field === 'string' && typeof data?.message === 'string' && typeof CustomEvent === 'function')
+      window.dispatchEvent(new CustomEvent('chilito:campo', {detail:{field:data.field, code:data.code, message:data.message}}));
     return {http:response.status, body:data};
   }
   async function configure(signal) {

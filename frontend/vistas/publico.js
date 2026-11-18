@@ -281,7 +281,7 @@ const ContactViews = Object.freeze({
           <p class="contact-direct" data-contact-direct hidden></p>
         </div>
         <form class="contact-form" data-contact-form novalidate>
-          <label><span>Nombre <small>(opcional)</small></span><input name="name" maxlength="100" autocomplete="name"></label>
+          <label><span>Nombre <small>(opcional)</small></span><input name="name" maxlength="60" autocomplete="name" data-campo="persona"></label>
           <label>Correo electrónico<input name="email" type="email" maxlength="254" autocomplete="email" required></label>
           <label>Tu mensaje<textarea name="message" rows="5" maxlength="2000" required></textarea></label>
           <label class="contact-trap" aria-hidden="true">Sitio web<input name="website" tabindex="-1" autocomplete="off"></label>

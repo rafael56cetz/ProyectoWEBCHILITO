@@ -42,9 +42,9 @@ const EquipmentViews = (() => {
   }
 
   const createForm = () => `<h2 id="admin-dialog-title">Dar de alta equipo</h2><form data-admin-form="equipment-create" novalidate>
-    <label for="eq-identifier">Identificador</label><input id="eq-identifier" name="identifier" type="text" maxlength="32" placeholder="ESP32-A1B2" autocomplete="off" required>
-    <label for="eq-mac">MAC</label><input id="eq-mac" name="mac" type="text" maxlength="17" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" required>
-    <label for="eq-firmware">Firmware (opcional)</label><input id="eq-firmware" name="firmware" type="text" maxlength="32" placeholder="1.0.0" autocomplete="off">
+    <label for="eq-identifier">Identificador</label><input id="eq-identifier" name="identifier" type="text" maxlength="32" data-campo="identificador" placeholder="ESP32-A1B2" autocomplete="off" required>
+    <label for="eq-mac">MAC</label><input id="eq-mac" name="mac" type="text" maxlength="17" data-campo="mac" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" required>
+    <label for="eq-firmware">Firmware (opcional)</label><input id="eq-firmware" name="firmware" type="text" maxlength="32" data-campo="firmware" placeholder="1.0.0" autocomplete="off">
     <p class="user-small-copy">Al crearlo generaremos su credencial y te la mostraremos una sola vez.</p>
     <div class="app-dialog-actions">${act('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit">Crear equipo</button></div></form>`;
 

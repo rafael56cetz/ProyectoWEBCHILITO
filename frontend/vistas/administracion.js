@@ -344,11 +344,11 @@ const SalesViews = (() => {
   function createForm(catalog) {
     return `<h2 id="admin-dialog-title">Registrar venta</h2><form data-admin-form="sale-create" novalidate>
       <label for="sc-device">Equipo</label><select id="sc-device" name="device" required>${options([['', 'Elige un equipo'], ...catalog.sellable.map(item => [item.id, item.identifier])])}</select>
-      <label for="sc-buyer">Nombre del comprador</label><input id="sc-buyer" name="buyer" type="text" maxlength="120" required>
+      <label for="sc-buyer">Nombre del comprador</label><input id="sc-buyer" name="buyer" type="text" maxlength="60" autocomplete="off" required data-campo="persona">
       <label for="sc-email">Correo del comprador</label><input id="sc-email" name="email" type="email" maxlength="254" required>
       <label for="sc-municipality">Municipio</label><select id="sc-municipality" name="municipality" required>${options([['', 'Elige un municipio'], ...catalog.municipalities.map(name => [name, name])])}</select>
-      <label for="sc-price">Precio total (MXN)</label><input id="sc-price" name="price" type="text" inputmode="decimal" placeholder="3500.00" required>
-      <label for="sc-received">Importe recibido (MXN)</label><input id="sc-received" name="received" type="text" inputmode="decimal" value="0">
+      <label for="sc-price">Precio total (MXN)</label><input id="sc-price" name="price" type="text" inputmode="decimal" maxlength="11" autocomplete="off" placeholder="3500.00" required data-campo="dinero">
+      <label for="sc-received">Importe recibido (MXN)</label><input id="sc-received" name="received" type="text" inputmode="decimal" maxlength="11" autocomplete="off" value="0" data-campo="dinero">
       <label for="sc-reference">Referencia del pago</label><input id="sc-reference" name="reference" type="text" maxlength="120">
       <label for="sc-method">Modalidad de entrega</label><select id="sc-method" name="method">${options(Object.entries(METHODS))}</select>
       <label for="sc-sold">Fecha de venta</label><input id="sc-sold" name="soldAt" type="date" max="${today()}" value="${today()}" required>
@@ -363,7 +363,7 @@ const SalesViews = (() => {
       ['Precio', T.money(sale.price)], ['Recibido', `${T.money(sale.received)} · ${PAYMENTS[sale.payment][0]}`], ['Referencia del pago', sale.reference ? escaparHTML(sale.reference) : '—'],
       ['Entrega', `${METHODS[sale.method]}${sale.deliveredAt ? ` · entregada el ${T.day(sale.deliveredAt)}` : sale.plannedDelivery ? ` · prevista ${T.day(sale.plannedDelivery)}` : ''}`],
       ['Fecha de venta', T.day(sale.soldAt)], ['Estado', open ? 'Vigente' : `Cancelada el ${T.day(sale.cancelledAt)}`], ['Nota', sale.note ? escaparHTML(sale.note) : '—']];
-    const forms = !open ? '' : `<form data-admin-form="sale-payment" data-id="${sale.id}" novalidate><h3>Registrar pago</h3><label for="sp-received">Importe recibido acumulado (MXN)</label><input id="sp-received" name="received" type="text" inputmode="decimal" value="${sale.received}">
+    const forms = !open ? '' : `<form data-admin-form="sale-payment" data-id="${sale.id}" novalidate><h3>Registrar pago</h3><label for="sp-received">Importe recibido acumulado (MXN)</label><input id="sp-received" name="received" type="text" inputmode="decimal" maxlength="11" autocomplete="off" value="${sale.received}" data-campo="dinero">
         <label for="sp-reference">Referencia (opcional)</label><input id="sp-reference" name="reference" type="text" maxlength="120"><button class="button btn-liquid-light" type="submit">Registrar pago</button></form>
       ${sale.deliveredAt ? '' : `<form data-admin-form="sale-delivery" data-id="${sale.id}" novalidate><h3>Marcar entregada</h3><label for="sd-date">Fecha de entrega</label><input id="sd-date" name="deliveredAt" type="date" min="${sale.soldAt}" max="${today()}" value="${today()}" required><button class="button btn-liquid-light" type="submit">Marcar entregada</button></form>`}
       <form data-admin-form="sale-note" data-id="${sale.id}" novalidate><h3>Nota</h3><label for="sn-note" class="sr-only">Nota</label><textarea id="sn-note" name="note" maxlength="500" rows="3">${escaparHTML(sale.note || '')}</textarea><button class="button btn-liquid-light" type="submit">Guardar nota</button></form>`;
@@ -488,7 +488,7 @@ const LegalAdminViews = (() => {
     const upload = published ? '' : `<div class="legal-upload">${T.button('upload', `${icon('document')}<span>Subir documento (.docx)</span>`, 'accent', 'aria-describedby="lg-upload-help"')}
       <p class="user-small-copy" id="lg-upload-help">Sube tu Word y se conserva el formato.</p>
       <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-legal-file hidden></div>`;
-    const form = `<form data-admin-form="legal" novalidate><label for="lg-version">Versión (formato 1.2)</label><input id="lg-version" name="version" type="text" maxlength="11" placeholder="1.2" value="${escaparHTML(doc?.version || '')}"${published ? ' readonly' : ''} required>
+    const form = `<form data-admin-form="legal" novalidate><label for="lg-version">Versión (formato 1.2)</label><input id="lg-version" name="version" type="text" inputmode="decimal" maxlength="11" placeholder="1.2" data-campo="version" value="${escaparHTML(doc?.version || '')}"${published ? ' readonly' : ''} required>
       <label for="lg-title">Título</label><input id="lg-title" name="title" type="text" maxlength="120" value="${escaparHTML(doc?.title || TYPES[state.type] || '')}"${published ? ' readonly' : ''} required>
       ${upload}<label for="lg-content">Contenido</label>${toolbar}<textarea id="lg-content" name="content" rows="18" maxlength="200000"${published ? ' readonly' : ''} required${published ? '' : ' aria-describedby="lg-content-help"'}>${escaparHTML(doc?.content || '')}</textarea>
       ${published ? '' : `<p class="user-small-copy" id="lg-content-help">Puedes pegar desde Word: el formato se limpia en el servidor. El borrador se guarda solo cada 10 segundos.</p>
@@ -546,7 +546,7 @@ const ConsentViews = (() => {
       <div><label for="cs-decision">Decisión</label><select id="cs-decision" name="decision">${options([['', 'Todas'], ['acepto', 'Aceptó'], ['rechazo', 'Rechazó']], values.decision)}</select></div>
       ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}
       <div><label for="cs-account">Buscar correo</label><input id="cs-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(values.cuenta || '')}"></div>
-      <div><label for="cs-version">Versión</label><input id="cs-version" name="version" type="text" maxlength="11" placeholder="1.1" value="${escaparHTML(values.version || '')}"></div>
+      <div><label for="cs-version">Versión</label><input id="cs-version" name="version" type="text" inputmode="decimal" maxlength="11" placeholder="1.1" data-campo="version" value="${escaparHTML(values.version || '')}"></div>
       <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${T.button('clear', 'Limpiar')}</div></form>`;
   }
 

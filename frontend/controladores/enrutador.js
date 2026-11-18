@@ -210,6 +210,8 @@ const SiteController = (() => {
     document.querySelector('.skip-link')?.addEventListener('click', event => {
       event.preventDefault(); SiteViews.focusMain();
     });
+    // Reglas de los campos (filtro de teclado y pegado, mensajes en línea) para toda la aplicación.
+    CamposVista.instalar(document);
     window.addEventListener('hashchange', render);
     window.addEventListener('pagehide', () => { renderId++; navigationRequest?.abort(); controller?.dispose(); controller = null; });
     ChilitoHTTP.onSessionExpired(() => {

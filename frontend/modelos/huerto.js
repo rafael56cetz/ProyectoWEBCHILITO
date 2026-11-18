@@ -195,11 +195,48 @@ const GardenModel = (() => {
       : tank?.lastRefill && ago(tank.lastRefill.at, now) ? `Última recarga ${ago(tank.lastRefill.at, now)}` : 'Depósito de 19 L';
     return {status, tone, line};
   }
+  // Fecha corta en Mérida para las fichas y el historial: «Hoy, 08:00», «Ayer, 21:00», «Mañana, 07:00» o «14 nov».
+  function meridaShort(value, now = Date.now()) {
+    if(!value || !Number.isFinite(Date.parse(value))) return '';
+    const day = {0:'Hoy', [-1]:'Ayer', 1:'Mañana'}[dayOffset(value, now)];
+    return day ? `${day}, ${meridaTime(value)}` : plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, day:'numeric', month:'short'})).replace(/\./g, '');
+  }
+  // «Necesitará agua»: «Hoy, ~14:00», «Mañana, ~08:00» o el día corto («vie 20 nov»).
+  function meridaForecast(value, now = Date.now()) {
+    const day = {0:'Hoy', 1:'Mañana'}[dayOffset(value, now)];
+    if(day) return `${day}, ~${meridaTime(value)}`;
+    const part = options => plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, ...options})).replace(/\./g, '');
+    return `${part({weekday:'short'})} ${part({day:'numeric'})} ${part({month:'short'})}`;
+  }
+  // Quién registró o detectó una recarga, como icono con su nombre accesible (fichas e historial del depósito).
+  function refillMarks(item) {
+    if(!item) return [];
+    if(item.origin !== 'equipo') return [{icon:'user', label:item.byOwner ? 'Registrada por ti' : 'Registrada por soporte'}];
+    return [{icon:'wifi', label:'Detectada por tu equipo'}, ...(item.confirmed ? [{icon:'check', label:item.byOwner ? 'Confirmada por ti' : 'Confirmada por soporte'}] : [])];
+  }
+  // Las tres fichas de la sección «Depósito de agua»: última recarga, duración y cuándo necesitará agua. Sin datos, «—» y una línea.
+  const AVERAGE_LOADS = 5;
+  function tankFacts(tank, now = Date.now()) {
+    const none = text => ({value:'—', text});
+    const last = tank?.lastRefill ? {value:meridaShort(tank.lastRefill.at, now), text:'', marks:refillMarks(tank.lastRefill)} : {...none('Aún no hay recargas'), marks:[]};
+    if(!tank?.hasDevice) {
+      const every = Number.isFinite(tank?.refillEverySeconds)
+        ? {value:plural(Math.max(1, Math.round(tank.refillEverySeconds / 86400)), 'día', 'días'), text:'entre tus recargas'} : none('Registra dos recargas para calcularlo');
+      return {last, average:{label:'Sueles rellenar cada', ...every}, next:none('Con tu equipo podremos estimarlo')};
+    }
+    const loads = Math.min(Number.isFinite(tank.averageLoads) ? tank.averageLoads : tank.completedLoads || 0, AVERAGE_LOADS);
+    const average = Number.isFinite(tank.averageSeconds)
+      ? {value:humanDuration(tank.averageSeconds), text:loads === 1 ? 'última carga' : `últimas ${loads} cargas`} : none('Lo sabremos al terminar una carga');
+    const next = tank.hasWater === false ? {value:'Ahora', text:'El flotador marca nivel bajo'}
+      : tank.estimatedLowAt && Date.parse(tank.estimatedLowAt) > now ? {value:meridaForecast(tank.estimatedLowAt, now), text:'al ritmo actual'}
+      : tank.estimatedLowAt ? {value:'Pronto', text:'Al ritmo actual ya podría necesitarla'} : none('Aún no hay datos suficientes');
+    return {last, average:{label:'Dura en promedio', ...average}, next};
+  }
   // Algo por hacer en Mantenimiento: nivel bajo sin recarga registrada o una recarga detectada por confirmar.
   const tankPending = (tank, now = Date.now()) => tankStage(tank) === 'rellenar' || Boolean(pendingRefill(tank, now));
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
     pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
-    meridaWhen, meridaDay, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
+    meridaWhen, meridaDay, meridaShort, meridaForecast, refillMarks, tankFacts, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
 })();
 
 // ── Guias ──

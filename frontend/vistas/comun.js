@@ -442,3 +442,139 @@ const AdminTableViews = (() => {
   const paint = (root, html) => { root.innerHTML = html; };
   return Object.freeze({button, table, pager, tabs, status, dialog, dateField, day, merida, money, open, dismiss, paint});
 })();
+
+// ── Campos ──
+// Filtro de teclado y pegado, y mensajes en línea, para todo campo con data-campo (reglas en Campos, modelos/comun.js).
+// Números, importes, nombres de persona y MAC no admiten caracteres no válidos; los demás muestran el mensaje al salir
+// del campo o al enviar. En cualquier texto se quitan los caracteres de control. El servidor vuelve a validar todo.
+const CamposVista = (() => {
+  const LIBRES = 'input:not([type]),input[type=text],input[type=search],input[type=email],input[type=url],textarea';
+  const ENVOLTURAS = '.care-stepper,.maint-date-field,.password-input-group,.key-form-row';
+  const numero = valor => valor === null || valor === undefined || valor === '' ? undefined : Number(valor);
+  const reglaDe = el => el?.dataset?.campo || (el?.matches?.(LIBRES) ? 'libre' : null);
+  const limites = el => ({min:numero(el.dataset?.min), max:numero(el.dataset?.max), minimo:numero(el.getAttribute('minlength')),
+    maximo:numero(el.getAttribute('maxlength')), requerido:Boolean(el.required)});
+  const multilinea = el => el.tagName === 'TEXTAREA';
+  const activo = el => el && !el.readOnly && !el.disabled;
+  let ultimoFormulario = null;
+
+  // Mensaje en línea debajo del campo (o de su envoltura), unido con aria-describedby y aria-invalid.
+  function aviso(el, mensaje, tipo = 'regla') {
+    const id = `${el.id || el.name || 'campo'}-aviso`;
+    const caja = el.closest?.(ENVOLTURAS) || el;
+    const siguiente = caja.nextElementSibling;
+    let nota = siguiente?.classList?.contains('campo-aviso') ? siguiente : null;
+    const descritos = (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(item => item && item !== id);
+    if(!mensaje) {
+      nota?.remove();
+      el.removeAttribute('aria-invalid');
+      if(descritos.length) el.setAttribute('aria-describedby', descritos.join(' ')); else el.removeAttribute('aria-describedby');
+      return;
+    }
+    if(!nota) {
+      nota = document.createElement('p');
+      nota.className = 'campo-aviso';
+      nota.id = id;
+      nota.setAttribute('aria-live', 'polite');
+      caja.insertAdjacentElement('afterend', nota);
+    }
+    nota.dataset.tipo = tipo;
+    nota.textContent = mensaje;
+    el.setAttribute('aria-invalid', 'true');
+    el.setAttribute('aria-describedby', [...descritos, id].join(' '));
+  }
+  const tipoDeAviso = el => { const caja = el.closest?.(ENVOLTURAS) || el; return caja.nextElementSibling?.classList?.contains('campo-aviso') ? caja.nextElementSibling.dataset.tipo : null; };
+
+  // Inserta texto donde está el cursor (respeta maxlength) y avisa con «input», como si se hubiera escrito.
+  function insertar(el, texto) {
+    const maximo = numero(el.getAttribute('maxlength'));
+    const inicio = el.selectionStart ?? el.value.length, fin = el.selectionEnd ?? inicio;
+    const cabe = maximo === undefined ? texto : Array.from(texto).slice(0, Math.max(0, maximo - (el.value.length - (fin - inicio)))).join('');
+    if(!cabe) return;
+    try { el.setRangeText(cabe, inicio, fin, 'end'); } catch { el.value = el.value.slice(0, inicio) + cabe + el.value.slice(fin); }
+    el.dispatchEvent(new Event('input', {bubbles:true}));
+  }
+
+  // Al escribir: un carácter que dejaría el campo con algo no permitido no entra y se dice por qué.
+  function alEscribir(event) {
+    const el = event.target, regla = el?.dataset?.campo;
+    if(!activo(el) || !Campos.filtra(regla) || typeof event.data !== 'string' || !/^insert(Text|ReplacementText)$/.test(event.inputType)) return;
+    const inicio = el.selectionStart ?? el.value.length, fin = el.selectionEnd ?? inicio;
+    const nuevo = el.value.slice(0, inicio) + event.data + el.value.slice(fin);
+    if(!Campos.filtrar(regla, nuevo).cambiado) return;
+    event.preventDefault();
+    aviso(el, Campos.bloqueo(regla, limites(el)), 'bloqueo');
+  }
+  // Al pegar o soltar texto: entra solo la parte válida; si se quitó algo, se dice.
+  function alPegar(event) {
+    const el = event.target, regla = reglaDe(el);
+    if(!activo(el) || !regla) return;
+    const datos = (event.clipboardData || event.dataTransfer)?.getData('text') ?? '';
+    const resultado = Campos.filtrar(regla, datos, {multilinea:multilinea(el)});
+    if(!resultado.cambiado) return;
+    event.preventDefault();
+    if(el.type === 'number') { if(resultado.limpio === datos) insertar(el, datos); }
+    else insertar(el, resultado.limpio);
+    if(resultado.quitado) aviso(el, Campos.bloqueo(regla, limites(el)), 'bloqueo');
+  }
+  // Respaldo (autocompletar, teclados en pantalla, IME): limpia lo que haya entrado y quita el aviso cuando ya no aplica.
+  function alCambiar(event) {
+    const el = event.target, regla = reglaDe(el);
+    if(!activo(el) || !regla || el.type === 'number') return;
+    const resultado = Campos.filtrar(regla, el.value, {multilinea:multilinea(el)});
+    if(resultado.cambiado) {
+      const cursor = Math.max(0, (el.selectionStart ?? el.value.length) - (el.value.length - resultado.limpio.length));
+      el.value = resultado.limpio;
+      try { el.setSelectionRange(cursor, cursor); } catch { /* sin cursor (email, number) */ }
+      if(resultado.quitado) { aviso(el, Campos.bloqueo(regla, limites(el)), 'bloqueo'); return; }
+    }
+    const tipo = tipoDeAviso(el);
+    if(tipo === 'bloqueo' || (tipo && !Campos.validar(regla, el.value, limites(el)))) aviso(el, null);
+  }
+  // Al salir del campo: el valor completo con su regla (rango, largo, formato).
+  function alSalir(event) {
+    const el = event.target, regla = el?.dataset?.campo;
+    if(!activo(el) || !regla) return;
+    // Vacío no se marca al salir (el obligatorio se revisa al enviar).
+    aviso(el, el.value.trim() ? Campos.validar(regla, el.value, limites(el)) : null);
+  }
+  // Antes de que el controlador envíe: si un campo visible no cumple, no se envía y el foco va al primero.
+  function revisar(form) {
+    let primero = null;
+    form.querySelectorAll('[data-campo]').forEach(el => {
+      if(!activo(el) || el.closest('[hidden]')) return;
+      const mensaje = Campos.validar(el.dataset.campo, el.value, limites(el));
+      aviso(el, mensaje);
+      if(mensaje && !primero) primero = el;
+    });
+    primero?.focus();
+    return !primero;
+  }
+  function alEnviar(event) {
+    const form = event.target;
+    if(!form?.matches?.('form')) return;
+    ultimoFormulario = form;
+    if(revisar(form)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  // El servidor rechazó un campo (400 con field y message): el mensaje va junto a ese campo del último formulario enviado.
+  function rechazo(event) {
+    const {field, message} = event.detail || {};
+    const form = document.activeElement?.form || ultimoFormulario;
+    const el = form?.elements?.namedItem?.(field);
+    if(!el || typeof message !== 'string' || !el.matches?.('input,textarea,select')) return;
+    aviso(el, message);
+    el.focus();
+  }
+  function instalar(raiz = document) {
+    raiz.addEventListener('beforeinput', alEscribir, true);
+    raiz.addEventListener('paste', alPegar, true);
+    raiz.addEventListener('drop', alPegar, true);
+    raiz.addEventListener('input', alCambiar, true);
+    raiz.addEventListener('focusout', alSalir, true);
+    raiz.addEventListener('submit', alEnviar, true);
+    window.addEventListener('chilito:campo', rechazo);
+  }
+  return Object.freeze({instalar, revisar, aviso, alEscribir, alPegar, alCambiar, alSalir, alEnviar, rechazo});
+})();

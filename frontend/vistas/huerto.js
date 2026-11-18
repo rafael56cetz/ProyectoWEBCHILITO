@@ -166,7 +166,7 @@ const GardenViews = (() => {
 
   function newGarden() {
     return `${AppViews.heading('Crea tu huerto')}<section class="bento-panel garden-form"><p>Ponle un nombre para reconocerlo. Podrás cambiarlo después.</p>
-      <form data-garden-form="create" novalidate><label for="garden-name">Nombre del huerto (opcional)</label><input id="garden-name" name="name" type="text" maxlength="60" autocomplete="off" placeholder="Mi huerto">
+      <form data-garden-form="create" novalidate><label for="garden-name">Nombre del huerto (opcional)</label><input id="garden-name" name="name" type="text" maxlength="60" autocomplete="off" data-campo="cosa" placeholder="Mi huerto">
       <p class="user-small-copy">Tu huerto tendrá 3 plantas de chile habanero. Disponible solo en Yucatán.</p>
       <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Crear huerto</button><a class="button btn-liquid-light" href="#huerto">Cancelar</a></div></form></section>`;
   }
@@ -259,7 +259,7 @@ const GardenViews = (() => {
   function plantDialogs(plant, hasDevice) {
     return {
       edit: `<h2 id="garden-dialog-title">Editar planta</h2><form class="dialog-form" data-garden-form="plant" novalidate>
-        <div class="dialog-field is-wide"><label for="plant-name">Nombre de la planta</label><input id="plant-name" name="name" type="text" maxlength="40" required value="${escaparHTML(plant.name)}"></div>
+        <div class="dialog-field is-wide"><label for="plant-name">Nombre de la planta</label><input id="plant-name" name="name" type="text" maxlength="40" required data-campo="cosa" value="${escaparHTML(plant.name)}"></div>
         <div class="dialog-field"><label for="plant-date">Fecha de siembra</label><input id="plant-date" name="sowingDate" type="date" max="${today()}" value="${escaparHTML(plant.sowingDate || '')}"></div>
         <div class="dialog-field"><label for="plant-stage">Etapa</label><select id="plant-stage" name="stage">${GardenModel.STAGES.map(stage => `<option value="${stage}"${stage === plant.stage ? ' selected' : ''}>${STAGES[stage]}</option>`).join('')}</select></div>
         <p class="user-small-copy dialog-note">${icon('info')}<span>Al cambiar la etapa, guardamos la fecha de hoy en su línea de vida.</span></p>
@@ -301,7 +301,7 @@ const GardenViews = (() => {
     return head + (cards || '<section class="bento-panel user-empty"><h2>Aún no tienes huertos</h2><p>Crea tu primer huerto para empezar.</p></section>') + `<div class="app-actions">${gardens.length ? create : '<a class="button btn-liquid-brand" href="#huerto/nuevo">Crear mi huerto</a>'}</div>${dialog}`;
   }
 
-  const renameDialog = garden => `<h2 id="garden-dialog-title">Renombrar huerto</h2><form data-garden-form="rename" data-garden-id="${escaparHTML(garden.id)}" novalidate><label for="rename-name">Nombre del huerto</label><input id="rename-name" name="name" type="text" maxlength="60" required value="${escaparHTML(garden.name)}">
+  const renameDialog = garden => `<h2 id="garden-dialog-title">Renombrar huerto</h2><form data-garden-form="rename" data-garden-id="${escaparHTML(garden.id)}" novalidate><label for="rename-name">Nombre del huerto</label><input id="rename-name" name="name" type="text" maxlength="60" required data-campo="cosa" value="${escaparHTML(garden.name)}">
     <div class="app-dialog-actions">${button('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit">Guardar</button></div></form>`;
 
   const confirmations = {
@@ -444,7 +444,7 @@ const CareViews = (() => {
           <div class="care-when" data-care-when data-when-mode="now"><span class="care-label care-when-label" id="care-when-label">¿Cuándo?</span>${whenTabs()}
             <div class="care-when-date" data-care-when-date hidden>${dateField('when', '¿Cuándo?', WHEN_HINT.pick)}</div></div>
           <div class="care-field" data-care-chiles hidden><label for="care-chiles">Chiles cosechados (opcional)</label>
-            <div class="care-stepper">${button('care-chiles', icon('minus'), 'light', 'data-step="-1" aria-label="Quitar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}<input id="care-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric" placeholder="0" readonly>${button('care-chiles', icon('plus'), 'light', 'data-step="1" aria-label="Agregar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}</div>
+            <div class="care-stepper">${button('care-chiles', icon('minus'), 'light', 'data-step="-1" aria-label="Quitar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}<input id="care-chiles" name="chiles" type="text" inputmode="numeric" maxlength="3" autocomplete="off" placeholder="0" data-campo="entero" data-min="0" data-max="999">${button('care-chiles', icon('plus'), 'light', 'data-step="1" aria-label="Agregar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}</div>
             <p class="care-stepper-live sr-only" aria-live="polite" data-care-chiles-live></p></div>
         </div>
         <div class="care-register-footer">
@@ -544,24 +544,37 @@ const CareViews = (() => {
     const refill = refillButton('refill', `${icon('tank')}<span>Ya lo rellené</span>`, tank, '', '', 'brand');
     return `<div class="tank-actions">${refill.button}</div>${refill.reason}`;
   }
+  // Icono con su nombre accesible (title para el puntero, aria-label para el lector de pantalla).
+  const mark = item => `<span class="tank-mark" role="img" aria-label="${escaparHTML(item.label)}" title="${escaparHTML(item.label)}">${icon(item.icon)}</span>`;
+  const TANK_VISIBLE_LOADS = 3;
+  // Historial compacto: fecha · duración (o «En curso») · iconos; solo las 3 últimas y «Ver todo» despliega el resto.
   function tankLoads(tank, loads) {
-    const when = GardenModel.meridaWhen;
     if(!tank.hasDevice) return '';
-    const item = load => `<li class="tank-load${load.lowAt ? '' : ' is-open'}"><span class="care-row-icon">${icon('tank')}</span><div class="care-row-main"><h3>Recarga ${escaparHTML(when(load.refilledAt))}</h3>
-      <p>${load.lowAt ? `Se quedó sin agua ${escaparHTML(when(load.lowAt))} · Duró ${escaparHTML(GardenModel.humanDuration(load.seconds))}` : 'En curso'}</p></div>${load.origin === 'equipo' ? `<div class="care-row-marks">${tag(GardenModel.detectedLabel(load), 'verde')}</div>` : ''}</li>`;
-    const list = loads.length ? `<ol class="user-history-list">${loads.map(item).join('')}</ol>` : '<p>Aún no hay recargas registradas.</p>';
-    return `<div class="tank-loads"><h3 id="tank-history-title">Historial del depósito</h3>${list}<p class="user-small-copy">${TANK_NOTE}</p></div>`;
+    const item = load => `<li class="tank-load${load.lowAt ? '' : ' is-open'}"><span class="tank-load-date">${escaparHTML(GardenModel.meridaShort(load.refilledAt))}</span>
+      <span class="tank-load-length">${load.lowAt ? escaparHTML(GardenModel.humanDuration(load.seconds)) : 'En curso'}</span><span class="tank-load-marks">${GardenModel.refillMarks(load).map(mark).join('')}</span></li>`;
+    const visible = loads.slice(0, TANK_VISIBLE_LOADS), rest = loads.slice(TANK_VISIBLE_LOADS);
+    const more = rest.length ? `<details class="tank-more"><summary>Ver todo <span class="tank-more-count">(${rest.length} más)</span></summary><ol class="tank-load-list">${rest.map(item).join('')}</ol></details>` : '';
+    const list = loads.length ? `<ol class="tank-load-list">${visible.map(item).join('')}</ol>${more}` : '<p class="tank-empty">Aún no hay recargas registradas.</p>';
+    return `<div class="tank-loads"><h3 id="tank-history-title">Historial del depósito</h3>${list}</div>`;
   }
+  // Las tres fichas: «Última recarga», «Dura en promedio» (o «Sueles rellenar cada» sin equipo) y «Necesitará agua».
+  function tankFacts(tank) {
+    const facts = GardenModel.tankFacts(tank);
+    const fact = (label, data, extra = '') => `<li class="tank-fact${data.value === '—' ? ' is-empty' : ''}"><span class="tank-fact-label">${escaparHTML(label)}</span>
+      <strong class="tank-fact-value">${escaparHTML(data.value)}${extra}</strong>${data.text ? `<span class="tank-fact-text">${escaparHTML(data.text)}</span>` : ''}</li>`;
+    return `<ul class="tank-facts" aria-label="Resumen del depósito">${fact('Última recarga', facts.last, facts.last.marks.length ? `<span class="tank-fact-marks">${facts.last.marks.map(mark).join('')}</span>` : '')}${fact(facts.average.label, facts.average)}${fact('Necesitará agua', facts.next)}</ul>`;
+  }
+  // ⓘ: la capacidad y la nota del calor y las etapas, a un toque y no como párrafos.
+  const tankInfo = tank => `<details class="tank-info"><summary aria-label="Sobre el depósito" title="Sobre el depósito">${icon('info')}</summary>
+    <div class="tank-info-body"><p>${tank.hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : 'Depósito de 19 L'}</p>${tank.hasDevice ? `<p>${TANK_NOTE}</p>` : ''}</div></details>`;
   function tankSection(data) {
     if(!data || data.status !== 'ready') return '';
     const {tank, loads = []} = data;
     const info = GardenModel.tankSummary(tank);
-    const main = `${info.status}${info.lowSince ? ` <small>desde ${escaparHTML(info.lowSince)}</small>` : ''}`;
-    const lines = info.lines.map(text => `<p class="tank-line">${escaparHTML(text)}</p>`).join('');
-    const empty = !tank.hasDevice && info.lines.length < 2 ? '<p class="tank-line">Registra tus recargas para saber cada cuánto rellenas tu depósito.</p>' : '';
-    return `<section class="bento-panel tank-history tank-section${info.tone}" aria-labelledby="tank-section-title"><h2 id="tank-section-title">${icon('tank')}Depósito de agua</h2>
-      <p class="tank-status"><strong>${main}</strong></p>${tankNotice(tank)}${tankActions(tank)}<div class="tank-lines">${lines}${empty}</div>
-      <p class="tank-capacity user-small-copy">${tank.hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : 'Depósito de 19 L'}</p>${tankLoads(tank, loads)}</section>`;
+    const tone = tank.hasWater === true ? 'verde' : tank.hasWater === false ? 'ambar' : 'gris';
+    const since = info.lowSince ? `<p class="tank-since">Nivel bajo desde ${escaparHTML(info.lowSince)}</p>` : '';
+    return `<section class="bento-panel tank-history tank-section${info.tone}" aria-labelledby="tank-section-title"><div class="tank-head"><h2 id="tank-section-title">${icon('tank')}Depósito de agua</h2>
+      <span class="badge tone-${tone} tank-state">${escaparHTML(info.status)}</span>${tankInfo(tank)}</div>${since}${tankNotice(tank)}${tankActions(tank)}${tankFacts(tank)}${tankLoads(tank, loads)}</section>`;
   }
   // Tras registrar o recargar el estado: vuelve a pintar la sección «Depósito de agua».
   function syncTank(root, data) {
@@ -871,7 +884,7 @@ const CareGuideViews = (() => {
         <form class="care-admin-form" data-guide-form novalidate>
           ${field('care-question','question','Pregunta',`<input id="care-question" name="question" maxlength="${limits.question}" required autocomplete="off">`)}
           ${field('care-answer','answer','Respuesta',`<textarea id="care-answer" name="answer" rows="9" maxlength="${limits.answer}" required aria-describedby="care-answer-help"></textarea>`,'Solo texto. Deja una línea en blanco para separar párrafos.')}
-          ${field('care-order','order','Orden',`<input id="care-order" name="order" inputmode="numeric" maxlength="4" required autocomplete="off" aria-describedby="care-order-help">`,'Número de 1 a 9999. Se muestra de menor a mayor.')}
+          ${field('care-order','order','Orden',`<input id="care-order" name="order" inputmode="numeric" maxlength="4" required autocomplete="off" data-campo="entero" data-min="1" data-max="9999" aria-describedby="care-order-help">`,'Número de 1 a 9999. Se muestra de menor a mayor.')}
           ${field('care-source-name','sourceName','Nombre de la fuente (opcional)',`<input id="care-source-name" name="sourceName" maxlength="${limits.sourceName}" autocomplete="off">`)}
           ${field('care-source-url','sourceUrl','Enlace de la fuente (opcional)',`<input id="care-source-url" name="sourceUrl" type="url" inputmode="url" maxlength="${limits.sourceUrl}" autocomplete="off" spellcheck="false" aria-describedby="care-source-url-help">`,'Solo http:// o https://.')}
           <p class="binding-status" data-guide-form-status role="status" tabindex="-1" hidden></p>
@@ -1022,12 +1035,12 @@ const MaintenanceViews = (() => {
   // Las reglas de tipo, planta y chiles son las del formulario de la persona usuaria (CareViews.adjust).
   const careFields = (record, whole = false) => `<label for="mant-type">Tipo</label><select id="mant-type" name="type" data-care-type>${choices(typeItems(), record?.type || 'rellenar_deposito')}</select>
     <div data-care-plant hidden><label for="mant-plant">Planta</label><select id="mant-plant" name="plant">${choices(plantItems(whole), record?.plant || '')}</select></div>
-    <div data-care-chiles hidden><label for="mant-chiles">Chiles cosechados (opcional)</label><input id="mant-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric" value="${record?.chiles ?? ''}"></div>`;
+    <div data-care-chiles hidden><label for="mant-chiles">Chiles cosechados (opcional)</label><input id="mant-chiles" name="chiles" type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-campo="entero" data-min="0" data-max="999" value="${record?.chiles ?? ''}"></div>`;
 
   function filters(values) {
     return `<form class="care-filters" data-admin-form="care-filter" novalidate>
       <div><label for="mant-search">Buscar</label><input id="mant-search" name="busqueda" type="search" maxlength="60" placeholder="Correo del dueño o huerto" value="${escaparHTML(values.busqueda || '')}"></div>
-      <div><label for="mant-garden">N.º de huerto</label><input id="mant-garden" name="huerto" type="text" inputmode="numeric" maxlength="18" pattern="[0-9]*" value="${escaparHTML(values.huerto || '')}"></div>
+      <div><label for="mant-garden">N.º de huerto</label><input id="mant-garden" name="huerto" type="text" inputmode="numeric" maxlength="18" pattern="[0-9]*" data-campo="digitos" value="${escaparHTML(values.huerto || '')}"></div>
       <div><label for="mant-f-plant">Planta</label><select id="mant-f-plant" name="planta">${choices([['', 'Todas'], ['huerto', 'Todo el huerto'], [1, 'Planta 1'], [2, 'Planta 2'], [3, 'Planta 3']], values.planta || '')}</select></div>
       <div><label for="mant-f-type">Tipo</label><select id="mant-f-type" name="tipo">${choices([['', 'Todos'], ...typeItems()], values.tipo || '')}</select></div>
       <div><label for="mant-f-state">Estado</label><select id="mant-f-state" name="estado">${choices([['', 'Todos'], ...Object.entries(STATES)], values.estado || '')}</select></div>
@@ -1053,7 +1066,7 @@ const MaintenanceViews = (() => {
   function createForm() {
     const first = MaintenanceDates.shift(MaintenanceDates.today(), -6);
     return `<h2 id="admin-dialog-title">Registrar intervención</h2><form data-admin-form="care-create" novalidate>
-      <label for="mant-new-garden">N.º de huerto</label><input id="mant-new-garden" name="garden" type="text" inputmode="numeric" maxlength="18" pattern="[0-9]*" required>
+      <label for="mant-new-garden">N.º de huerto</label><input id="mant-new-garden" name="garden" type="text" inputmode="numeric" maxlength="18" pattern="[0-9]*" required data-campo="digitos">
       ${careFields(null, true)}
       <label for="mant-when">¿Cuándo?</label><input id="mant-when" name="when" type="date" min="${MaintenanceDates.format(first)}" max="${today()}">
       <p class="user-small-copy">Déjalo vacío para registrar ahora. Se admiten hasta 6 días atrás.</p>
@@ -1088,7 +1101,7 @@ const MaintenanceViews = (() => {
     picker.innerHTML = `<div class="maint-calendar-header"><h2 id="maint-calendar-title">Calendario</h2>
       <button type="button" data-date-action="close" aria-label="Cerrar calendario">${icon('close')}</button></div>
       <div class="maint-calendar-navigation"><button type="button" data-date-action="prev" aria-label="Mes anterior">${icon('arrow')}</button>
-      <select data-date-month aria-label="Mes"></select><input type="number" data-date-year min="1" max="9999" step="1" aria-label="Año" inputmode="numeric">
+      <select data-date-month aria-label="Mes"></select><input type="number" data-date-year min="1" max="9999" step="1" aria-label="Año" inputmode="numeric" data-campo="entero" data-min="1" data-max="9999">
       <button type="button" data-date-action="next" aria-label="Mes siguiente">${icon('arrow')}</button></div>
       <h3 id="maint-calendar-month" data-date-heading aria-live="polite" aria-atomic="true"></h3>
       <p id="maint-calendar-help" class="sr-only">Usa las flechas para recorrer los días, Inicio y Fin para la semana, Re Pág y Av Pág para cambiar de mes, y Mayús para cambiar de año. Pulsa Intro para seleccionar y Escape para cerrar.</p>

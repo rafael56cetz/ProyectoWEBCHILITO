@@ -1621,35 +1621,60 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .g
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="refill"]:disabled,
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="care-quick"]:disabled { opacity:.55;cursor:not-allowed; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .refill-reason { margin:var(--esp-2) 0 0;color:var(--claro-suave); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section { display:flex;flex-direction:column;gap:var(--esp-3);margin-bottom:var(--esp-5); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section>h2 { display:flex;align-items:center;gap:var(--esp-2);margin:0; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-status { margin:0;font-size:1.25rem;color:var(--claro-titulo); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section.is-ok .tank-status strong { color:var(--claro-verde); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section.is-low .tank-status strong { color:var(--insignia-ambar-texto,#6b3f06); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-status small { font-size:.7em;font-weight:500;color:var(--claro-suave); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-lines { display:grid;gap:var(--esp-1); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-lines p,html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-capacity { margin:0; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-line { color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section { display:flex;flex-direction:column;gap:var(--esp-4);margin-bottom:var(--esp-5); }
+/* Encabezado: título, estado como insignia a la derecha y el botón ⓘ con la capacidad y la nota. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-head { position:relative;display:flex;align-items:center;gap:var(--esp-2);flex-wrap:wrap; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-head>h2 { display:flex;align-items:center;gap:var(--esp-2);margin:0;flex:1 1 auto;min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-state { flex-shrink:0;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info { position:static;flex-shrink:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary { display:inline-flex;align-items:center;justify-content:center;width:var(--boton-alto-compacto);height:var(--boton-alto-compacto);border-radius:var(--radio-boton);list-style:none;cursor:pointer;color:var(--claro-suave);border:1px solid var(--claro-linea);background:var(--boton-secundaria); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary::-webkit-details-marker { display:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary:hover,html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info[open]>summary { color:var(--claro-verde);border-color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary:focus-visible { outline:none;border-color:var(--foco-borde);box-shadow:var(--foco-halo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary .icon { width:18px;height:18px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info-body { position:absolute;top:calc(100% + var(--esp-2));right:0;z-index:5;display:grid;gap:var(--esp-2);width:min(340px,100%);padding:var(--esp-3) var(--esp-4);border:1px solid var(--vidrio-flotante-borde);border-radius:var(--radio-campo);background:var(--vidrio-flotante-fondo);box-shadow:var(--vidrio-flotante-sombra);-webkit-backdrop-filter:var(--vidrio-flotante-desenfoque);backdrop-filter:var(--vidrio-flotante-desenfoque); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info-body p { margin:0;font-size:13.5px;line-height:1.5;color:var(--claro-tinta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-since { margin:calc(var(--esp-2) * -1) 0 0;font-size:14px;color:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-actions { display:flex;flex-wrap:wrap;gap:var(--esp-2); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-call { display:flex;align-items:center;gap:var(--esp-2);margin:0;font-size:1.05rem;font-weight:700;color:var(--claro-titulo); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-note { display:flex;align-items:flex-start;gap:var(--esp-2);margin:0;padding:var(--esp-3);border:1px solid var(--claro-linea);border-radius:var(--radio-campo);color:var(--claro-titulo); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-note.is-warning { border-color:#b7791f;background:rgba(183,121,31,.08); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-note.is-warning { border-color:var(--insignia-ambar-borde);background:var(--insignia-ambar-fondo); }
 /* Recarga detectada sin aviso de la persona: «¿Ya lo rellenaste?» con «Sí, ya lo rellené» (primario) y «No fue una recarga». */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-pending { display:flex;flex-direction:column;gap:var(--esp-2);padding:var(--esp-3);border:1px solid var(--claro-verde);border-radius:var(--radio-campo); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-pending-title { display:flex;align-items:center;gap:var(--esp-2);margin:0;font-weight:600;color:var(--claro-titulo); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-pending-copy { margin:0;color:var(--claro-suave); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-loads { display:flex;flex-direction:column;gap:var(--esp-3);margin-top:var(--esp-2); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-loads h3 { margin:0; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load.is-open h3 { color:var(--claro-verde); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load { grid-template-columns:auto minmax(0,1fr) auto;align-items:center; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load>.care-row-marks { display:flex;justify-content:flex-end;margin:0; }
-/* Teléfono: los botones de la sección, uno debajo del otro y a todo el ancho. */
+/* Tres fichas en fila (una columna en teléfono). */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-facts { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--esp-3);margin:0;padding:0;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact { display:flex;flex-direction:column;gap:2px;min-width:0;padding:var(--esp-3) var(--esp-4);border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);box-shadow:var(--vidrio-base-sombra); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-label { font-size:12.5px;font-weight:600;letter-spacing:.01em;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-value { display:flex;align-items:center;gap:var(--esp-2);flex-wrap:wrap;font-size:1.3rem;font-weight:650;line-height:1.25;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact.is-empty .tank-fact-value { color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-text { font-size:13px;line-height:1.4;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-marks { display:inline-flex;gap:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-mark { display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:var(--insignia-verde-fondo);color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-mark .icon { width:15px;height:15px; }
+/* Historial compacto: fecha · duración · iconos; «Ver todo» despliega el resto. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-loads { display:flex;flex-direction:column;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-loads h3 { margin:0;font-size:15px;font-weight:650;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-list { display:grid;gap:0;margin:0;padding:0;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load { display:grid;grid-template-columns:minmax(88px,auto) minmax(0,1fr) auto;align-items:center;gap:var(--esp-3);min-height:var(--fila-alto);padding:var(--esp-1) var(--esp-1);border-bottom:1px solid var(--claro-linea);font-size:14px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load:last-child { border-bottom:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-date { font-weight:600;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-length { color:var(--claro-tinta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load.is-open .tank-load-length { font-weight:600;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-marks { display:inline-flex;gap:var(--esp-1);justify-content:flex-end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-more>summary { display:inline-flex;align-items:center;gap:var(--esp-1);min-height:var(--boton-alto-compacto);cursor:pointer;font-size:14px;font-weight:600;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-more[open]>summary { margin-bottom:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-more-count { font-weight:500;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-empty { margin:0;font-size:14px;color:var(--claro-suave); }
+/* Teléfono: fichas en una columna y botones a todo el ancho. */
 @media (max-width:640px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-facts { grid-template-columns:minmax(0,1fr); }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-actions { flex-direction:column;align-items:stretch; }
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-actions>.button { width:100%;justify-content:center; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load { grid-template-columns:auto minmax(0,1fr); }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load>.care-row-marks { grid-column:2;justify-content:flex-start; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load { grid-template-columns:auto minmax(0,1fr) auto;gap:var(--esp-2); }
 }
+@media (forced-colors:active) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section :is(.tank-fact,.tank-info-body,.tank-mark) { border:1px solid CanvasText; } }
 
 /* ── Mi huerto: vidrio y jerarquía ───────────────────────────────────────────────────────────────
    Prueba de diseño sobre la pantalla de inicio del usuario. El saludo y el estado del equipo
@@ -2057,23 +2082,9 @@ html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-pag
 html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register .care-submit:not(:disabled):hover { filter:brightness(1.06); }
 html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register .care-submit:disabled { opacity:.5;box-shadow:none!important; }
 
-/* Historial del depósito: filas de vidrio dentro de la tarjeta. */
+/* Depósito de agua: la tarjeta de vidrio comparte el estilo; su contenido lo define «.tank-section». */
 html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history { margin-bottom:var(--esp-5); }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history>p { margin:0;color:var(--claro-suave);font-size:14.5px;line-height:1.55; }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list { display:grid;gap:10px;margin:2px 0 0; }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list li {
-  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 14px;padding:14px 16px;
-  border:1px solid rgba(255,255,255,.7);border-radius:18px;background:rgba(255,255,255,.42);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
-}
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list li>span {
-  width:40px;height:40px;border-radius:12px;background:rgba(47,106,72,.1);color:var(--claro-verde);
-}
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list li>span .icon { width:19px;height:19px; }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list h3 { margin:0 0 3px;font-size:15px;font-weight:600; }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list p { margin:0;font-size:14px; }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-small-copy { margin-top:4px;font-size:13.5px;line-height:1.5; }
-html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .tank-load.is-open h3 { color:var(--claro-verde); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .tank-head>h2 { margin:0!important;color:var(--claro-titulo);font-size:clamp(21px,1.8vw,24px)!important;font-weight:650;line-height:1.2;letter-spacing:-.02em; }
 
 /* Historial de cuidados: filtros en una cuadrícula clara y filas de vidrio. */
 html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history { margin-bottom:var(--esp-5); }
@@ -2141,8 +2152,6 @@ html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-pag
   html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register-actions>.button { flex:1 1 100%;justify-content:center;width:100%; }
   html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters .app-actions { flex:1 1 100%;margin:0; }
   html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters .app-actions .button { flex:1 1 0; }
-  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list li { grid-template-columns:auto minmax(0,1fr);gap:0 12px; }
-  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .user-history-list li>.care-row-marks { grid-column:1/-1;margin-top:8px; }
   html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide summary { padding:16px;font-size:15.5px; }
   html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide-answer { padding:0 16px 16px; }
 }
@@ -2168,3 +2177,13 @@ html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-pag
   }
   html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome-garden { border:1px solid CanvasText!important;background:Canvas!important; }
 }
+
+/* ── Campos: mensaje en línea de la regla de cada campo (CamposVista) ───────────────────────────── */
+.campo-aviso { display:flex;align-items:flex-start;gap:var(--esp-1);margin:var(--esp-1) 0 0;font-size:13.5px;font-weight:500;line-height:1.4;color:var(--error); }
+.campo-aviso::before { content:"";flex:0 0 auto;width:6px;height:6px;margin-top:.5em;border-radius:50%;background:currentColor; }
+:is(input,textarea)[aria-invalid=true] { border-color:var(--error)!important; }
+html body[data-private=true] #app-page .campo-aviso { color:var(--claro-peligro); }
+.contact-form .campo-aviso { color:var(--aviso-error); }
+.contact-form :is(input,textarea)[aria-invalid=true] { border-color:var(--aviso-error)!important; }
+html body[data-private=true] #app-page :is(input,textarea)[aria-invalid=true] { border-color:var(--claro-peligro)!important; }
+@media (forced-colors:active) { .campo-aviso { color:CanvasText; } :is(input,textarea)[aria-invalid=true] { border:2px solid CanvasText!important; } }
