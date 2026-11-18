@@ -18,6 +18,7 @@ const GardenViews = (() => {
     'deposito-repetida':'Ya registraste esta recarga: no hace falta registrar otra.',
     'deposito-resuelta':'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.',
     'deposito-espera':'Ya registraste una recarga hace menos de 12 horas.',
+    'cuidado-ciclo-anterior':'Esa fecha es de un ciclo que ya terminaste. Elige una fecha desde que empezó el ciclo actual.',
     'rate-limited':'Demasiados intentos. Espera un momento.'};
   const errorText = (code, fallback = 'No se pudo completar la solicitud. Inténtalo de nuevo.') => ERRORS[code] || fallback;
   const tag = (text, tone = 'gris') => `<span class="badge tone-${tone}">${escaparHTML(text)}</span>`;
@@ -256,7 +257,7 @@ const GardenViews = (() => {
   const dialog = '<dialog class="bento-panel app-dialog garden-dialog" aria-labelledby="garden-dialog-title"><div data-garden-dialog-content></div></dialog>';
   const today = () => MaintenanceDates.format(MaintenanceDates.today());
 
-  function plantDialogs(plant, hasDevice) {
+  function plantDialogs(plant, hasDevice, cycle) {
     return {
       edit: `<h2 id="garden-dialog-title">Editar planta</h2><form class="dialog-form" data-garden-form="plant" novalidate>
         <div class="dialog-field is-wide"><label for="plant-name">Nombre de la planta</label><input id="plant-name" name="name" type="text" maxlength="40" required data-campo="cosa" value="${escaparHTML(plant.name)}"></div>
@@ -267,22 +268,40 @@ const GardenViews = (() => {
       water: `<h2 id="garden-dialog-title">Regar esta planta</h2><form class="dialog-form" data-garden-form="water" novalidate>
         <div class="dialog-field is-wide"><label for="water-seconds">Duración del riego</label><select id="water-seconds" name="duration">${GardenModel.WATERING_SECONDS.map(seconds => `<option value="${seconds}"${seconds === 8 ? ' selected' : ''}>${seconds} segundos</option>`).join('')}</select></div>
         <p class="user-small-copy dialog-note">${icon('info')}<span>Si el depósito no tiene agua, tu equipo no regará.</span></p>
-        <div class="app-dialog-actions">${button('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit"${hasDevice ? '' : ' disabled'}>Regar</button></div></form>`};
+        <div class="app-dialog-actions">${button('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit"${hasDevice ? '' : ' disabled'}>Regar</button></div></form>`,
+      endCycle: `<h2 id="garden-dialog-title">Terminar el ciclo ${Number(cycle?.number) || ''}</h2><form class="dialog-form" data-garden-form="end-cycle" novalidate>
+        <div class="dialog-field is-wide"><label for="cycle-reason">¿Por qué termina?</label><select id="cycle-reason" name="reason" required><option value="">Elige un motivo</option>${Object.entries(GardenModel.CYCLE_REASONS).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></div>
+        <div class="dialog-field is-wide"><label for="cycle-note">Nota <span>(opcional)</span></label><textarea id="cycle-note" name="note" rows="3" maxlength="500"></textarea></div>
+        <p class="user-small-copy dialog-note">${icon('info')}<span>La planta vuelve a «Sin sembrar» sin fecha de siembra y conserva su nombre. Su línea de vida y sus cuidados quedan en «Ciclos anteriores». No se puede deshacer.</span></p>
+        <div class="app-dialog-actions">${button('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit" data-danger="true">Terminar ciclo</button></div></form>`};
+  }
+  // Línea de vida y cuidados de un ciclo (el actual o uno anterior, de solo lectura).
+  const careLabels = {rellenar_deposito:'Recarga del depósito', sustrato:'Sustrato y perlita', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
+  const lifeList = stages => `<ol class="user-history-list">${stages.map(item => `<li><span>${icon('leaf')}</span><div><h3>${STAGES[item.stage] || escaparHTML(item.stage)}</h3><p>${AppViews.date(item.since)}</p></div></li>`).join('')}</ol>`;
+  const careList = care => `<ol class="user-history-list">${care.map(item => `<li><span>${icon('check')}</span><div><h3>${careLabels[item.type] || escaparHTML(item.type)}</h3><p>${AppViews.date(item.doneAt)}</p></div></li>`).join('')}</ol>`;
+  function pastCycles(cycles = []) {
+    if(!cycles.length) return '';
+    const item = cycle => `<details class="plant-cycle"><summary>${escaparHTML(GardenModel.cycleTitle(cycle))}</summary><div class="plant-cycle-body">
+      ${cycle.note ? `<p class="plant-cycle-note">${escaparHTML(cycle.note)}</p>` : ''}
+      <div class="plant-cycle-columns"><div><h3>Línea de vida</h3>${cycle.stages.length ? lifeList(cycle.stages) : '<p>Sin etapas registradas.</p>'}</div>
+      <div><h3>Cuidados</h3>${cycle.care.length ? careList(cycle.care) : '<p>Sin cuidados registrados.</p>'}</div></div></div></details>`;
+    return `<section class="bento-panel plant-cycles"><details class="plant-cycles-toggle"><summary><h2>Ciclos anteriores</h2><span class="plant-cycles-count">${cycles.length}</span></summary>
+      <p class="user-small-copy">Solo lectura: lo que pasó en cada ciclo se conserva tal cual.</p>${cycles.map(item).join('')}</details></section>`;
   }
 
-  function plantPage({garden, plant, stages, series, range, care, lastWatering, hasDevice}) {
+  function plantPage({garden, plant, stages, series, range, care, lastWatering, hasDevice, cycle = null, pastCycles:past = []}) {
     const since = plant.stageSince ? ` (desde el ${AppViews.date(plant.stageSince)})` : '';
     const sown = plant.sowingDate ? `Sembrada el ${AppViews.date(plant.sowingDate)}${plant.daysSown === null ? '' : ` (hace ${plant.daysSown} días)`}` : 'Sin fecha de siembra';
-    const careLabels = {rellenar_deposito:'Recarga del depósito', sustrato:'Sustrato y perlita', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
+    const cycleLine = cycle ? `<p class="plant-cycle-current">${escaparHTML(`Ciclo ${cycle.number} · ${GardenModel.cycleRange(cycle)}`)}</p>` : '';
     const watering = lastWatering ? `Último riego: ${{automatico:'automático', usuario:'tuyo', soporte:'de soporte'}[lastWatering.origin] || escaparHTML(lastWatering.origin)}, ${lastWatering.duration ?? '—'} s, ${GardenModel.ago(lastWatering.at)}` : 'Sin riegos registrados';
     return `<div class="plant-hero plant-photo-${plant.number}"><a class="garden-back" href="${withGarden('huerto', garden.id)}">← Mi huerto</a>
-      <div class="page-heading"><div><h1>Planta ${plant.number}${plant.name === `Planta ${plant.number}` ? '' : ` · ${escaparHTML(plant.name)}`}</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${since} · ${sown}</p></div>${button('edit', 'Editar')}</div></div>
+      <div class="page-heading"><div><h1>Planta ${plant.number}${plant.name === `Planta ${plant.number}` ? '' : ` · ${escaparHTML(plant.name)}`}</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${since} · ${sown}</p>${cycleLine}</div><div class="app-actions">${button('edit', 'Editar')}${cycle ? button('end-cycle', 'Terminar ciclo', 'light', 'data-danger="true"') : ''}</div></div></div>
       <div class="user-chart-toolbar"><h2>Humedad del sustrato</h2><div class="user-range-control" role="group" aria-label="Periodo">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>
       ${chart('Humedad del sustrato', series, '%', range, 'plant')}
-      <div class="plant-columns"><section class="bento-panel"><h2>Línea de vida</h2>${stages.length ? `<ol class="user-history-list">${stages.map(item => `<li><span>${icon('leaf')}</span><div><h3>${STAGES[item.stage] || item.stage}</h3><p>${AppViews.date(item.since)}</p></div></li>`).join('')}</ol>${stages.length === 1 ? '<p class="user-small-copy">Cambia la etapa en Editar para ir llenando su línea de vida.</p>' : ''}` : '<p>Aún no hay etapas registradas.</p>'}</section>
-      <section class="bento-panel"><h2>Cuidados de esta planta</h2>${care.length ? `<ol class="user-history-list">${care.map(item => `<li><span>${icon('check')}</span><div><h3>${careLabels[item.type] || item.type}</h3><p>${AppViews.date(item.doneAt)}</p></div></li>`).join('')}</ol>` : '<p>No hay cuidados registrados para esta planta.</p>'}<a class="button btn-liquid-light" href="#mantenimiento">Registrar cuidado</a></section></div>
+      <div class="plant-columns"><section class="bento-panel"><h2>Línea de vida</h2>${stages.length ? `${lifeList(stages)}${stages.length === 1 ? '<p class="user-small-copy">Cambia la etapa en Editar para ir llenando su línea de vida.</p>' : ''}` : '<p>Aún no hay etapas registradas.</p>'}</section>
+      <section class="bento-panel"><h2>Cuidados de esta planta</h2>${care.length ? careList(care) : `<p>${cycle && cycle.number > 1 ? 'No hay cuidados registrados en este ciclo.' : 'No hay cuidados registrados para esta planta.'}</p>`}<a class="button btn-liquid-light" href="#mantenimiento">Registrar cuidado</a></section></div>
       <section class="bento-panel user-operating"><div><h2>Riego</h2><p>${escaparHTML(watering)}</p></div>${hasDevice ? button('water', 'Regar esta planta', 'brand') : '<p class="user-small-copy">Vincula tu equipo para regar desde aquí.</p>'}</section>
-      <div data-order-card></div>${dialog}`;
+      ${pastCycles(past)}<div data-order-card></div>${dialog}`;
   }
 
   const deviceFacts = device => device
@@ -310,11 +329,13 @@ const GardenViews = (() => {
     desvincular: identifier => ({titulo:`¿Desvincular el equipo ${identifier}?`, texto:'Dejará de enviar lecturas a este huerto. Para volver a usarlo tendrás que vincularlo de nuevo.', accion:'Desvincular equipo', peligro:true}),
     archivar: name => ({titulo:`¿Archivar ${name}?`, texto:'Dejarás de verlo. Su historial se conserva.', accion:'Archivar huerto', peligro:true}),
     refill:{titulo:'¿Confirmas que ya rellenaste el depósito?', texto:'Registraremos la recarga con la hora de ahora.', accion:'Sí, ya lo rellené'},
-    'refill-discard':{titulo:'¿No fue una recarga?', texto:'Descartaremos esta detección y no se registrará ninguna recarga. No se puede deshacer.', accion:'No fue una recarga', peligro:true}};
+    'refill-discard':{titulo:'¿No fue una recarga?', texto:'Descartaremos esta detección y no se registrará ninguna recarga. No se puede deshacer.', accion:'No fue una recarga', peligro:true},
+    endCycle: (number, name, reason) => ({titulo:`¿Terminar el ciclo ${number} de ${name}?`,
+      texto:`Motivo: ${GardenModel.CYCLE_REASONS[reason] || reason}. La planta volverá a «Sin sembrar». No se puede deshacer.`, accion:'Terminar ciclo', peligro:true})};
 
   return Object.freeze({
     tag, button, stat, selector, screenTitle, statusLine, loading, noGarden, codeBox, noDevice, orderTitle, orderStateTag, lineChart, chart,
-    errorText, refillButton, summary, summaryList, orderCard, newGarden, linkWizard, plantPage, plantDialogs, myGardens, renameDialog, confirmations, failed,
+    errorText, refillButton, summary, summaryList, orderCard, newGarden, linkWizard, plantPage, plantDialogs, pastCycles, myGardens, renameDialog, confirmations, failed,
     paint(root, html) { root.innerHTML = html; },
     fillSlot(root, selector, html) { const slot = root.querySelector(selector); if(slot) slot.innerHTML = html; },
     countdown(root, seconds) { root.querySelectorAll('[data-countdown]').forEach(node => { node.textContent = GardenModel.clock(seconds); }); },
@@ -325,6 +346,8 @@ const GardenViews = (() => {
       box.showModal();
       box.querySelector('input,select,button')?.focus();
     },
+    // Un campo obligatorio vacío: su mensaje en línea y el foco.
+    missing(field, message) { CamposVista.aviso(field, message); field.focus(); },
     closeDialog(root) { const box = root.querySelector('.garden-dialog'); if(box?.open) box.close(); }
   });
 })();

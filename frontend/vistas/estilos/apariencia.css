@@ -2187,3 +2187,24 @@ html body[data-private=true] #app-page .campo-aviso { color:var(--claro-peligro)
 .contact-form :is(input,textarea)[aria-invalid=true] { border-color:var(--aviso-error)!important; }
 html body[data-private=true] #app-page :is(input,textarea)[aria-invalid=true] { border-color:var(--claro-peligro)!important; }
 @media (forced-colors:active) { .campo-aviso { color:CanvasText; } :is(input,textarea)[aria-invalid=true] { border:2px solid CanvasText!important; } }
+
+/* ── Ficha de planta: ciclo actual y «Ciclos anteriores» plegable (solo lectura) ─────────────────── */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-current { margin:var(--esp-1) 0 0;font-size:14px;font-weight:600;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading>.app-actions { display:flex;flex-wrap:wrap;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles { margin-top:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary { display:flex;align-items:center;gap:var(--esp-2);cursor:pointer;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary::-webkit-details-marker,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle>summary::-webkit-details-marker { display:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary::after { content:"";width:8px;height:8px;margin-left:auto;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform var(--duracion-corta) ease; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle[open]>summary::after { transform:rotate(225deg); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary h2 { margin:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-count { display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 8px;border-radius:var(--radio-boton);background:var(--insignia-gris-fondo);color:var(--insignia-gris-texto);font-size:13px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>p { margin:var(--esp-3) 0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle { margin-top:var(--esp-2);border:1px solid var(--claro-linea);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle>summary { min-height:var(--fila-alto);display:flex;align-items:center;padding:var(--esp-2) var(--esp-4);cursor:pointer;list-style:none;font-weight:600;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-cycles-toggle,.plant-cycle)>summary:focus-visible { outline:none;border-radius:var(--radio-campo);box-shadow:var(--foco-halo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-body { padding:0 var(--esp-4) var(--esp-4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-note { margin:0 0 var(--esp-3);padding:var(--esp-2) var(--esp-3);border-left:3px solid var(--claro-linea);white-space:pre-line;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns h3 { margin:0 0 var(--esp-2);font-size:14px; }
+@media (max-width:700px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns { grid-template-columns:1fr; } }

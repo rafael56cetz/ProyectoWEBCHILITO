@@ -223,6 +223,23 @@ const PlantController = (() => {
       mostrarAviso('exito', 'Planta actualizada.');
       await load();
     }
+    // «Terminar ciclo»: el motivo es obligatorio; se pide confirmación («No se puede deshacer») antes de enviar.
+    let ending = false;
+    async function endCycle(form) {
+      const reason = form.elements.reason.value, note = form.elements.note.value.trim();
+      if(ending) return;
+      if(!reason) { GardenViews.missing(form.elements.reason, 'Elige un motivo'); return; }
+      GardenViews.closeDialog(root);
+      if(!await confirmar(GardenViews.confirmations.endCycle(data.cycle.number, data.plant.name, reason))) return;
+      ending = true;
+      try {
+        const result = await service.endCycle(gardenId, route.extra, {reason, note});
+        if(life.signal.aborted) return;
+        if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code, 'No pudimos terminar el ciclo. Inténtalo de nuevo.')); return; }
+        mostrarAviso('exito', `Empezó el ciclo ${result.cycle.number}. El anterior quedó en «Ciclos anteriores».`);
+        await load();
+      } finally { ending = false; }
+    }
     async function water(form) {
       const result = await service.order(gardenId, {type:'regar', plant:Number(route.extra), duration:Number(form.elements.duration.value)});
       if(life.signal.aborted) return;
@@ -234,11 +251,12 @@ const PlantController = (() => {
     root.addEventListener('click', async event => {
       const trigger = event.target.closest('[data-garden-action]');
       if(!trigger || !data) return;
-      const dialogs = GardenViews.plantDialogs(data.plant, data.hasDevice);
+      const dialogs = GardenViews.plantDialogs(data.plant, data.hasDevice, data.cycle);
       const action = trigger.dataset.gardenAction;
       if(action === 'range') { range = trigger.dataset.range; await load(); }
       else if(action === 'edit') GardenViews.openDialog(root, dialogs.edit);
       else if(action === 'water') GardenViews.openDialog(root, dialogs.water);
+      else if(action === 'end-cycle') GardenViews.openDialog(root, dialogs.endCycle);
       else if(action === 'close-dialog') GardenViews.closeDialog(root);
     }, {signal:life.signal});
     root.addEventListener('submit', event => {
@@ -246,6 +264,7 @@ const PlantController = (() => {
       const kind = event.target.closest('[data-garden-form]')?.dataset.gardenForm;
       if(kind === 'plant') save(event.target);
       else if(kind === 'water') water(event.target);
+      else if(kind === 'end-cycle') endCycle(event.target);
     }, {signal:life.signal});
     load();
     return {redraw() {}, dispose() { tracker?.stop(); life.abort(); }};

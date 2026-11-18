@@ -793,7 +793,7 @@ suite('depósito con flotador', async () => {
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.40'], 'todos los estáticos en mvc.40');
+  assert.deepEqual([...versions], ['?v=mvc.41'], 'todos los estáticos en mvc.41');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 
@@ -1111,6 +1111,74 @@ suite('campos', async () => {
   assert.ok(!/type="number"[^>]*name="chiles"|name="chiles"[^>]*type="number"/.test(read('vistas/huerto.js')), 'chiles no usa type=number (admite e, + y -)');
   assert.match(read('controladores/enrutador.js'), /CamposVista\.instalar\(document\);/, 'el filtro se instala una vez para toda la aplicación');
   console.log('PASS campos: reglas, teclado y pegado filtrados, mensajes en línea, envío detenido, rechazo del servidor e inventario');
+});
+
+// ── Ciclos de planta: ciclo actual, «Terminar ciclo» y «Ciclos anteriores» ───────────────────
+suite('ciclos de planta', async () => {
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value)}, Date, Intl});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
+  const M = vm.runInContext('GardenModel', context);
+  // Modelo: motivos y fechas del ciclo en hora de Mérida.
+  assert.deepEqual(Object.keys(M.CYCLE_REASONS), ['cosecha_terminada', 'planta_murio', 'no_germino', 'pudricion_plaga', 'otro'], 'los 5 motivos de la base');
+  const pasado = {number:1, startedAt:'2026-11-01T18:00:00Z', endedAt:'2026-11-18T18:00:00Z', reason:'no_germino', note:'<b>Nunca</b> brotó', stages:[{stage:'sin_sembrar', since:'2026-11-01'}, {stage:'germinacion', since:'2026-11-03'}],
+    care:[{type:'germinacion', doneAt:'2026-11-03T15:00:00Z'}]};
+  assert.equal(M.cycleTitle(pasado), 'Ciclo 1 · 1 nov 2026 – 18 nov 2026 · No germinó');
+  assert.equal(M.cycleRange({number:2, startedAt:'2026-11-18T18:00:00Z', endedAt:null}), 'desde el 18 nov 2026');
+  assert.equal(M.cycleTitle({number:3, startedAt:'2026-12-01T03:00:00Z', endedAt:'2026-12-02T05:59:00Z', reason:'otro'}), 'Ciclo 3 · 30 nov 2026 – 1 dic 2026 · Otro motivo', 'el día lo decide Mérida');
+
+  // Vista de la ficha: el ciclo actual, el botón de peligro y los ciclos anteriores plegables y de solo lectura.
+  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
+    AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
+  vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
+  const V = vm.runInContext('GardenViews', views);
+  const plant = {number:1, name:'Chile <bravo>', stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null};
+  const ficha = extra => V.plantPage({garden:{id:'7'}, plant, stages:[{stage:'sin_sembrar', since:'2026-11-18'}], series:{points:[]}, range:'24h', care:[], lastWatering:null, hasDevice:false,
+    cycle:{number:2, startedAt:'2026-11-18T18:00:00Z', endedAt:null, reason:null}, pastCycles:[pasado], ...extra});
+  const html = ficha();
+  assert.ok(html.includes('<p class="plant-cycle-current">Ciclo 2 · desde el 18 nov 2026</p>'), 'el ciclo actual bajo el título');
+  assert.match(html, /<button type="button" class="button btn-liquid-light" data-garden-action="end-cycle" data-danger="true">Terminar ciclo<\/button>/);
+  const linea = html.slice(html.indexOf('<h2>Línea de vida</h2>'), html.indexOf('<h2>Cuidados de esta planta</h2>'));
+  assert.equal((linea.match(/<li>/g) || []).length, 1, 'la línea de vida muestra solo el ciclo actual');
+  assert.ok(html.includes('No hay cuidados registrados en este ciclo.'), 'cuidados: solo el ciclo actual');
+  const anteriores = html.slice(html.indexOf('<section class="bento-panel plant-cycles">'));
+  assert.match(anteriores, /^<section class="bento-panel plant-cycles"><details class="plant-cycles-toggle"><summary><h2>Ciclos anteriores<\/h2><span class="plant-cycles-count">1<\/span><\/summary>/, 'plegable, cerrado por omisión');
+  assert.ok(anteriores.includes('<details class="plant-cycle"><summary>Ciclo 1 · 1 nov 2026 – 18 nov 2026 · No germinó</summary>'));
+  assert.ok(anteriores.includes('&lt;b&gt;Nunca&lt;/b&gt; brotó') && !anteriores.includes('<b>Nunca'), 'la nota va escapada');
+  assert.ok(anteriores.includes('Germinación') && anteriores.includes('fecha:2026-11-03'), 'su línea de vida y sus cuidados');
+  const soloLectura = anteriores.slice(0, anteriores.indexOf('</section>'));
+  assert.ok(!/<button|<form|<input|<select|<textarea|data-garden-action/.test(soloLectura), 'los ciclos anteriores son de solo lectura');
+  assert.ok(!ficha({pastCycles:[]}).includes('plant-cycles'), 'sin ciclos anteriores no hay sección');
+  assert.ok(html.includes('Chile &lt;bravo&gt;') && !html.includes('Chile <bravo>'));
+
+  // Diálogo y confirmación: motivo obligatorio, nota opcional y «No se puede deshacer».
+  const dialogo = V.plantDialogs(plant, false, {number:2}).endCycle;
+  assert.ok(dialogo.includes('Terminar el ciclo 2') && dialogo.includes('<select id="cycle-reason" name="reason" required><option value="">Elige un motivo</option>'));
+  for(const [valor, texto] of Object.entries(M.CYCLE_REASONS)) assert.ok(dialogo.includes(`<option value="${valor}">${texto}</option>`), valor);
+  assert.match(dialogo, /<textarea id="cycle-note" name="note" rows="3" maxlength="500"><\/textarea>/);
+  assert.ok(dialogo.includes('conserva su nombre') && dialogo.includes('No se puede deshacer.') && dialogo.includes('data-danger="true">Terminar ciclo</button>'));
+  const pregunta = V.confirmations.endCycle(2, 'Chile bravo', 'planta_murio');
+  assert.deepEqual([pregunta.titulo, pregunta.accion, pregunta.peligro], ['¿Terminar el ciclo 2 de Chile bravo?', 'Terminar ciclo', true]);
+  assert.ok(pregunta.texto.includes('Motivo: La planta murió') && pregunta.texto.includes('No se puede deshacer.'));
+  assert.notEqual(V.errorText('cuidado-ciclo-anterior'), V.errorText('desconocido'), 'cuidado fechado en un ciclo terminado');
+
+  // Servicio: la ruta y que un número de planta no válido no llega al servidor como texto.
+  const calls = [];
+  const http = vm.createContext({URL, URLSearchParams, ChilitoHTTP:{sessionExpired() {}, async request(path, options) { calls.push([options.method, path, JSON.stringify(options.body)]); return {http:200, body:{status:'accepted'}}; }}});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), http);
+  const S = vm.runInContext('GardenService', http);
+  assert.equal((await S.endCycle('7', '2', {reason:'otro', note:''})).status, 'accepted');
+  assert.deepEqual(calls, [['POST', '/api/huertos/7/plantas/2/terminar-ciclo', '{"reason":"otro","note":""}']]);
+
+  // Controlador: confirma antes de enviar, no envía dos veces y vuelve a cargar la ficha.
+  const source = read('controladores/huerto.js');
+  const control = source.slice(source.indexOf('const PlantController'), source.indexOf('const GardenController'));
+  assert.match(control, /if\(!reason\) \{ GardenViews\.missing\(form\.elements\.reason, 'Elige un motivo'\); return; \}/, 'sin motivo no se envía');
+  assert.match(control, /if\(!await confirmar\(GardenViews\.confirmations\.endCycle\([^)]*\)\)\) return;\n\s+ending = true;\n\s+try \{\n\s+const result = await service\.endCycle\(/, 'confirmación antes de enviar');
+  assert.match(control, /else if\(action === 'end-cycle'\) GardenViews\.openDialog\(root, dialogs\.endCycle\);/);
+  assert.match(control, /else if\(kind === 'end-cycle'\) endCycle\(event\.target\);/);
+  console.log('PASS ciclos de planta: ciclo actual, «Terminar ciclo» con confirmación y «Ciclos anteriores» de solo lectura');
 });
 
 // ── Ejecución: una suite tras otra ────────────────────────────────────────────────────────────

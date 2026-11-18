@@ -33,6 +33,7 @@ const GardenService = (() => {
     unlink: id => post(garden(id, '/desvincular')),
     plant: (id, number, range = '24h') => get(garden(id, `/plantas/${Number(number)}?rango=${encodeURIComponent(range)}`)),
     editPlant: (id, number, values) => post(garden(id, `/plantas/${Number(number)}`), values),
+    endCycle: (id, number, values) => post(garden(id, `/plantas/${Number(number)}/terminar-ciclo`), values),
     order: (id, values) => post(garden(id, '/comandos'), values),
     orderState: (orderId, signal) => get(validUuid(orderId) ? `/api/comandos/${orderId}` : null, {signal, headers:background}),
     care: (id, values) => post(garden(id, '/cuidados'), values),
@@ -232,11 +233,21 @@ const GardenModel = (() => {
       : tank.estimatedLowAt ? {value:'Pronto', text:'Al ritmo actual ya podría necesitarla'} : none('Aún no hay datos suficientes');
     return {last, average:{label:'Dura en promedio', ...average}, next};
   }
+  // Ciclos de la planta: motivos de fin y «18 nov 2026 – 3 dic 2026» (en curso: «desde el 18 nov 2026»).
+  const CYCLE_REASONS = Object.freeze({cosecha_terminada:'Terminó la cosecha', planta_murio:'La planta murió', no_germino:'No germinó',
+    pudricion_plaga:'Pudrición o plaga', otro:'Otro motivo'});
+  const meridaDate = value => plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, day:'numeric', month:'short', year:'numeric'})).replace(/\./g, '');
+  function cycleRange(cycle) {
+    if(!cycle?.startedAt || !Number.isFinite(Date.parse(cycle.startedAt))) return '';
+    return cycle.endedAt ? `${meridaDate(cycle.startedAt)} – ${meridaDate(cycle.endedAt)}` : `desde el ${meridaDate(cycle.startedAt)}`;
+  }
+  // «Ciclo 2 · 18 nov 2026 – 3 dic 2026 · No germinó».
+  const cycleTitle = cycle => [`Ciclo ${cycle.number}`, cycleRange(cycle), CYCLE_REASONS[cycle.reason] || ''].filter(Boolean).join(' · ');
   // Algo por hacer en Mantenimiento: nivel bajo sin recarga registrada o una recarga detectada por confirmar.
   const tankPending = (tank, now = Date.now()) => tankStage(tank) === 'rellenar' || Boolean(pendingRefill(tank, now));
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
     pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
-    meridaWhen, meridaDay, meridaShort, meridaForecast, refillMarks, tankFacts, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
+    CYCLE_REASONS, cycleRange, cycleTitle, meridaWhen, meridaDay, meridaShort, meridaForecast, refillMarks, tankFacts, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
 })();
 
 // ── Guias ──
