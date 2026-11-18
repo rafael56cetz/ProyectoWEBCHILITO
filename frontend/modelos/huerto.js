@@ -186,9 +186,20 @@ const GardenModel = (() => {
     }
     return {status, tone:tank.hasWater === true ? ' is-ok' : tank.hasWater === false ? ' is-low' : '', lowSince, lines};
   }
+  // Ficha de Mi huerto: el estado y una sola línea («Dura ~N días», «Última recarga hace …» o la capacidad).
+  function tankBrief(tank, now = Date.now()) {
+    const status = tank?.hasWater === true ? 'Con agua' : tank?.hasWater === false ? 'Nivel bajo' : 'Sin lectura';
+    const tone = tank?.hasWater === true ? ' is-ok' : tank?.hasWater === false ? ' is-low' : '';
+    const every = tank?.hasDevice ? tank.averageSeconds : tank?.refillEverySeconds;
+    const line = Number.isFinite(every) ? `Dura ~${plural(Math.max(1, Math.round(every / 86400)), 'día', 'días')}`
+      : tank?.lastRefill && ago(tank.lastRefill.at, now) ? `Última recarga ${ago(tank.lastRefill.at, now)}` : 'Depósito de 19 L';
+    return {status, tone, line};
+  }
+  // Algo por hacer en Mantenimiento: nivel bajo sin recarga registrada o una recarga detectada por confirmar.
+  const tankPending = (tank, now = Date.now()) => tankStage(tank) === 'rellenar' || Boolean(pendingRefill(tank, now));
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
     pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
-    meridaWhen, meridaDay, humanDuration, refillState, tankSummary, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
+    meridaWhen, meridaDay, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
 })();
 
 // ── Guias ──

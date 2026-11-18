@@ -88,34 +88,13 @@ const GardenViews = (() => {
   // Celda del bloque de resumen; la usan Mi huerto y el Panel técnico.
   const stat = (ico, title, main, note, tone = '') => `<div class="garden-stat${tone}"><h2>${icon(ico)}${title}</h2><strong>${main}</strong><p>${note}</p></div>`;
 
-  // Depósito: estado del flotador, lo que toca hacer (rellenar, responder a una detección, revisar el flotador), última recarga
-  // y cuánto dura (con equipo) o cada cuánto se rellena (sin equipo). La fase la decide el servidor (tank.state).
-  function tankStat(tank, fallbackHasWater) {
-    const info = GardenModel.tankSummary(tank || (fallbackHasWater == null ? null : {hasWater:fallbackHasWater}));
-    const main = `${info.status}${info.lowSince ? ` <small>desde ${escaparHTML(info.lowSince)}</small>` : ''}`;
-    return `<div class="garden-stat garden-tank${info.tone}"><h2>${icon('tank')}Depósito de agua</h2>${tankNotice(tank)}<strong>${main}</strong>
-      ${info.lines.map(text => `<p class="garden-tank-line">${escaparHTML(text)}</p>`).join('')}${tankActions(tank)}<p>Depósito de 19 L · el flotador solo detecta nivel bajo</p></div>`;
-  }
-  function tankNotice(tank) {
-    const notice = GardenModel.tankNotice(tank);
-    if(!notice || notice.kind === 'detected') return '';
-    if(notice.kind === 'refill') return `<p class="tank-call" role="status">${icon('drop')}<span>${escaparHTML(notice.title)}</span></p>`;
-    return `<p class="tank-note${notice.kind === 'warning' ? ' is-warning' : ''}" role="status">${icon(notice.kind === 'warning' ? 'info' : 'clock')}<span>${escaparHTML(notice.text)}</span></p>`;
-  }
-  // Acciones según la fase: «Ya lo rellené» con nivel bajo (o sin equipo), la pregunta de una detección real o nada.
-  function tankActions(tank) {
-    const stage = GardenModel.tankStage(tank);
-    if(stage === 'detectada') {
-      const notice = GardenModel.tankNotice(tank);
-      if(!notice) return '';
-      const id = escaparHTML(tank.pendingRefill.id);
-      return `<div class="tank-pending" role="group" aria-labelledby="tank-pending-title"><p class="tank-pending-title" id="tank-pending-title">${icon('drop')}<span>${escaparHTML(notice.title)}</span></p>
-      <p class="tank-pending-copy">${escaparHTML(notice.text)} Solo las recargas que registras o confirmas cuentan para calcular cuánto dura tu depósito.</p>
-      <div class="tank-pending-actions">${button('refill-confirm', `${icon('check')}<span>Sí, ya lo rellené</span>`, 'brand', `data-detection="${id}"`)}${button('refill-discard', 'No fue una recarga', 'light', `data-detection="${id}"`)}</div></div>`;
-    }
-    if(stage !== 'rellenar' && stage !== 'sin_equipo') return '';
-    const refill = refillButton('refill', `${icon('tank')}<span>Ya lo rellené</span>`, tank, '', '', 'brand');
-    return `<div class="garden-tank-actions">${refill.button}${refill.reason}</div>`;
+  // Ficha Depósito de Mi huerto: el estado y una sola línea, como las demás cifras. Lo que haya por hacer (rellenar, confirmar
+  // una recarga detectada) vive en Mantenimiento; aquí solo una insignia que lleva allí.
+  function tankStat(tank, fallbackHasWater, gardenId = '') {
+    const data = tank || (fallbackHasWater == null ? null : {hasWater:fallbackHasWater});
+    const info = GardenModel.tankBrief(data);
+    const badge = GardenModel.tankPending(data) ? `<a class="tank-badge" href="${withGarden('mantenimiento', gardenId)}">Revisar en Mantenimiento →</a>` : '';
+    return `<div class="garden-stat garden-tank${info.tone}"><h2>${icon('tank')}Depósito de agua</h2><strong>${info.status}</strong><p>${escaparHTML(info.line)}</p>${badge}</div>`;
   }
   // Botón de recarga manual: desactivado cuando el servidor no la permite, con el motivo a la vista.
   function refillButton(action, content, tank, extraClass = '', attrs = '', tone = 'light') {
@@ -125,14 +104,14 @@ const GardenViews = (() => {
     return {button:extraClass ? html.replace('class="button ', `class="button ${extraClass} `) : html,
       reason:allowed ? '' : `<p class="refill-reason user-small-copy" id="${id}" data-refill-reason>${escaparHTML(reason)}</p>`};
   }
-  const tankPanel = tank => `<section class="bento-panel garden-stats garden-tank-panel" aria-label="Depósito de agua">${tankStat(tank)}</section>`;
+  const tankPanel = (tank, gardenId) => `<section class="bento-panel garden-stats garden-tank-panel" aria-label="Depósito de agua">${tankStat(tank, null, gardenId)}</section>`;
 
   function metrics(detail) {
     const {metrics: m, lamp, plants} = detail;
     const average = GardenModel.averageMoisture(plants);
     const lampState = {on:'Encendida', off:'Apagada'}[lamp?.state] || 'Sin lectura';
     return `<section class="bento-panel garden-stats" aria-label="Resumen del huerto">
-      ${tankStat(detail.tank, m?.tankHasWater)}
+      ${tankStat(detail.tank, m?.tankHasWater, detail.garden.id)}
       ${stat('drop', 'Humedad media del sustrato', average === null ? 'Sin lectura' : `${number(average)}<small>%</small>`, 'Promedio de las plantas con lectura')}
       ${stat('temp', 'Ambiente', reading(m?.temperature, '°C'), `Humedad relativa: ${reading(m?.airHumidity, '%')}`)}
       ${stat('sun', 'Lámpara', lampState, lamp?.mode === 'manual-off' ? 'Apagado manual' : 'Automático')}</section>`;
@@ -156,7 +135,7 @@ const GardenViews = (() => {
   function quickActions(detail) {
     const off = detail.lamp?.mode === 'manual-off';
     const tile = (ico, label) => `${icon(ico)}<span>${label}</span>`;
-    // La recarga del depósito vive en su tarjeta («Ya lo rellené»), según lo que marque el flotador.
+    // La recarga del depósito vive en Mantenimiento («Depósito de agua»); la ficha solo enlaza allí cuando hay algo pendiente.
     return `<div class="user-section-heading"><div><h2>Acciones rápidas</h2></div></div>
       <section class="user-quick-actions garden-actions" aria-label="Acciones rápidas">
         <a class="button btn-liquid-light" href="#mantenimiento">${tile('check', 'Registrar un cuidado')}</a>
@@ -173,7 +152,7 @@ const GardenViews = (() => {
     if(status === 'error') return failed;
     if(!gardens.length) return emptyGarden(name);
     const head = selector(gardens, detail.garden);
-    if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${detail.tank ? tankPanel(detail.tank) : ''}${plantsSection(detail, 'Tus tres plantas')}`;
+    if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${detail.tank ? tankPanel(detail.tank, detail.garden.id) : ''}${plantsSection(detail, 'Tus tres plantas')}`;
     return `${head}${welcome(name, detail.garden.name)}${statusLine(detail.garden.device)}${deviceNote(detail.garden.device)}${metrics(detail)}${plantsSection(detail, 'Tus tres plantas')}${summaryCard(detail.summary)}${quickActions(detail)}`;
   }
 
@@ -532,21 +511,51 @@ const CareViews = (() => {
     if(state.status === 'error') return failed;
     if(!state.gardens.length) return noGarden('Mantenimiento');
     const {garden, plants} = state;
-    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}<section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section>${form(plants, state.tank?.tank)}<div data-care-tank>${tankHistory(state.tank)}</div>${filters(plants)}${CareGuideViews.slot()}`;
+    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}<div data-care-tank>${tankSection(state.tank)}</div><section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section>${form(plants, state.tank?.tank)}${filters(plants)}${CareGuideViews.slot()}`;
   }
 
-  // Historial del depósito: cada carga va de una recarga hasta que el flotador marcó nivel bajo (la abierta, «En curso»).
+  // Sección «Depósito de agua» (arriba de Mantenimiento): estado, lo que toca hacer según la fase que decide el servidor
+  // (rellenar, responder a una detección, revisar el flotador), última recarga, duración, estimación e historial de cargas.
   const TANK_NOTE = 'Cuánto dura cada carga cambia con el calor y con la etapa de tus plantas: en floración y fructificación beben más, y en los días calurosos el agua se acaba antes.';
-  function tankHistory(data) {
-    if(!data || data.status !== 'ready') return '';
-    const {tank, loads} = data, when = GardenModel.meridaWhen;
-    const summary = GardenModel.tankSummary(tank).lines.slice(1).map(text => `<p>${escaparHTML(text)}</p>`).join('');
-    const head = '<h2 id="tank-history-title">Historial del depósito</h2>';
-    if(!tank.hasDevice) return `<section class="bento-panel tank-history" aria-labelledby="tank-history-title">${head}${summary || '<p>Registra tus recargas para saber cada cuánto rellenas tu depósito.</p>'}</section>`;
+  function tankNotice(tank) {
+    const notice = GardenModel.tankNotice(tank);
+    if(!notice || notice.kind === 'detected') return '';
+    if(notice.kind === 'refill') return `<p class="tank-call" role="status">${icon('drop')}<span>${escaparHTML(notice.title)}</span></p>`;
+    return `<p class="tank-note${notice.kind === 'warning' ? ' is-warning' : ''}" role="status">${icon(notice.kind === 'warning' ? 'info' : 'clock')}<span>${escaparHTML(notice.text)}</span></p>`;
+  }
+  // Acciones según la fase: «Ya lo rellené» con nivel bajo (o sin equipo), la pregunta de una detección real o nada.
+  function tankActions(tank) {
+    const stage = GardenModel.tankStage(tank);
+    if(stage === 'detectada') {
+      const notice = GardenModel.tankNotice(tank);
+      if(!notice) return '';
+      const id = escaparHTML(tank.pendingRefill.id);
+      return `<div class="tank-pending" role="group" aria-labelledby="tank-pending-title"><p class="tank-pending-title" id="tank-pending-title">${icon('drop')}<span>${escaparHTML(notice.title)}</span></p>
+      <p class="tank-pending-copy">${escaparHTML(notice.text)} Solo las recargas que registras o confirmas cuentan para calcular cuánto dura tu depósito.</p>
+      <div class="tank-actions">${button('refill-confirm', `${icon('check')}<span>Sí, ya lo rellené</span>`, 'brand', `data-detection="${id}"`)}${button('refill-discard', 'No fue una recarga', 'light', `data-detection="${id}"`)}</div></div>`;
+    }
+    if(stage !== 'rellenar' && stage !== 'sin_equipo') return '';
+    const refill = refillButton('refill', `${icon('tank')}<span>Ya lo rellené</span>`, tank, '', '', 'brand');
+    return `<div class="tank-actions">${refill.button}</div>${refill.reason}`;
+  }
+  function tankLoads(tank, loads) {
+    const when = GardenModel.meridaWhen;
+    if(!tank.hasDevice) return '';
     const item = load => `<li class="tank-load${load.lowAt ? '' : ' is-open'}"><span class="care-row-icon">${icon('tank')}</span><div class="care-row-main"><h3>Recarga ${escaparHTML(when(load.refilledAt))}</h3>
       <p>${load.lowAt ? `Se quedó sin agua ${escaparHTML(when(load.lowAt))} · Duró ${escaparHTML(GardenModel.humanDuration(load.seconds))}` : 'En curso'}</p></div>${load.origin === 'equipo' ? `<div class="care-row-marks">${tag(GardenModel.detectedLabel(load), 'verde')}</div>` : ''}</li>`;
     const list = loads.length ? `<ol class="user-history-list">${loads.map(item).join('')}</ol>` : '<p>Aún no hay recargas registradas.</p>';
-    return `<section class="bento-panel tank-history" aria-labelledby="tank-history-title">${head}${summary}${list}<p class="user-small-copy">${TANK_NOTE}</p></section>`;
+    return `<div class="tank-loads"><h3 id="tank-history-title">Historial del depósito</h3>${list}<p class="user-small-copy">${TANK_NOTE}</p></div>`;
+  }
+  function tankSection(data) {
+    if(!data || data.status !== 'ready') return '';
+    const {tank, loads = []} = data;
+    const info = GardenModel.tankSummary(tank);
+    const main = `${info.status}${info.lowSince ? ` <small>desde ${escaparHTML(info.lowSince)}</small>` : ''}`;
+    const lines = info.lines.map(text => `<p class="tank-line">${escaparHTML(text)}</p>`).join('');
+    const empty = !tank.hasDevice && info.lines.length < 2 ? '<p class="tank-line">Registra tus recargas para saber cada cuánto rellenas tu depósito.</p>' : '';
+    return `<section class="bento-panel tank-history tank-section${info.tone}" aria-labelledby="tank-section-title"><h2 id="tank-section-title">${icon('tank')}Depósito de agua</h2>
+      <p class="tank-status"><strong>${main}</strong></p>${tankNotice(tank)}${tankActions(tank)}<div class="tank-lines">${lines}${empty}</div>
+      <p class="tank-capacity user-small-copy">${tank.hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : 'Depósito de 19 L'}</p>${tankLoads(tank, loads)}</section>`;
   }
   // Tras registrar o recargar el estado: el botón «Rellené el depósito», su motivo y el historial del depósito.
   function syncTank(root, data) {
@@ -556,7 +565,7 @@ const CareViews = (() => {
     const reason = root.querySelector('[data-care-refill-reason]');
     if(reason) reason.innerHTML = refill.reason;
     const box = root.querySelector('[data-care-tank]');
-    if(box) box.innerHTML = tankHistory(data);
+    if(box) box.innerHTML = tankSection(data);
   }
 
   // Reglas del formulario: depósito sin planta; sustrato, germinación y cosecha con planta; inspección, de una planta o de todo el huerto.
@@ -659,7 +668,7 @@ const CareViews = (() => {
     period(root, '');
   }
 
-  return Object.freeze({screen, list, status, tankHistory, syncTank, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, prepare, reset, resetFilters, types:TYPES});
+  return Object.freeze({screen, list, status, tankSection, syncTank, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, prepare, reset, resetFilters, types:TYPES});
 })();
 
 const SupportViews = (() => {

@@ -608,7 +608,7 @@ suite('depósito con flotador', async () => {
   const noDevice = M.tankSummary(tank({hasDevice:false, hasWater:null, refillEverySeconds:4 * 86400 + 3000}), NOW);
   assert.deepEqual([noDevice.status, ...noDevice.lines], ['Sin lectura', 'Última recarga: hoy a las 08:00 (detectada por tu equipo)', 'Sueles rellenar cada 4 días.']);
   assert.ok(!M.tankSummary(tank({hasDevice:false, hasWater:null}), NOW).lines.some(text => text.startsWith('Sueles') || text.startsWith('Te diremos')));
-  // Vistas: Mi huerto (con y sin equipo), Mantenimiento e historial.
+  // Vistas: la ficha simple de Mi huerto (con y sin equipo) y la sección «Depósito de agua» de Mantenimiento.
   const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
     AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
     AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
@@ -619,33 +619,96 @@ suite('depósito con flotador', async () => {
   const plants = [1, 2, 3].map(number => ({number, name:`Planta ${number}`, stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null}));
   const device = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:null, linkedAt:null, firmware:null, lastReadingAt:'2026-11-18T17:59:00Z'};
   const detail = (gardenDevice, tankData) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:{tankHasWater:tankData?.hasWater ?? null}, lamp:null, summary:null, tank:tankData});
-  const withDevice = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank({hasWater:false, lowSince:'2026-11-18T15:30:00Z', canRefill:true, refillBlock:null}))}, 'Ana');
-  assert.ok(withDevice.includes('Nivel bajo <small>desde') && withDevice.includes('Última recarga:') && withDevice.includes('(detectada por tu equipo)'));
-  assert.ok(/class="button btn-liquid-brand" data-garden-action="refill"(?![^>]*disabled)/.test(withDevice), 'con nivel bajo «Ya lo rellené» es el primario y está activo');
-  const blocked = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank())}, 'Ana');
-  assert.ok(!/data-garden-action="refill"/.test(blocked) && !blocked.includes('id="refill-reason"'), 'con agua la tarjeta no tiene botones');
-  assert.ok(blocked.includes('Te diremos cuánto dura tu depósito cuando se termine esta carga.'));
+  const DETECTION = '0b6f9a3e-2c4d-4e5f-8a7b-1c2d3e4f5a6b';
+  const mine = refill('2026-11-18T17:00:00Z', 'persona', true);
+  const lowAt = '2026-11-18T15:30:00Z';
   const noDeviceTank = tank({hasDevice:false, hasWater:null, canRefill:false, refillBlock:'espera', nextRefillAt:'2099-01-01T12:00:00Z', refillEverySeconds:3 * 86400});
-  const B = V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null, noDeviceTank)}, 'Ana');
-  assert.ok(B.includes('Depósito de agua') && B.includes('Sueles rellenar cada 3 días') && B.includes('Podrás registrar otra recarga') && /data-garden-action="refill"[^>]*disabled/.test(B));
-  // Mantenimiento: «Rellené el depósito» desactivado con el motivo, insignia en el historial e Historial del depósito.
+  // Cada fase que manda el servidor (más sin lectura y sin equipo).
+  const STATES = {
+    con_agua:tank({state:'con_agua', lastRefill:mine, averageSeconds:3 * 86400, estimatedLowAt:'2026-11-20T16:00:00Z'}),
+    rellenar:tank({state:'rellenar', hasWater:false, lowSince:lowAt, lastRefill:null, canRefill:true, refillBlock:null}),
+    detectada:tank({state:'detectada', hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new Date().toISOString()}}),
+    sigue_bajo:tank({state:'sigue_bajo', hasWater:false, lowSince:lowAt, lastRefill:mine, canRefill:false, refillBlock:'repetida'}),
+    esperando_lectura:tank({state:'esperando_lectura', hasWater:false, lowSince:lowAt, lastRefill:mine, canRefill:false, refillBlock:'repetida'}),
+    sin_lectura:tank({state:'sin_lectura', hasWater:null, lastRefill:null}),
+    sin_equipo:noDeviceTank};
+  const home = (key, data = STATES[key]) => key === 'sin_equipo' ? V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null, data)}, 'Ana')
+    : V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, data)}, 'Ana');
+  const tile = html => html.match(/<div class="garden-stat garden-tank[^"]*">[\s\S]*?<\/div>/)[0];
+  const BADGE = '<a class="tank-badge" href="#mantenimiento?h=1">Revisar en Mantenimiento →</a>';
+  // Mi huerto: la ficha es una cifra más. Sin botones en ningún estado, una sola línea y la insignia solo con algo pendiente.
+  for(const key of Object.keys(STATES)) {
+    const html = home(key), card = tile(html);
+    assert.ok(!/<button|data-garden-action/.test(card), `ficha sin botones (${key})`);
+    assert.ok(!/refill|Ya lo rellené|¿Ya lo rellenaste\?|Historial del depósito|Al ritmo actual|Es hora de rellenar|sigue marcando/.test(html), `Mi huerto sin acciones ni textos del depósito (${key})`);
+    assert.equal((card.match(/<p>/g) || []).length, 1, `una sola línea secundaria (${key})`);
+    assert.equal(card.includes(BADGE), ['rellenar', 'detectada'].includes(key), `insignia solo con algo pendiente (${key})`);
+  }
+  assert.ok(tile(home('con_agua')).includes('<strong>Con agua</strong><p>Dura ~3 días</p>') && home('con_agua').includes('garden-tank is-ok'), 'con agua: verde y duración');
+  assert.ok(tile(home('rellenar')).includes('<strong>Nivel bajo</strong><p>Depósito de 19 L</p>') && home('rellenar').includes('garden-tank is-low'), 'nivel bajo: ámbar y sin recargas');
+  assert.match(tile(home('sigue_bajo')), /<p>Última recarga hace [^<]+<\/p>/, 'sin promedio: última recarga');
+  assert.ok(tile(home('sin_equipo')).includes('<p>Dura ~3 días</p>'), 'sin equipo: cada cuánto se rellena');
+  assert.ok(tile(V.summary({status:'ready', gardens:[detail(device).garden], detail:{...detail(device, null), metrics:{tankHasWater:false}}}, 'Ana')).includes('<strong>Nivel bajo</strong>'), 'sin datos del depósito: la lectura del resumen');
+  const B = home('sin_equipo');
+  assert.ok(B.includes('Depósito de agua') && !/data-garden-action="refill"/.test(B));
+  // Modelo de la ficha.
+  assert.deepEqual({...M.tankBrief(STATES.con_agua, NOW)}, {status:'Con agua', tone:' is-ok', line:'Dura ~3 días'});
+  assert.equal(M.tankBrief(tank({averageSeconds:3600}), NOW).line, 'Dura ~1 día');
+  assert.equal(M.tankBrief(tank({lastRefill:refill('2026-11-18T14:00:00Z')}), NOW).line, 'Última recarga hace 4 h');
+  assert.equal(M.tankBrief(tank({lastRefill:null, hasWater:null}), NOW).line, 'Depósito de 19 L');
+  assert.equal(M.tankBrief(null, NOW).status, 'Sin lectura');
+  assert.deepEqual(Object.keys(STATES).filter(key => M.tankPending(STATES[key])), ['rellenar', 'detectada']);
+  assert.equal(M.tankPending(tank({state:'detectada', hasWater:false, pendingRefill:{id:DETECTION, detectedAt:lowAt}})), false, 'detección sin agua: no pendiente');
+  // Mantenimiento: la sección «Depósito de agua» arriba de todo, con cada estado.
   const garden = {id:'1', name:'Patio', device};
   const loads = [{refilledAt:'2026-11-18T14:00:00Z', origin:'equipo', lowAt:null, seconds:null},
     {refilledAt:'2026-11-14T14:00:00Z', origin:'persona', lowAt:'2026-11-17T18:00:00Z', seconds:3 * 86400 + 4 * 3600}];
-  const tankData = {status:'ready', tank:tank({averageSeconds:3 * 86400 + 4 * 3600, completedLoads:1}), loads};
-  const screen = Care.screen({status:'ready', gardens:[garden], garden, plants, tank:tankData});
-  assert.ok(/data-garden-action="care-quick"[^>]*disabled aria-describedby="care-quick-reason"/.test(screen) && screen.includes('id="care-quick-reason"'));
-  assert.ok(screen.includes('Historial del depósito') && screen.includes('En curso') && screen.includes('Duró 3 días y 4 horas') && screen.includes('Se quedó sin agua')
-    && screen.includes('Tu depósito dura en promedio 3 días y 4 horas.') && screen.includes('la etapa de tus plantas'));
-  assert.ok(!/data-garden-action="care-quick"[^>]*disabled/.test(Care.screen({status:'ready', gardens:[garden], garden, plants, tank:{...tankData, tank:tank({canRefill:true, refillBlock:null})}})));
-  assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants, tank:null}).includes('data-type="rellenar_deposito"'), 'sin datos del depósito el atajo sigue');
-  const withoutDevice = Care.tankHistory({status:'ready', tank:noDeviceTank, loads:[]});
-  assert.ok(withoutDevice.includes('Sueles rellenar cada 3 días') && !withoutDevice.includes('En curso'));
+  const care = (data, extra = {}) => Care.screen({status:'ready', gardens:[garden], garden, plants, tank:{status:'ready', tank:data, loads, ...extra}});
+  const section = html => html.match(/<section class="bento-panel tank-history tank-section[\s\S]*?<\/section>/)[0];
+  for(const key of Object.keys(STATES)) {
+    const html = care(STATES[key]);
+    assert.ok(html.indexOf('tank-section') > 0 && html.indexOf('tank-section') < html.indexOf('data-care-status') && html.indexOf('tank-section') < html.indexOf('care-register'), `sección arriba (${key})`);
+    assert.equal(html.split('Historial del depósito').length - 1, STATES[key].hasDevice ? 1 : 0, `un solo historial (${key})`);
+    assert.equal((html.match(/aria-labelledby="tank-section-title"/g) || []).length, 1, `una sola sección (${key})`);
+    assert.ok(section(html).includes(STATES[key].hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : '>Depósito de 19 L<'), `capacidad (${key})`);
+  }
+  const s1 = section(care(STATES.con_agua));
+  assert.ok(s1.includes('Con agua') && s1.includes('Última recarga: hoy a las 11:00 (registrada por ti)') && s1.includes('Tu depósito dura en promedio 3 días.')
+    && s1.includes('Al ritmo actual, necesitará agua alrededor del viernes 20 de noviembre.') && s1.includes('Duró 3 días y 4 horas') && s1.includes('En curso'), 'con agua: recarga, duración, estimación e historial');
+  assert.ok(!/data-garden-action="refill/.test(s1), 'con agua: sin botones');
+  const s2 = section(care(STATES.rellenar));
+  assert.ok(s2.includes('Nivel bajo <small>desde hoy a las 09:30</small>') && s2.includes('Es hora de rellenar tu depósito') && s2.includes('Ya lo rellené')
+    && /class="button btn-liquid-brand" data-garden-action="refill"(?![^>]*disabled)/.test(s2) && s2.includes('class="tank-actions"'), 'rellenar: llamada y «Ya lo rellené» primario');
+  const s4 = section(care(STATES.detectada));
+  assert.ok(s4.includes('Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?') && /Detectada hoy a las \d\d:\d\d\./.test(s4), 'detectada: la pregunta');
+  assert.ok(new RegExp(`class="button btn-liquid-brand" data-garden-action="refill-confirm" data-detection="${DETECTION}"`).test(s4), '«Sí, ya lo rellené» es el primario');
+  assert.ok(new RegExp(`class="button btn-liquid-light" data-garden-action="refill-discard" data-detection="${DETECTION}"`).test(s4), '«No fue una recarga» es el secundario');
+  assert.ok(!s4.includes('Confirmar recarga') && !/data-garden-action="refill"/.test(s4));
+  const s5 = section(care(STATES.sigue_bajo));
+  assert.ok(s5.includes('Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.') && s5.includes('(registrada por ti)'), 'sigue bajo: el aviso');
+  assert.ok(!/data-garden-action="refill/.test(s5) && !s5.includes('Es hora de rellenar'), 'sigue bajo: sin botón');
+  const waitingSection = section(care(STATES.esperando_lectura));
+  assert.ok(waitingSection.includes("Esperamos la siguiente lectura de tu equipo.") && !/data-garden-action="refill/.test(waitingSection), 'registrada, a la espera de lectura');
+  const s0 = section(care(STATES.sin_equipo, {loads:[]}));
+  assert.ok(s0.includes('Sueles rellenar cada 3 días') && s0.includes('Podrás registrar otra recarga') && /data-garden-action="refill"[^>]*disabled/.test(s0) && !s0.includes('En curso'), 'sin equipo');
+  // Lo que devuelve la API tras un solo «medir --sin-agua» (y aunque llegara una detección con nivel bajo): pide rellenar, no pregunta.
+  const onlyLow = {state:'rellenar', hasWater:false, lowSince:'2026-11-18T17:59:00Z', pendingRefill:null, lastRefill:null, canRefill:true, refillBlock:null};
+  for(const data of [onlyLow, {...onlyLow, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:00:00Z'}}, {...onlyLow, state:undefined}]) {
+    const html = section(care(tank(data)));
+    assert.ok(html.includes('Es hora de rellenar tu depósito') && html.includes('Ya lo rellené'), 'solo nivel bajo: pide rellenar');
+    assert.ok(!html.includes('¿Ya lo rellenaste?') && !/refill-confirm|refill-discard/.test(html), 'solo nivel bajo: no pregunta por una recarga');
+    assert.ok(tile(home('rellenar', tank(data))).includes(BADGE), 'solo nivel bajo: la ficha lleva a Mantenimiento');
+  }
+  // Atajo «Rellené el depósito»: el mismo botón de siempre, desactivado con su motivo, sin repetir la sección.
+  const blockedCare = care(tank({averageSeconds:3 * 86400 + 4 * 3600, completedLoads:1}));
+  assert.ok(/data-garden-action="care-quick"[^>]*disabled aria-describedby="care-quick-reason"/.test(blockedCare) && blockedCare.includes('id="care-quick-reason"'));
+  assert.ok(!/data-garden-action="care-quick"[^>]*disabled/.test(care(tank({canRefill:true, refillBlock:null}))));
+  const noTank = Care.screen({status:'ready', gardens:[garden], garden, plants, tank:null});
+  assert.ok(noTank.includes('data-type="rellenar_deposito"') && !noTank.includes('tank-section"'), 'sin datos del depósito el atajo sigue y no hay sección');
   const row = item => Care.list({status:'ready', page:1, total:1, items:[{id:'a', type:'rellenar_deposito', plant:null, chiles:null, doneAt:'2026-11-18T14:00:00Z', voided:false, corrected:false, ...item}]});
   assert.ok(row({origin:'equipo'}).includes('Detectada por tu equipo'));
   assert.ok(!row({origin:'persona'}).includes('Detectada por tu equipo'));
-  // Agua detectada sin aviso (web.0005/0006): texto, botones solo con una detección real e insignia de la confirmada.
-  const DETECTION = '0b6f9a3e-2c4d-4e5f-8a7b-1c2d3e4f5a6b';
+  // Agua detectada (web.0005/0006): texto de la detección e insignias de la confirmada.
   assert.equal(M.pendingRefill(tank({state:'detectada', pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), 'Detectada hoy a las 10:05.');
   assert.equal(M.pendingRefill(tank({pendingRefill:null}), NOW), '');
   assert.equal(M.pendingRefill(tank({state:'rellenar', hasWater:false, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), '', 'con nivel bajo no hay pregunta');
@@ -653,42 +716,12 @@ suite('depósito con flotador', async () => {
   assert.equal(confirmed.lines[0], 'Última recarga: hoy a las 08:00 (detectada por tu equipo · confirmada por ti)');
   assert.equal(M.detectedLabel({origin:'equipo', confirmed:true, byOwner:false}), 'Detectada por tu equipo · confirmada por soporte');
   assert.equal(M.detectedLabel({origin:'equipo', confirmed:false}), 'Detectada por tu equipo', 'las automáticas anteriores no dicen quién confirmó');
-  const pendingTank = tank({state:'detectada', hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new Date().toISOString()}});
-  const pending = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, pendingTank)}, 'Ana');
-  assert.ok(pending.includes('Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?') && /Detectada hoy a las \d\d:\d\d\./.test(pending), 'la pregunta en la tarjeta Depósito');
-  assert.ok(new RegExp(`class="button btn-liquid-brand" data-garden-action="refill-confirm" data-detection="${DETECTION}"`).test(pending), '«Sí, ya lo rellené» es el primario');
-  assert.ok(new RegExp(`class="button btn-liquid-light" data-garden-action="refill-discard" data-detection="${DETECTION}"`).test(pending), '«No fue una recarga» es el secundario');
-  assert.ok(pending.includes('Sí, ya lo rellené') && pending.includes('No fue una recarga') && !pending.includes('Confirmar recarga'));
-  for(const html of [withDevice, blocked, B]) assert.ok(!/refill-confirm|refill-discard|¿Ya lo rellenaste\?|Confirmar recarga/.test(html), 'sin detección real no hay pregunta');
-  // Fases de la tarjeta Depósito (1 a 6) con lo que manda el servidor.
-  const card = data => V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank(data))}, 'Ana');
-  const mine = refill('2026-11-18T17:00:00Z', 'persona', true);
-  const s1 = card({state:'con_agua', lastRefill:mine, averageSeconds:3 * 86400});
-  assert.ok(s1.includes('Con agua') && s1.includes('Última recarga: hoy a las 11:00 (registrada por ti)') && s1.includes('Tu depósito dura en promedio 3 días.'), 'fase 1');
-  assert.ok(!/data-garden-action="refill/.test(s1), 'fase 1: sin botones');
-  const s1b = card({state:'con_agua', lastRefill:{...refill('2026-11-18T14:00:00Z'), confirmed:true, byOwner:true}});
-  assert.ok(s1b.includes('(detectada por tu equipo · confirmada por ti)'), 'fase 1: la confirmada');
-  const s2 = card({state:'rellenar', hasWater:false, lowSince:'2026-11-18T15:30:00Z', lastRefill:null, canRefill:true, refillBlock:null});
-  assert.ok(s2.includes('Es hora de rellenar tu depósito') && s2.includes('Ya lo rellené') && /class="button btn-liquid-brand" data-garden-action="refill"/.test(s2), 'fase 2');
   const refillAsk = V.confirmations.refill;
-  assert.deepEqual([refillAsk.titulo, refillAsk.accion, Boolean(refillAsk.peligro)], ['¿Confirmas que ya rellenaste el depósito?', 'Sí, ya lo rellené', false], 'fase 3: la confirmación estándar');
-  assert.ok(pending.includes('Tu equipo detectó agua'), 'fase 4');
-  const s5 = card({state:'sigue_bajo', hasWater:false, lowSince:'2026-11-18T15:30:00Z', lastRefill:mine, canRefill:false, refillBlock:'repetida'});
-  assert.ok(s5.includes('Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.') && s5.includes('(registrada por ti)'), 'fase 5');
-  assert.ok(!/data-garden-action="refill/.test(s5) && !s5.includes('Es hora de rellenar'), 'fase 5: sin botón');
-  const waitingCard = card({state:'esperando_lectura', hasWater:false, lowSince:'2026-11-18T15:30:00Z', lastRefill:mine, canRefill:false, refillBlock:'repetida'});
-  assert.ok(waitingCard.includes('Esperamos la siguiente lectura de tu equipo.') && !/data-garden-action="refill/.test(waitingCard), 'registrada, a la espera de lectura');
-  // Fase 6: lo que devuelve la API tras un solo «medir --sin-agua» (y aunque llegara una detección con nivel bajo).
-  const onlyLow = {state:'rellenar', hasWater:false, lowSince:'2026-11-18T17:59:00Z', pendingRefill:null, lastRefill:null, canRefill:true, refillBlock:null};
-  for(const data of [onlyLow, {...onlyLow, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:00:00Z'}}, {...onlyLow, state:undefined}]) {
-    const html = card(data);
-    assert.ok(html.includes('Es hora de rellenar tu depósito') && html.includes('Ya lo rellené'), 'fase 6: pide rellenar');
-    assert.ok(!html.includes('Confirmar recarga') && !html.includes('¿Ya lo rellenaste?') && !/refill-confirm|refill-discard/.test(html), 'fase 6: no pregunta por una recarga');
-  }
+  assert.deepEqual([refillAsk.titulo, refillAsk.accion, Boolean(refillAsk.peligro)], ['¿Confirmas que ya rellenaste el depósito?', 'Sí, ya lo rellené', false], 'la confirmación estándar');
   const discard = V.confirmations['refill-discard'];
   assert.ok(discard.peligro && discard.accion === 'No fue una recarga' && discard.texto.includes('no se registrará ninguna recarga'), '«No fue una recarga» pide confirmación');
   assert.ok(row({origin:'equipo', confirmed:true, byOwner:true}).includes('Detectada por tu equipo · confirmada por ti'), 'historial de mantenimiento');
-  assert.ok(Care.tankHistory({status:'ready', tank:tank(), loads:[{...loads[0], confirmed:true, byOwner:true}]}).includes('Detectada por tu equipo · confirmada por ti'));
+  assert.ok(Care.tankSection({status:'ready', tank:tank(), loads:[{...loads[0], confirmed:true, byOwner:true}]}).includes('Detectada por tu equipo · confirmada por ti'));
   // Servicio: rutas de confirmar y descartar; un identificador inválido no llega al servidor.
   const calls = [];
   const http = vm.createContext({URL, URLSearchParams, ChilitoHTTP:{sessionExpired() {}, async request(path, options) { calls.push({path, method:options.method}); return {http:200, body:{status:'accepted'}}; }}});
@@ -699,16 +732,19 @@ suite('depósito con flotador', async () => {
   assert.deepEqual(calls.map(c => `${c.method} ${c.path}`), [`POST /api/huertos/7/deposito/detecciones/${DETECTION}/confirmar`, `POST /api/huertos/7/deposito/detecciones/${DETECTION}/descartar`]);
   assert.equal((await S.confirmRefill('7', '../x')).code, 'invalid-input');
   assert.equal(calls.length, 2);
-  // Controlador: «No fue una recarga» pasa por el diálogo de confirmación antes de llamar al servidor.
-  const control = bloque('controladores/huerto.js', 'Huerto');
-  assert.match(control, /async function recordRefill\(\) \{\n\s+if\(!await confirmar\(GardenViews\.confirmations\.refill\)\) return;/, '«Ya lo rellené» confirma antes de registrar');
-  assert.match(read('controladores/huerto.js'), /action === 'care-quick' && type === 'rellenar_deposito'\) \{ if\(await confirmar\(GardenViews\.confirmations\.refill\)\) await register/, '«Rellené el depósito» usa la misma confirmación');
-  assert.match(control, /if\(discard && !await confirmar\(GardenViews\.confirmations\['refill-discard'\]\)\) return;/);
-  assert.match(control, /action === 'refill-confirm' \|\| action === 'refill-discard'/);
+  // Controladores: las acciones del depósito viven en Mantenimiento; Mi huerto ya no registra ni confirma recargas.
+  const control = bloque('controladores/huerto.js', 'Huerto'), source = read('controladores/huerto.js');
+  const careControl = source.slice(source.indexOf('const CareController'), source.indexOf('const SupportController'));
+  assert.ok(!/recordRefill|decideRefill|refill-confirm/.test(control.slice(control.indexOf('const GardenSummaryController'), control.indexOf('const GardenCreateController'))), 'Mi huerto sin acciones del depósito');
+  assert.match(careControl, /async function recordRefill\(\) \{\n\s+if\(await confirmar\(GardenViews\.confirmations\.refill\)\) await register\(\{type:'rellenar_deposito'\}\);/, '«Ya lo rellené» confirma antes de registrar');
+  assert.match(careControl, /action === 'care-quick' && type === 'rellenar_deposito'\) \{ if\(await confirmar\(GardenViews\.confirmations\.refill\)\) await register/, '«Rellené el depósito» usa la misma confirmación');
+  assert.match(careControl, /if\(discard && !await confirmar\(GardenViews\.confirmations\['refill-discard'\]\)\) return;/);
+  assert.match(careControl, /else if\(action === 'refill'\) await recordRefill\(\);/);
+  assert.match(careControl, /action === 'refill-confirm' \|\| action === 'refill-discard'\) && !working\) await decideRefill/);
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.36'], 'todos los estáticos en mvc.36');
+  assert.deepEqual([...versions], ['?v=mvc.38'], 'todos los estáticos en mvc.38');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 
