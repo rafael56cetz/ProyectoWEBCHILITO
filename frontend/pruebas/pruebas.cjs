@@ -569,6 +569,89 @@ suite('Mi huerto y retirada de despliegues', async () => {
   console.log('PASS Mi huerto (A, B y C), selector, tarjeta de orden y retirada de la vinculación de 26 caracteres');
 });
 
+// ── Depósito con flotador: textos, botones de recarga, insignia y historial del depósito ─────────
+suite('depósito con flotador', async () => {
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value)}, Date, Intl});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
+  const M = vm.runInContext('GardenModel', context);
+  // Hora de Mérida (UTC−6) y duraciones en días y horas.
+  const NOW = Date.parse('2026-11-18T18:00:00Z');       // 12:00 en Mérida
+  assert.equal(M.meridaWhen('2026-11-18T16:05:00Z', NOW), 'hoy a las 10:05');
+  assert.equal(M.meridaWhen('2026-11-18T03:00:00Z', NOW), 'ayer a las 21:00', 'el día lo decide Mérida, no UTC');
+  assert.equal(M.meridaWhen('2026-11-19T14:00:00Z', NOW), 'mañana a las 08:00');
+  assert.equal(M.meridaWhen('2026-11-10T16:05:00Z', NOW), 'el 10 nov a las 10:05');
+  assert.equal(M.meridaDay('2026-11-20T16:00:00Z'), 'viernes 20 de noviembre');
+  assert.deepEqual([3 * 86400 + 4 * 3600, 5 * 3600, 3600, 86400, 2 * 86400 + 3600, 1800].map(M.humanDuration),
+    ['3 días y 4 horas', '5 horas', '1 hora', '1 día', '2 días y 1 hora', 'menos de 1 hora']);
+  // Recarga manual: permitida o desactivada con el motivo.
+  const refill = (at, origin = 'equipo', byOwner = false) => ({at, origin, byOwner});
+  assert.deepEqual({...M.refillState({canRefill:true}, NOW)}, {allowed:true, reason:''});
+  assert.equal(M.refillState({canRefill:false, refillBlock:'con-agua', lastRefill:refill('2026-11-17T15:00:00Z')}, NOW).reason,
+    'Tu depósito tiene agua desde tu última recarga (ayer a las 09:00).');
+  assert.equal(M.refillState({canRefill:false, refillBlock:'espera', nextRefillAt:'2026-11-18T23:30:00Z'}, NOW).reason, 'Podrás registrar otra recarga a las 17:30.');
+  assert.equal(M.refillState({canRefill:false, refillBlock:'espera', nextRefillAt:'2026-11-19T13:00:00Z'}, NOW).reason, 'Podrás registrar otra recarga mañana a las 07:00.');
+  assert.match(M.refillState({canRefill:false, refillBlock:'repetida', lastRefill:refill('2026-11-18T17:00:00Z', 'persona', true)}, NOW).reason, /^Ya registraste esta recarga \(hoy a las 11:00\)/);
+  // Tarjeta Depósito.
+  const tank = extra => ({hasDevice:true, hasWater:true, lowSince:null, lastRefill:refill('2026-11-18T14:00:00Z'), canRefill:false, refillBlock:'con-agua',
+    nextRefillAt:null, averageSeconds:null, estimatedLowAt:null, completedLoads:0, refillEverySeconds:null, ...extra});
+  const low = M.tankSummary(tank({hasWater:false, lowSince:'2026-11-18T15:30:00Z'}), NOW);
+  assert.equal(`${low.status} desde ${low.lowSince}`, 'Nivel bajo desde hoy a las 09:30');
+  const waiting = M.tankSummary(tank(), NOW);
+  assert.deepEqual([waiting.status, ...waiting.lines], ['Con agua', 'Última recarga: hoy a las 08:00 (detectada por tu equipo)',
+    'Te diremos cuánto dura tu depósito cuando se termine esta carga.']);
+  const average = M.tankSummary(tank({averageSeconds:3 * 86400, estimatedLowAt:'2026-11-20T16:00:00Z', lastRefill:refill('2026-11-17T14:00:00Z', 'persona', true)}), NOW);
+  assert.deepEqual([...average.lines], ['Última recarga: ayer a las 08:00 (registrada por ti)', 'Tu depósito dura en promedio 3 días.',
+    'Al ritmo actual, necesitará agua alrededor del viernes 20 de noviembre.']);
+  assert.equal(M.tankSummary(tank({averageSeconds:86400}), NOW).lines.length, 2, 'sin carga abierta no hay estimación');
+  assert.ok(M.tankSummary(tank({averageSeconds:86400, estimatedLowAt:'2026-11-18T10:00:00Z'}), NOW).lines.includes('Al ritmo actual, ya podría necesitar agua.'));
+  const noDevice = M.tankSummary(tank({hasDevice:false, hasWater:null, refillEverySeconds:4 * 86400 + 3000}), NOW);
+  assert.deepEqual([noDevice.status, ...noDevice.lines], ['Sin lectura', 'Última recarga: hoy a las 08:00 (detectada por tu equipo)', 'Sueles rellenar cada 4 días.']);
+  assert.ok(!M.tankSummary(tank({hasDevice:false, hasWater:null}), NOW).lines.some(text => text.startsWith('Sueles') || text.startsWith('Te diremos')));
+  // Vistas: Mi huerto (con y sin equipo), Mantenimiento e historial.
+  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
+    AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
+  vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
+  vm.runInContext("var CareGuideService = {SUBSTRATE_KEY:'sustrato-perlita'}, CareGuideViews = {slot:() => ''};", views);
+  vm.runInContext(bloque('vistas/huerto.js', 'Operacion'), views);
+  const V = vm.runInContext('GardenViews', views), Care = vm.runInContext('CareViews', views);
+  const plants = [1, 2, 3].map(number => ({number, name:`Planta ${number}`, stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null}));
+  const device = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:null, linkedAt:null, firmware:null, lastReadingAt:'2026-11-18T17:59:00Z'};
+  const detail = (gardenDevice, tankData) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:{tankHasWater:tankData?.hasWater ?? null}, lamp:null, summary:null, tank:tankData});
+  const withDevice = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank({hasWater:false, lowSince:'2026-11-18T15:30:00Z', canRefill:true, refillBlock:null}))}, 'Ana');
+  assert.ok(withDevice.includes('Nivel bajo <small>desde') && withDevice.includes('Última recarga:') && withDevice.includes('(detectada por tu equipo)'));
+  assert.ok(/data-garden-action="refill"(?![^>]*disabled)/.test(withDevice), 'con nivel bajo el botón está activo');
+  const blocked = V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, tank())}, 'Ana');
+  assert.ok(/data-garden-action="refill"[^>]*disabled aria-describedby="refill-reason"/.test(blocked) && blocked.includes('id="refill-reason"')
+    && blocked.includes('Tu depósito tiene agua desde tu última recarga'), 'con agua el botón se desactiva con el motivo');
+  assert.ok(blocked.includes('Te diremos cuánto dura tu depósito cuando se termine esta carga.'));
+  const noDeviceTank = tank({hasDevice:false, hasWater:null, canRefill:false, refillBlock:'espera', nextRefillAt:'2099-01-01T12:00:00Z', refillEverySeconds:3 * 86400});
+  const B = V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null, noDeviceTank)}, 'Ana');
+  assert.ok(B.includes('Depósito de agua') && B.includes('Sueles rellenar cada 3 días') && B.includes('Podrás registrar otra recarga') && /data-garden-action="refill"[^>]*disabled/.test(B));
+  // Mantenimiento: «Rellené el depósito» desactivado con el motivo, insignia en el historial e Historial del depósito.
+  const garden = {id:'1', name:'Patio', device};
+  const loads = [{refilledAt:'2026-11-18T14:00:00Z', origin:'equipo', lowAt:null, seconds:null},
+    {refilledAt:'2026-11-14T14:00:00Z', origin:'persona', lowAt:'2026-11-17T18:00:00Z', seconds:3 * 86400 + 4 * 3600}];
+  const tankData = {status:'ready', tank:tank({averageSeconds:3 * 86400 + 4 * 3600, completedLoads:1}), loads};
+  const screen = Care.screen({status:'ready', gardens:[garden], garden, plants, tank:tankData});
+  assert.ok(/data-garden-action="care-quick"[^>]*disabled aria-describedby="care-quick-reason"/.test(screen) && screen.includes('id="care-quick-reason"'));
+  assert.ok(screen.includes('Historial del depósito') && screen.includes('En curso') && screen.includes('Duró 3 días y 4 horas') && screen.includes('Se quedó sin agua')
+    && screen.includes('Tu depósito dura en promedio 3 días y 4 horas.') && screen.includes('la etapa de tus plantas'));
+  assert.ok(!/data-garden-action="care-quick"[^>]*disabled/.test(Care.screen({status:'ready', gardens:[garden], garden, plants, tank:{...tankData, tank:tank({canRefill:true, refillBlock:null})}})));
+  assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants, tank:null}).includes('data-type="rellenar_deposito"'), 'sin datos del depósito el atajo sigue');
+  const withoutDevice = Care.tankHistory({status:'ready', tank:noDeviceTank, loads:[]});
+  assert.ok(withoutDevice.includes('Sueles rellenar cada 3 días') && !withoutDevice.includes('En curso'));
+  const row = item => Care.list({status:'ready', page:1, total:1, items:[{id:'a', type:'rellenar_deposito', plant:null, chiles:null, doneAt:'2026-11-18T14:00:00Z', voided:false, corrected:false, ...item}]});
+  assert.ok(row({origin:'equipo'}).includes('Detectada por tu equipo'));
+  assert.ok(!row({origin:'persona'}).includes('Detectada por tu equipo'));
+  // Errores de la regla y versión de los estáticos.
+  for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
+  const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
+  assert.deepEqual([...versions], ['?v=mvc.32'], 'todos los estáticos en mvc.32');
+  console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, insignia e historial del depósito');
+});
+
 // ── Guías de cuidado: modelo y separación de capas ────────────────────────────────────────────
 suite('guías de cuidado', async () => {
   const calls = [];

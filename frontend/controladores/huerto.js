@@ -91,7 +91,13 @@ const GardenSummaryController = (() => {
     }
     async function recordRefill() {
       const result = await service.care(state.detail.garden.id, {type:'rellenar_deposito'});
+      if(life.signal.aborted) return;
       mostrarAviso(result.status === 'accepted' ? 'exito' : 'error', result.status === 'accepted' ? 'Recarga registrada.' : GardenViews.errorText(result.code));
+      // La tarjeta Depósito y el botón dependen de la recarga recién guardada (o de la regla que la rechazó).
+      const detail = await service.detail(state.detail.garden.id, life.signal);
+      if(life.signal.aborted || detail.status !== 'ready') return;
+      state = {...state, detail};
+      paint();
     }
     async function showSummaries() {
       const result = await service.summaries(state.detail.garden.id, 1);
@@ -381,7 +387,7 @@ const TechnicalController = (() => {
 const CareController = (() => {
   function mount({root, route, service}) {
     const life = new AbortController();
-    let state = {status:'loading', gardens:[], garden:null, plants:[]}, cares = {status:'loading', items:[], page:1, total:0}, filters = {}, dates = null, guides = null, serial = 0;
+    let state = {status:'loading', gardens:[], garden:null, plants:[], tank:null}, cares = {status:'loading', items:[], page:1, total:0}, filters = {}, dates = null, guides = null, serial = 0;
     async function loadCares(page = 1) {
       const result = await service.cares(state.garden.id, filters, page);
       if(life.signal.aborted) return;
@@ -395,9 +401,11 @@ const CareController = (() => {
       state = {...state, status:'loading'};
       GardenViews.paint(root, CareViews.screen(state));
       const context = await GardenContext.resolve({service, route, signal:life.signal});
-      const detail = context.garden ? await service.detail(context.garden.id, life.signal) : {status:'ready', plants:[]};
+      const [detail, tank] = context.garden ? await Promise.all([service.detail(context.garden.id, life.signal), service.tank(context.garden.id, life.signal)])
+        : [{status:'ready', plants:[]}, null];
       if(life.signal.aborted || id !== serial) return;
-      state = {status:context.ok && detail.status === 'ready' ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null, plants:detail.plants || []};
+      state = {status:context.ok && detail.status === 'ready' ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null, plants:detail.plants || [],
+        tank:tank?.status === 'ready' ? tank : null};
       GardenViews.paint(root, CareViews.screen(state));
       if(state.status !== 'ready' || !state.garden) return;
       dates = DateFilterViews.mount(root, life.signal);
@@ -405,12 +413,22 @@ const CareController = (() => {
       guides.paint(true);
       await loadCares(1);
     }
+    async function loadTank() {
+      const tank = await service.tank(state.garden.id, life.signal);
+      if(life.signal.aborted) return;
+      state = {...state, tank:tank.status === 'ready' ? tank : null};
+      CareViews.syncTank(root, state.tank);
+    }
     async function register(values) {
       const result = await service.care(state.garden.id, values);
       if(life.signal.aborted) return false;
-      if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code, 'Revisa los datos del cuidado e inténtalo de nuevo.')); return false; }
+      if(result.status !== 'accepted') {
+        mostrarAviso('error', GardenViews.errorText(result.code, 'Revisa los datos del cuidado e inténtalo de nuevo.'));
+        if(String(result.code).startsWith('deposito-')) await loadTank();
+        return false;
+      }
       mostrarAviso('exito', 'Cuidado registrado.');
-      await loadCares(1);
+      await Promise.all([loadCares(1), values.type === 'rellenar_deposito' ? loadTank() : null]);
       return true;
     }
     async function submitCare(form) {

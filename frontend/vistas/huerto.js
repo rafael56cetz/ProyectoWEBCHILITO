@@ -14,6 +14,9 @@ const GardenViews = (() => {
     'huerto-sin-equipo':'Ya tienes un huerto sin equipo. Vincúlalo antes de crear otro.',
     'huerto-con-equipo':'Desvincula el equipo antes de archivar este huerto.',
     'equipo-no-vinculado':'Este huerto no tiene un equipo vinculado.',
+    'deposito-con-agua':'Tu depósito tiene agua desde tu última recarga. Podrás registrar otra cuando el flotador marque nivel bajo.',
+    'deposito-repetida':'Ya registraste esta recarga: tu equipo la confirmará cuando el flotador detecte agua.',
+    'deposito-espera':'Ya registraste una recarga hace menos de 12 horas.',
     'rate-limited':'Demasiados intentos. Espera un momento.'};
   const errorText = (code, fallback = 'No se pudo completar la solicitud. Inténtalo de nuevo.') => ERRORS[code] || fallback;
   const tag = (text, tone = 'gris') => `<span class="badge tone-${tone}">${escaparHTML(text)}</span>`;
@@ -84,14 +87,32 @@ const GardenViews = (() => {
   // Celda del bloque de resumen; la usan Mi huerto y el Panel técnico.
   const stat = (ico, title, main, note, tone = '') => `<div class="garden-stat${tone}"><h2>${icon(ico)}${title}</h2><strong>${main}</strong><p>${note}</p></div>`;
 
+  // Depósito: estado del flotador, última recarga y cuánto dura (con equipo) o cada cuánto se rellena (sin equipo).
+  function tankStat(tank, fallbackHasWater) {
+    const info = GardenModel.tankSummary(tank || (fallbackHasWater == null ? null : {hasWater:fallbackHasWater}));
+    const main = `${info.status}${info.lowSince ? ` <small>desde ${escaparHTML(info.lowSince)}</small>` : ''}`;
+    return `<div class="garden-stat garden-tank${info.tone}"><h2>${icon('tank')}Depósito de agua</h2><strong>${main}</strong>
+      ${info.lines.map(text => `<p class="garden-tank-line">${escaparHTML(text)}</p>`).join('')}<p>Depósito de 19 L · el flotador solo detecta nivel bajo</p></div>`;
+  }
+  // Botón de recarga manual: desactivado cuando el servidor no la permite, con el motivo a la vista.
+  function refillButton(action, content, tank, extraClass = '', attrs = '') {
+    const {allowed, reason} = GardenModel.refillState(tank);
+    const id = `${action}-reason`;
+    const html = button(action, content, 'light', `${attrs}${allowed ? '' : ` disabled aria-describedby="${id}"`}`);
+    return {button:extraClass ? html.replace('class="button ', `class="button ${extraClass} `) : html,
+      reason:allowed ? '' : `<p class="refill-reason user-small-copy" id="${id}" data-refill-reason>${escaparHTML(reason)}</p>`};
+  }
+  function tankPanel(tank) {
+    const refill = refillButton('refill', `${icon('tank')}<span>Registrar recarga</span>`, tank);
+    return `<section class="bento-panel garden-stats garden-tank-panel" aria-label="Depósito de agua">${tankStat(tank)}<div class="garden-tank-actions">${refill.button}${refill.reason}</div></section>`;
+  }
+
   function metrics(detail) {
     const {metrics: m, lamp, plants} = detail;
     const average = GardenModel.averageMoisture(plants);
-    const tank = m?.tankHasWater === true ? 'Con agua' : m?.tankHasWater === false ? 'Nivel bajo' : 'Sin lectura';
     const lampState = {on:'Encendida', off:'Apagada'}[lamp?.state] || 'Sin lectura';
-    const tankTone = m?.tankHasWater === true ? ' is-ok' : m?.tankHasWater === false ? ' is-low' : '';
     return `<section class="bento-panel garden-stats" aria-label="Resumen del huerto">
-      ${stat('tank', 'Depósito de agua', tank, 'Depósito de 19 L · el flotador solo detecta nivel bajo', tankTone)}
+      ${tankStat(detail.tank, m?.tankHasWater)}
       ${stat('drop', 'Humedad media del sustrato', average === null ? 'Sin lectura' : `${number(average)}<small>%</small>`, 'Promedio de las plantas con lectura')}
       ${stat('temp', 'Ambiente', reading(m?.temperature, '°C'), `Humedad relativa: ${reading(m?.airHumidity, '%')}`)}
       ${stat('sun', 'Lámpara', lampState, lamp?.mode === 'manual-off' ? 'Apagado manual' : 'Automático')}</section>`;
@@ -115,14 +136,15 @@ const GardenViews = (() => {
   function quickActions(detail) {
     const off = detail.lamp?.mode === 'manual-off';
     const tile = (ico, label) => `${icon(ico)}<span>${label}</span>`;
+    const refill = refillButton('refill', tile('tank', 'Registrar recarga'), detail.tank);
     return `<div class="user-section-heading"><div><h2>Acciones rápidas</h2></div></div>
       <section class="user-quick-actions garden-actions" aria-label="Acciones rápidas">
-        ${button('refill', tile('tank', 'Registrar recarga'))}
+        ${refill.button}
         <a class="button btn-liquid-light" href="#mantenimiento">${tile('check', 'Registrar un cuidado')}</a>
         ${button('order', tile('activity', 'Revisar mi equipo'), 'light', 'data-type="autodiagnostico"')}
         ${button('order-confirm', tile('sun', off ? 'Restaurar automático' : 'Apagar lámpara'), 'light', `data-type="${off ? 'lampara_automatico' : 'lampara_apagar'}"`)}
         <a class="button btn-liquid-light is-featured" href="#soporte">${tile('support', 'Solicitar revisión técnica')}</a></section>
-      <div data-order-card></div>
+      ${refill.reason}<div data-order-card></div>
       <p class="user-safety-copy">Ante una emergencia, utiliza el paro físico del equipo.</p>`;
   }
 
@@ -132,7 +154,7 @@ const GardenViews = (() => {
     if(status === 'error') return failed;
     if(!gardens.length) return emptyGarden(name);
     const head = selector(gardens, detail.garden);
-    if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${plantsSection(detail, 'Tus tres plantas')}`;
+    if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${detail.tank ? tankPanel(detail.tank) : ''}${plantsSection(detail, 'Tus tres plantas')}`;
     return `${head}${welcome(name, detail.garden.name)}${statusLine(detail.garden.device)}${deviceNote(detail.garden.device)}${metrics(detail)}${plantsSection(detail, 'Tus tres plantas')}${summaryCard(detail.summary)}${quickActions(detail)}`;
   }
 
@@ -292,7 +314,7 @@ const GardenViews = (() => {
 
   return Object.freeze({
     tag, button, stat, selector, screenTitle, statusLine, loading, noGarden, codeBox, noDevice, orderTitle, orderStateTag, lineChart, chart,
-    errorText, summary, summaryList, orderCard, newGarden, linkWizard, plantPage, plantDialogs, myGardens, renameDialog, confirmations, failed,
+    errorText, refillButton, summary, summaryList, orderCard, newGarden, linkWizard, plantPage, plantDialogs, myGardens, renameDialog, confirmations, failed,
     paint(root, html) { root.innerHTML = html; },
     fillSlot(root, selector, html) { const slot = root.querySelector(selector); if(slot) slot.innerHTML = html; },
     countdown(root, seconds) { root.querySelectorAll('[data-countdown]').forEach(node => { node.textContent = GardenModel.clock(seconds); }); },
@@ -388,7 +410,7 @@ const TechnicalViews = (() => {
 })();
 
 const CareViews = (() => {
-  const {tag, button, selector, screenTitle, noGarden, loading, failed} = GardenViews;
+  const {tag, button, selector, screenTitle, noGarden, loading, failed, refillButton} = GardenViews;
   const TYPES = {rellenar_deposito:'Rellenar depósito', sustrato:'Revisar sustrato', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
   // Solo presentación: el ícono de cada tipo en los chips y en el historial.
   const CARE_ICONS = {rellenar_deposito:'drop', sustrato:'layers', germinacion:'sprout', cosecha:'leaf', inspeccion:'eye'};
@@ -409,7 +431,9 @@ const CareViews = (() => {
   const whenTabs = () => `<div class="care-chips care-when-chips" role="group" aria-labelledby="care-when-label">${WHEN.map(([value, label, mark]) => chip('care-when', `${icon(mark)}<span>${label}</span>`, `data-when="${value}" aria-pressed="${value === 'now'}"`)).join('')}</div>`;
   const WHEN_HINT = {field:'Déjalo vacío para registrar ahora, o escribe un día de hasta 7 días atrás.', pick:'Puedes elegir un día de hasta 7 días atrás.'};
 
-  function form(plants) {
+  const quickRefill = tank => refillButton('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, tank, 'care-quick-refill', 'data-type="rellenar_deposito"');
+  function form(plants, tank = null) {
+    const refill = quickRefill(tank);
     return `<section class="bento-panel garden-form care-register" aria-labelledby="care-title"><h2 id="care-title">Registrar un cuidado</h2>
       <form data-garden-form="care" novalidate>
         <div class="care-type-field"><label for="care-type" id="care-type-label">¿Qué hiciste?</label>${typeChips('rellenar_deposito')}<select id="care-type" name="type" class="care-hidden-select" tabindex="-1" aria-hidden="true">${typeOptions('rellenar_deposito')}</select></div>
@@ -423,8 +447,8 @@ const CareViews = (() => {
         </div>
         <div class="care-register-footer">
           <p class="care-register-help">¿Dudas sobre cómo revisar el sustrato? <a class="care-guide-link" href="#mantenimiento/sustrato" data-care-guide-link="${CareGuideService.SUBSTRATE_KEY}">Ver guía de sustrato</a></p>
-          <div class="care-register-actions">${button('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, 'light', 'data-type="rellenar_deposito"').replace('class="button ', 'class="button care-quick-refill ')}<button class="button btn-liquid-brand care-submit" type="submit">Registrar</button></div>
-        </div></form></section>`;
+          <div class="care-register-actions" data-care-refill>${refill.button}<button class="button btn-liquid-brand care-submit" type="submit">Registrar</button></div>
+        </div><div data-care-refill-reason>${refill.reason}</div></form></section>`;
   }
 
   // Fila de estado (solo lectura): el último registro no anulado de cada tipo, tomado del historial ya cargado.
@@ -467,7 +491,7 @@ const CareViews = (() => {
     const detail = item.chiles != null ? ` · ${item.chiles} chiles` : '';
     const where = item.plant ? `planta ${item.plant}` : 'todo el huerto';
     const title = TYPES[item.type] || escaparHTML(item.type);
-    const marks = `${item.voided ? tag('Anulado', 'rojo') : ''}${item.corrected ? tag('Corregido por soporte', 'ambar') : ''}`;
+    const marks = `${item.origin === 'equipo' ? tag('Detectada por tu equipo', 'verde') : ''}${item.voided ? tag('Anulado', 'rojo') : ''}${item.corrected ? tag('Corregido por soporte', 'ambar') : ''}`;
     const reason = item.reason ? `<details><summary>Motivo</summary><p>${escaparHTML(item.reason)}</p></details>` : '';
     const mark = item.voided ? 'close' : item.corrected ? 'pencil' : CARE_ICONS[item.type] || 'check';
     return `<li class="care-row${item.voided ? ' is-voided' : ''}${item.corrected ? ' is-corrected' : ''}"><span class="care-row-icon">${icon(mark)}</span><div class="care-row-main"><h3>${item.voided ? `<s>${title}</s>` : title}</h3><p>${when(item.doneAt)} · ${where}${detail}</p></div>${marks ? `<div class="care-row-marks">${marks}</div>` : ''}${reason ? `<div class="care-row-reason">${reason}</div>` : ''}</li>`;
@@ -487,7 +511,31 @@ const CareViews = (() => {
     if(state.status === 'error') return failed;
     if(!state.gardens.length) return noGarden('Mantenimiento');
     const {garden, plants} = state;
-    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}<section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section>${form(plants)}${filters(plants)}${CareGuideViews.slot()}`;
+    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}<section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section>${form(plants, state.tank?.tank)}<div data-care-tank>${tankHistory(state.tank)}</div>${filters(plants)}${CareGuideViews.slot()}`;
+  }
+
+  // Historial del depósito: cada carga va de una recarga hasta que el flotador marcó nivel bajo (la abierta, «En curso»).
+  const TANK_NOTE = 'Cuánto dura cada carga cambia con el calor y con la etapa de tus plantas: en floración y fructificación beben más, y en los días calurosos el agua se acaba antes.';
+  function tankHistory(data) {
+    if(!data || data.status !== 'ready') return '';
+    const {tank, loads} = data, when = GardenModel.meridaWhen;
+    const summary = GardenModel.tankSummary(tank).lines.slice(1).map(text => `<p>${escaparHTML(text)}</p>`).join('');
+    const head = '<h2 id="tank-history-title">Historial del depósito</h2>';
+    if(!tank.hasDevice) return `<section class="bento-panel tank-history" aria-labelledby="tank-history-title">${head}${summary || '<p>Registra tus recargas para saber cada cuánto rellenas tu depósito.</p>'}</section>`;
+    const item = load => `<li class="tank-load${load.lowAt ? '' : ' is-open'}"><span class="care-row-icon">${icon('tank')}</span><div class="care-row-main"><h3>Recarga ${escaparHTML(when(load.refilledAt))}</h3>
+      <p>${load.lowAt ? `Se quedó sin agua ${escaparHTML(when(load.lowAt))} · Duró ${escaparHTML(GardenModel.humanDuration(load.seconds))}` : 'En curso'}</p></div>${load.origin === 'equipo' ? `<div class="care-row-marks">${tag('Detectada por tu equipo', 'verde')}</div>` : ''}</li>`;
+    const list = loads.length ? `<ol class="user-history-list">${loads.map(item).join('')}</ol>` : '<p>Aún no hay recargas registradas.</p>';
+    return `<section class="bento-panel tank-history" aria-labelledby="tank-history-title">${head}${summary}${list}<p class="user-small-copy">${TANK_NOTE}</p></section>`;
+  }
+  // Tras registrar o recargar el estado: el botón «Rellené el depósito», su motivo y el historial del depósito.
+  function syncTank(root, data) {
+    const refill = quickRefill(data?.status === 'ready' ? data.tank : null);
+    const old = root.querySelector('[data-care-refill] [data-garden-action="care-quick"]');
+    if(old) old.outerHTML = refill.button;
+    const reason = root.querySelector('[data-care-refill-reason]');
+    if(reason) reason.innerHTML = refill.reason;
+    const box = root.querySelector('[data-care-tank]');
+    if(box) box.innerHTML = tankHistory(data);
   }
 
   // Reglas del formulario: depósito sin planta; sustrato, germinación y cosecha con planta; inspección, de una planta o de todo el huerto.
@@ -590,7 +638,7 @@ const CareViews = (() => {
     period(root, '');
   }
 
-  return Object.freeze({screen, list, status, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, prepare, reset, resetFilters, types:TYPES});
+  return Object.freeze({screen, list, status, tankHistory, syncTank, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, prepare, reset, resetFilters, types:TYPES});
 })();
 
 const SupportViews = (() => {
@@ -890,7 +938,10 @@ const MaintenanceViews = (() => {
   const act = (...args) => T.button(...args);
   const when = value => AppViews.date(value);
   const ERRORS = {'stale-record':'Otra persona cambió este registro. Se actualizó la lista.', 'cuidado-anulado':'Este registro ya está anulado y no admite más cambios.',
-    'not-found':'No se encontró ese huerto o ese registro.', 'rate-limited':'Demasiadas operaciones seguidas. Espera un momento.', 'access-denied':'Tu cuenta no tiene acceso a esta operación.'};
+    'not-found':'No se encontró ese huerto o ese registro.', 'rate-limited':'Demasiadas operaciones seguidas. Espera un momento.', 'access-denied':'Tu cuenta no tiene acceso a esta operación.',
+    'deposito-con-agua':'El depósito de ese huerto tiene agua desde su última recarga: se registra otra cuando el flotador marque nivel bajo.',
+    'deposito-repetida':'Ya hay una recarga registrada después del último nivel bajo de ese huerto.',
+    'deposito-espera':'Ese huerto ya tiene una recarga registrada hace menos de 12 horas.'};
   const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
   const STATES = {vigente:'Vigente', corregido:'Corregido', anulado:'Anulado'};
   const plantLabel = plant => plant ? `planta ${plant}` : 'todo el huerto';

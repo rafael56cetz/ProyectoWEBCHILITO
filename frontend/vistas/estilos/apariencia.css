@@ -1387,3 +1387,13 @@ html body[data-private=true][data-role=admin] #app-page .care-admin-meta { font-
 html body[data-private=true][data-role=admin] #app-page :is([data-admin-form=legal],.care-admin-form) { display:grid;gap:0; }
 html body[data-private=true][data-role=admin] #app-page [data-admin-form=legal]>:is(input,textarea) { margin-bottom:var(--esp-4); }
 html body[data-private=true][data-role=admin] #app-page .care-admin-form>.care-admin-field { margin-bottom:var(--esp-4); }
+
+/* Depósito con flotador: líneas de la tarjeta, botón de recarga desactivado con su motivo e historial de cargas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat .garden-tank-line { color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-panel { grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-actions { display:flex;flex-direction:column;gap:var(--esp-2);padding:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="refill"]:disabled,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="care-quick"]:disabled { opacity:.55;cursor:not-allowed; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .refill-reason { margin:var(--esp-2) 0 0;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history { display:flex;flex-direction:column;gap:var(--esp-3); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-history .tank-load.is-open h3 { color:var(--claro-verde); }
