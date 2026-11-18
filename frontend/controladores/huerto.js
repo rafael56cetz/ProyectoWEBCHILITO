@@ -387,6 +387,8 @@ const CareController = (() => {
       if(life.signal.aborted) return;
       cares = result.status === 'ready' ? {status:'ready', items:result.items, page:result.page, total:result.total} : {status:'error', items:[], page:1, total:0};
       GardenViews.fillSlot(root, '[data-care-list]', CareViews.list(cares));
+      // Fila de estado (solo lectura): se pinta con esta misma respuesta cuando es el historial sin filtros, página 1.
+      if(cares.page === 1 && !Object.values(filters).some(Boolean)) GardenViews.fillSlot(root, '[data-care-status]', CareViews.status(cares, state.plants));
     }
     async function load() {
       const id = ++serial;
@@ -434,6 +436,10 @@ const CareController = (() => {
       const {gardenAction: action, type, page} = trigger.dataset;
       if(action === 'reload') await load();
       else if(action === 'care-type') CareViews.pickType(root, type);
+      else if(action === 'care-plant') CareViews.pickPlant(root, trigger.dataset.plant);
+      else if(action === 'care-when') CareViews.pickWhen(root, trigger.dataset.when);
+      else if(action === 'care-chiles') CareViews.stepChiles(root, trigger.dataset.step);
+      else if(action === 'care-date') CareViews.openDate(root, trigger.dataset.date);
       else if(action === 'care-quick' && type === 'rellenar_deposito') await register({type});
       else if(action === 'care-quick') CareViews.prepare(root, type);
       else if(action === 'care-page') await loadCares(Number(page));
@@ -447,6 +453,7 @@ const CareController = (() => {
     }, {signal:life.signal});
     root.addEventListener('change', event => {
       if(event.target.id === 'care-type') CareViews.adjust(root, event.target.value);
+      else if(event.target.id === 'filter-period') CareViews.period(root, event.target.value);
     }, {signal:life.signal});
     load();
     return {redraw() {}, dispose() { serial++; life.abort(); }};
