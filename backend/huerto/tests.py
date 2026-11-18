@@ -765,6 +765,16 @@ class Deposito(BaseHuerto):
         self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), ('Tu depósito se quedó sin agua. Rellénalo y avísanos.', '#huerto', None))
         self.assertFalse(Notificacion.objects.filter(titulo='Confirma la recarga de tu depósito').exists())
 
+    def test_avisos_del_deposito_enlazan_a_mantenimiento(self):
+        """La base guarda #huerto; la API lleva los dos avisos del depósito a Mantenimiento, donde se rellena o se confirma."""
+        self.flotador((3, True), (2, False), (1, True))
+        enlaces = {aviso['title']: aviso['link'] for aviso in self.client.get('/api/avisos').json()['items']}
+        self.assertEqual(enlaces['Tu depósito necesita agua'], '#mantenimiento')
+        self.assertEqual(enlaces['Confirma la recarga de tu depósito'], '#mantenimiento')
+        aviso = Notificacion.objects.get(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito')
+        self.assertEqual(aviso.enlace, '#huerto')                                         # la base no cambia
+        self.assertEqual(self.client.get(f'/api/avisos/{aviso.pk}').json()['notice']['link'], '#mantenimiento')
+
     def test_estado_3_ya_lo_rellene_registra_con_la_hora_de_confirmacion(self):
         self.flotador((2, True), (1, False))
         respuesta = self.registrar()                          # «Sí, ya lo rellené»: sin fecha, la hora de confirmación
@@ -1076,6 +1086,14 @@ class Avisos(BaseHuerto):
                 self.assertEqual(self.post(f'/api/avisos/{mio.pk}/{accion}', cliente=ajena).status_code, 404)
         self.assertEqual(ajena.get('/api/avisos').json()['total'], 0)
 
+    def test_solo_los_avisos_del_deposito_cambian_de_enlace(self):
+        Notificacion.objects.create(destinatario=self.dueña, origen='dispositivo', titulo='Tu equipo se conectó', enlace='#huerto')
+        Notificacion.objects.create(destinatario=self.dueña, origen='sistema', titulo='Tu depósito necesita agua', enlace='#huerto')
+        Notificacion.objects.create(destinatario=self.dueña, origen='dispositivo', titulo='Tu depósito necesita agua', enlace='')
+        enlaces = sorted((a['origin'], a['title'], a['link'] or '') for a in self.client.get('/api/avisos').json()['items'])
+        self.assertEqual(enlaces, [('dispositivo', 'Tu depósito necesita agua', ''), ('dispositivo', 'Tu equipo se conectó', '#huerto'),
+                                   ('sistema', 'Tu depósito necesita agua', '#huerto')])
+
     def test_el_administrador_tiene_sus_avisos(self):
         admin = cuenta('huerto-admin@example.test', 'atender_soporte')
         self.aviso(admin)
@@ -1104,6 +1122,24 @@ class SimuladorDeEquipoEntorno(SimpleTestCase):
     def test_usa_solo_el_rol_iot_y_sus_variables(self):
         ajustes = simular_equipo.exigir_entorno({**self.BASE, 'CHILITO_DB_USER': 'chilito_pkg_runtime', 'CHILITO_DB_PASSWORD': 'de-la-app'})
         self.assertEqual((ajustes['user'], ajustes['password'], ajustes['dbname']), ('chilito_pkg_iot', 'x', 'test_chilito_x'))
+
+
+@unittest.skipIf(simular_equipo is None, 'Esta copia no incluye el simulador')
+class SimuladorCorrerSinAgua(SimpleTestCase):
+    """«correr --sin-agua» llega hasta cada medición: el flotador marca nivel bajo en todos los ciclos."""
+
+    def test_main_pasa_sin_agua_a_correr_y_a_cada_medicion(self):
+        self.assertTrue(simular_equipo.leer_argumentos(['CHI-1', 'correr', '--sin-agua']).sin_agua)
+        self.assertFalse(simular_equipo.leer_argumentos(['CHI-1', 'correr']).sin_agua)
+        mediciones = []
+        with patch.object(simular_equipo, 'exigir_entorno', return_value={}), patch.object(simular_equipo.psycopg, 'connect'), \
+                patch.object(simular_equipo, 'equipo', return_value={'id': 1, 'huerto': 1, 'firmware': 'x'}), \
+                patch.object(simular_equipo, 'marcar_simulado'), patch.object(simular_equipo, 'conexion'), \
+                patch.object(simular_equipo, 'atender', return_value=0), patch.object(simular_equipo.time, 'sleep'), \
+                patch.object(simular_equipo, 'medir', side_effect=lambda *a, **k: mediciones.append(k.get('sin_agua'))):
+            simular_equipo.main(['CHI-1', 'correr', '--sin-agua', '--ciclos', '3', '--cada', '0'])
+            simular_equipo.main(['CHI-1', 'correr', '--ciclos', '2', '--cada', '0'])
+        self.assertEqual(mediciones, [True, True, True, False, False])
 
 
 @unittest.skipIf(simular_equipo is None, 'Esta copia no incluye el simulador')
@@ -1246,6 +1282,20 @@ class SimuladorDeEquipo(AyudasHuerto, TransactionTestCase):
         avisos = Notificacion.objects.filter(destinatario=self.dueña, origen='dispositivo')
         self.assertEqual([(a.titulo, a.texto, a.enlace) for a in avisos],
                          [('Tu depósito necesita agua', 'Tu depósito se quedó sin agua. Rellénalo y avísanos.', '#huerto')])
+
+    def test_correr_sin_agua_no_genera_recargas(self):
+        huerto_id = self.huerto_con_equipo()
+        with self.conexion_iot() as con:
+            dispositivo = simular_equipo.equipo(con, 'CHI-0001')
+            simular_equipo.medir(con, dispositivo, hace=1)                       # con agua antes de empezar
+            simular_equipo.correr(con, dispositivo, cada=0, ciclos=3, sin_agua=True, pausa=0)
+        lecturas = list(Medicion.objects.filter(huerto_id=huerto_id).order_by('medida_en').values_list('deposito_con_agua', flat=True))
+        self.assertEqual(lecturas, [True, False, False, False])
+        self.assertEqual(DispositivoEvento.objects.filter(huerto_id=huerto_id, tipo='deposito_bajo').count(), 1)
+        self.assertFalse(DispositivoEvento.objects.filter(huerto_id=huerto_id, tipo='deposito_recargado').exists())
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=huerto_id).exists())
+        self.assertFalse(Cuidado.objects.filter(huerto_id=huerto_id, tipo='rellenar_deposito').exists())
+        self.assertEqual(self.client.get(f'/api/huertos/{huerto_id}').json()['tank']['state'], 'rellenar')
 
     def test_solo_equipos_vinculados(self):
         equipo('CHI-0009', '02:00:00:00:00:09')

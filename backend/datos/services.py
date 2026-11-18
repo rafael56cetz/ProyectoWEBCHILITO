@@ -537,10 +537,21 @@ def resolver_caso(actor, caso_id, resultado, nota):
 
 
 # Avisos: la misma tabla sirve a personas y administradores; cada quien ve solo los suyos.
+# Los avisos del depósito (nivel bajo y recarga detectada) los escribe la base con enlace a #huerto; lo que hay que hacer
+# vive en Mantenimiento, así que la API los lleva allí (también los avisos ya guardados).
+AVISOS_DEL_DEPOSITO = frozenset({'Tu depósito necesita agua', 'Confirma la recarga de tu depósito'})
+
+
+def _enlace_aviso(aviso):
+    if aviso.origen == 'dispositivo' and aviso.titulo in AVISOS_DEL_DEPOSITO and aviso.enlace == '#huerto':
+        return '#mantenimiento'
+    return aviso.enlace or None
+
+
 def _aviso_dto(aviso):
     return {'id': str(aviso.pk), 'origin': aviso.origen, 'severity': aviso.severidad, 'title': aviso.titulo, 'text': aviso.texto,
             'garden': aviso.huerto.nombre if aviso.huerto_id else None, 'gardenId': str(aviso.huerto_id) if aviso.huerto_id else None,
-            'link': aviso.enlace or None, 'createdAt': _fecha(aviso.creada_en), 'read': aviso.leida_en is not None,
+            'link': _enlace_aviso(aviso), 'createdAt': _fecha(aviso.creada_en), 'read': aviso.leida_en is not None,
             'resolvedAt': _fecha(aviso.resuelta_en),
             'resolvable': aviso.origen == 'dispositivo' and aviso.severidad == 'critico' and aviso.resuelta_en is None}
 

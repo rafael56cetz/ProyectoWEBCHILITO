@@ -20,7 +20,9 @@ Uso (salvo «vincular», el equipo debe estar vinculado a un huerto):
 
 Ciclo del depósito (el flotador lo interpreta la base: aviso, eventos y recarga «Detectada por tu equipo»):
   medir --sin-agua                     el flotador marca nivel bajo: evento deposito_bajo y aviso «Tu depósito necesita agua»
-  medir                                vuelve a detectar agua: evento deposito_recargado y una recarga del equipo
+  medir                                vuelve a detectar agua: evento deposito_recargado y una recarga por confirmar
+  correr --sin-agua                    cada ciclo marca nivel bajo (un solo aviso, sin recargas); sin --sin-agua, cada ciclo
+                                       marca «con agua»: tras un nivel bajo, el primer ciclo cuenta como recarga detectada
 Cargas completas con duración (en orden cronológico; --hace desplaza la medición N horas hacia atrás, hasta 7 días):
   medir --hace 120 --sin-agua  →  medir --hace 119  →  medir --hace 48 --sin-agua  →  medir
   (deja una carga de ~71 h y otra abierta con su estimación; las mediciones atrasadas respecto a otra más nueva no cuentan)
@@ -200,7 +202,7 @@ def leer_argumentos(argv=None):
     analizador.add_argument('--n', type=int, default=1, help='mediciones a insertar (medir)')
     analizador.add_argument('--intervalo', type=int, default=60, help='segundos entre mediciones hacia atrás (medir)')
     analizador.add_argument('--luz', action='store_true', help='incluye lecturas del sensor de luz')
-    analizador.add_argument('--sin-agua', action='store_true', help='el flotador marca nivel bajo (medir y correr)')
+    analizador.add_argument('--sin-agua', action='store_true', help='el flotador marca nivel bajo: en medir, cada medición; en correr, todos los ciclos (sin esto, «con agua»)')
     analizador.add_argument('--hace', type=float, default=0.0, help='horas hacia atrás de la última medición (medir; máximo 168)')
     analizador.add_argument('--pausa', type=float, default=2.0, help='segundos en «enviada» antes de responder')
     analizador.add_argument('--falla', choices=COMPONENTES, help='componente que falla en el autodiagnóstico')
