@@ -1,4 +1,5 @@
 """Sobre PostgreSQL: huertos, plantas, órdenes, vinculación del equipo y aceptación de textos."""
+import importlib
 import io
 import json
 import os
@@ -7,6 +8,7 @@ import uuid
 from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
@@ -17,7 +19,7 @@ from django.utils import timezone
 
 from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, Dispositivo, Medicion, MedicionPlanta,
                           Notificacion)
-from huerto.models import Huerto, Planta
+from huerto.models import Huerto, Planta, PlantaEtapa
 from privacidad.models import Decision
 from tests import aceptar_vigentes, cuenta, publicar_textos
 try:
@@ -171,6 +173,45 @@ class Plantas(BaseHuerto):
         self.assertEqual((planta['plant']['name'], planta['plant']['stage']), ('Chilito', 'germinacion'))
         self.assertIsNotNone(planta['plant']['stageSince'])
         self.assertEqual([e['stage'] for e in planta['stages']][-1], 'germinacion')
+
+    def test_huerto_nuevo_nace_con_su_etapa_inicial(self):
+        huerto_id = self.crear_huerto()
+        filas = list(PlantaEtapa.objects.filter(planta__huerto_id=huerto_id).order_by('planta__numero')
+                     .values_list('planta__numero', 'etapa', 'desde', 'registrada_por_id'))
+        hoy = timezone.localdate()
+        self.assertEqual(filas, [(n, 'sin_sembrar', hoy, self.dueña.pk) for n in (1, 2, 3)])
+        etapas = self.client.get(f'/api/huertos/{huerto_id}/plantas/1').json()['stages']
+        self.assertEqual(etapas, [{'stage': 'sin_sembrar', 'since': hoy.isoformat()}])
+
+    def test_cambiar_etapa_agrega_en_orden(self):
+        huerto_id = self.crear_huerto()
+        respuesta = self.post(f'/api/huertos/{huerto_id}/plantas/1', {'stage': 'germinacion'})
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        etapas = self.client.get(f'/api/huertos/{huerto_id}/plantas/1').json()['stages']
+        self.assertEqual([e['stage'] for e in etapas], ['sin_sembrar', 'germinacion'])
+        self.assertEqual(PlantaEtapa.objects.filter(planta__huerto_id=huerto_id, planta__numero=1).count(), 2)
+
+    def test_relleno_no_duplica(self):
+        relleno = importlib.import_module('web.migrations.0003_linea_de_vida').RELLENO
+        primero = self.crear_huerto()
+        self.post(f'/api/huertos/{primero}/plantas/1', {'stage': 'germinacion'})
+        with connection.cursor() as cursor:
+            cursor.execute(relleno)
+            self.assertEqual(cursor.rowcount, 0, 'las plantas con historial no reciben otra fila')
+            # Un huerto como los de antes de la migración: sus plantas nacen sin fila de historial.
+            cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')   # ALTER TABLE no admite comprobaciones pendientes
+            cursor.execute('ALTER TABLE huerto_planta DISABLE TRIGGER planta_etapa_inicial')
+            segundo = Huerto.objects.create(propietario=self.otra).pk
+            cursor.execute('ALTER TABLE huerto_planta ENABLE TRIGGER planta_etapa_inicial')
+            self.assertFalse(PlantaEtapa.objects.filter(planta__huerto_id=segundo).exists())
+            cursor.execute(relleno)
+            self.assertEqual(cursor.rowcount, 3)
+            cursor.execute(relleno)
+            self.assertEqual(cursor.rowcount, 0)
+        creado = timezone.localtime(Huerto.objects.get(pk=segundo).creado_en, ZoneInfo('America/Merida')).date()
+        self.assertEqual(sorted(PlantaEtapa.objects.filter(planta__huerto_id=segundo).values_list('planta__numero', 'etapa', 'desde')),
+                         [(n, 'sin_sembrar', creado) for n in (1, 2, 3)])
+        self.assertEqual(PlantaEtapa.objects.filter(planta__huerto_id=primero).count(), 4)
 
     def test_validacion(self):
         huerto_id = self.crear_huerto()
