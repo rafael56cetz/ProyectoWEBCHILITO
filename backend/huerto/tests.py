@@ -533,6 +533,23 @@ class Cuidados(BaseHuerto):
             with self.subTest(consulta=consulta):
                 self.assertEqual(self.listar(consulta).status_code, 400)
 
+    def test_ultimos_por_tipo_no_dependen_de_la_pagina(self):
+        hace = lambda horas: timezone.now() - timedelta(hours=horas)
+        Cuidado.objects.create(huerto_id=self.huerto_id, tipo='cosecha', planta_numero=2, chiles_cosechados=4, realizado_en=hace(100), registrado_por=self.dueña)
+        anulada = Cuidado.objects.create(huerto_id=self.huerto_id, tipo='cosecha', planta_numero=1, realizado_en=hace(90), registrado_por=self.dueña)
+        CuidadoRevision.objects.create(cuidado=anulada, numero=1, tipo='anulacion', motivo='Duplicado', editor=self.editor)
+        for numero in range(30):      # más de una página de inspecciones, todas más recientes que la cosecha
+            Cuidado.objects.create(huerto_id=self.huerto_id, tipo='inspeccion', realizado_en=hace(80 - numero), registrado_por=self.dueña)
+        datos = self.listar().json()
+        self.assertTrue(all(fila['type'] == 'inspeccion' for fila in datos['items']), 'la cosecha no está en la página 1')
+        ultimos = datos['latest']
+        self.assertEqual((ultimos['cosecha']['plant'], ultimos['cosecha']['chiles']), (2, 4), 'la anulada no cuenta')
+        self.assertEqual(ultimos['inspeccion']['doneAt'], datos['items'][0]['doneAt'])
+        self.assertIsNone(ultimos['sustrato'])
+        self.assertIsNone(ultimos['rellenar_deposito'])
+        self.assertNotIn('latest', self.listar('?page=2').json())
+        self.assertNotIn('latest', self.listar('?tipo=cosecha').json())
+
     def test_otra_cuenta(self):
         ajena = self.cliente(self.otra)
         self.assertEqual(ajena.get(f'/api/huertos/{self.huerto_id}/cuidados').status_code, 404)

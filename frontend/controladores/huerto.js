@@ -23,9 +23,10 @@ const GardenOrderCard = (() => {
     GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(order));
     if(GardenModel.FINAL_ORDER_STATES.includes(order.state)) return {stop() {}};
     const timer = setInterval(async () => {
-      if(Date.now() - started > POLL_LIMIT_MS) { clearInterval(timer); return; }
+      if(signal.aborted || Date.now() - started > POLL_LIMIT_MS) { clearInterval(timer); return; }
       const result = await service.orderState(order.id, signal);
-      if(signal.aborted || result.status !== 'ready') return;
+      if(signal.aborted) { clearInterval(timer); return; }
+      if(result.status !== 'ready') return;
       GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(result.command));
       if(!GardenModel.FINAL_ORDER_STATES.includes(result.command.state)) return;
       clearInterval(timer);
@@ -317,29 +318,32 @@ const TechnicalController = (() => {
   function mount({root, route, service}) {
     const life = new AbortController();
     let state = {status:'loading', gardens:[], garden:null, data:null, range:'24h', log:{type:'ordenes', status:'loading', items:[], page:1, total:0}};
-    let tracker = null, serial = 0;
+    let tracker = null, serial = 0, logSerial = 0, dataSerial = 0;
     const paint = () => GardenViews.paint(root, TechnicalViews.screen(state));
     const paintLog = () => GardenViews.fillSlot(root, '[data-log-panel]', TechnicalViews.logPanel(state.log));
     async function loadLog(type, page) {
+      const id = ++logSerial;
       const result = await service.log(state.garden.id, type, page);
-      if(life.signal.aborted) return;
+      if(life.signal.aborted || id !== logSerial) return;
       state.log = result.status === 'ready' ? {type, status:'ready', items:result.items, page:result.page, total:result.total} : {type, status:'error', items:[], page:1, total:0};
     }
     async function loadData() {
+      const id = ++dataSerial;
       const [telemetry] = await Promise.all([service.telemetry(state.garden.id, state.range, life.signal), loadLog(state.log.type, 1)]);
-      if(life.signal.aborted) return false;
+      if(life.signal.aborted || id !== dataSerial) return null;   // descartada: ya hay una carga más reciente
       if(telemetry.status !== 'ready') return false;
       state.data = telemetry;
       return true;
     }
     async function load() {
       const id = ++serial;
+      tracker?.stop(); tracker = null;
       state = {...state, status:'loading'};
       paint();
       const context = await GardenContext.resolve({service, route, signal:life.signal});
       if(life.signal.aborted || id !== serial) return;
       state = {...state, status:context.ok ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null};
-      if(state.status === 'ready' && state.garden?.device && !await loadData()) state.status = 'error';
+      if(state.status === 'ready' && state.garden?.device && await loadData() === false) state.status = 'error';
       if(life.signal.aborted || id !== serial) return;
       paint();
     }
@@ -358,7 +362,7 @@ const TechnicalController = (() => {
       if(!trigger) return;
       const {gardenAction: action, range, log, page} = trigger.dataset;
       if(action === 'reload') await load();
-      else if(action === 'range') { state.range = range; if(await loadData()) paint(); else mostrarAviso('error', 'No se pudo cargar el periodo.'); }
+      else if(action === 'range') { state.range = range; const loaded = await loadData(); if(loaded) paint(); else if(loaded === false) mostrarAviso('error', 'No se pudo cargar el periodo.'); }
       else if(action === 'log-tab') { await loadLog(log, 1); paintLog(); }
       else if(action === 'log-page') { await loadLog(state.log.type, Number(page)); paintLog(); }
     }, {signal:life.signal});
@@ -376,11 +380,12 @@ const TechnicalController = (() => {
 const CareController = (() => {
   function mount({root, route, service}) {
     const life = new AbortController();
-    let state = {status:'loading', gardens:[], garden:null, plants:[], tank:null}, cares = {status:'loading', items:[], page:1, total:0}, filters = {}, dates = null, guides = null, serial = 0, working = false;
+    let state = {status:'loading', gardens:[], garden:null, plants:[], tank:null}, cares = {status:'loading', items:[], page:1, total:0}, filters = {}, dates = null, guides = null, serial = 0, caresSerial = 0, working = false;
     async function loadCares(page = 1) {
+      const id = ++caresSerial;
       const result = await service.cares(state.garden.id, filters, page);
-      if(life.signal.aborted) return;
-      cares = result.status === 'ready' ? {status:'ready', items:result.items, page:result.page, total:result.total} : {status:'error', items:[], page:1, total:0};
+      if(life.signal.aborted || id !== caresSerial) return;      // una respuesta vieja no pisa a la más reciente
+      cares = result.status === 'ready' ? {status:'ready', items:result.items, page:result.page, total:result.total, latest:result.latest || null} : {status:'error', items:[], page:1, total:0};
       GardenViews.fillSlot(root, '[data-care-list]', CareViews.list(cares));
       // Fila de estado (solo lectura): se pinta con esta misma respuesta cuando es el historial sin filtros, página 1.
       if(cares.page === 1 && !Object.values(filters).some(Boolean)) GardenViews.fillSlot(root, '[data-care-status]', CareViews.status(cares, state.plants));
@@ -420,9 +425,11 @@ const CareController = (() => {
       await Promise.all([loadCares(1), values.type === 'rellenar_deposito' ? loadTank() : null]);
       return true;
     }
-    // Sección Depósito: «Ya lo rellené» con la confirmación estándar (la misma del atajo «Rellené el depósito»).
+    // Sección Depósito: «Ya lo rellené» con la confirmación estándar.
     async function recordRefill() {
-      if(await confirmar(GardenViews.confirmations.refill)) await register({type:'rellenar_deposito'});
+      if(working || !await confirmar(GardenViews.confirmations.refill) || working) return;
+      working = true;
+      try { await register({type:'rellenar_deposito'}); } finally { working = false; }
     }
     // Recarga detectada: confirmarla o descartarla (con confirmación) y volver a pintar la sección y el historial.
     async function decideRefill(action, detectionId) {
@@ -438,17 +445,19 @@ const CareController = (() => {
       } finally { working = false; }
     }
     async function submitCare(form) {
-      const invalid = dates.validate();
+      if(working) return;
+      const invalid = dates.validate(form);
       if(invalid) { mostrarAviso('error', invalid); return; }
       const type = form.elements.type.value, plant = form.elements.plant.value, chiles = form.elements.chiles.value;
       const moment = GardenModel.careMoment(form.elements.when.value.trim());
       if(!moment.valid) { mostrarAviso('error', 'Elige un día de hasta 7 días atrás, sin fechas futuras.'); return; }
       if(GardenModel.CARE_NEEDS_PLANT.includes(type) && !plant) { mostrarAviso('error', 'Elige en qué planta lo hiciste.'); return; }
       const values = {type, ...(plant ? {plant:Number(plant)} : {}), ...(type === 'cosecha' && chiles !== '' ? {chiles:Number(chiles)} : {}), ...(moment.at ? {doneAt:moment.at} : {})};
-      if(await register(values)) CareViews.reset(root);
+      working = true;
+      try { if(await register(values)) CareViews.reset(root); } finally { working = false; }
     }
     async function submitFilter(form) {
-      const invalid = dates.validate();
+      const invalid = dates.validate(form);
       if(invalid) { mostrarAviso('error', invalid); return; }
       const values = Object.fromEntries(new FormData(form));
       filters = {planta:values.planta, tipo:values.tipo, desde:values.since, hasta:values.until};
@@ -464,10 +473,8 @@ const CareController = (() => {
       else if(action === 'care-when') CareViews.pickWhen(root, trigger.dataset.when);
       else if(action === 'care-chiles') CareViews.stepChiles(root, trigger.dataset.step);
       else if(action === 'care-date') CareViews.openDate(root, trigger.dataset.date);
-      else if(action === 'care-quick' && type === 'rellenar_deposito') { if(await confirmar(GardenViews.confirmations.refill)) await register({type}); }
       else if(action === 'refill') await recordRefill();
       else if((action === 'refill-confirm' || action === 'refill-discard') && !working) await decideRefill(action, trigger.dataset.detection);
-      else if(action === 'care-quick') CareViews.prepare(root, type);
       else if(action === 'care-page') await loadCares(Number(page));
       else if(action === 'care-clear') { filters = {}; CareViews.resetFilters(root); await loadCares(1); }
     }, {signal:life.signal});

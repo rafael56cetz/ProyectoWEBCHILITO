@@ -153,7 +153,7 @@ const GardenViews = (() => {
     if(!gardens.length) return emptyGarden(name);
     const head = selector(gardens, detail.garden);
     if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${detail.tank ? tankPanel(detail.tank, detail.garden.id) : ''}${plantsSection(detail, 'Tus tres plantas')}`;
-    return `${head}${welcome(name, detail.garden.name)}${statusLine(detail.garden.device)}${deviceNote(detail.garden.device)}${metrics(detail)}${plantsSection(detail, 'Tus tres plantas')}${summaryCard(detail.summary)}${quickActions(detail)}`;
+    return `${head}<div class="home-head">${welcome(name, detail.garden.name)}${statusLine(detail.garden.device)}</div>${deviceNote(detail.garden.device)}${metrics(detail)}${plantsSection(detail, 'Tus tres plantas')}${summaryCard(detail.summary)}${quickActions(detail)}`;
   }
 
   // Tarjeta de orden 3.3: el estado lo confirma el equipo, no esta pantalla.
@@ -276,7 +276,7 @@ const GardenViews = (() => {
     const careLabels = {rellenar_deposito:'Recarga del depósito', sustrato:'Sustrato y perlita', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
     const watering = lastWatering ? `Último riego: ${{automatico:'automático', usuario:'tuyo', soporte:'de soporte'}[lastWatering.origin] || escaparHTML(lastWatering.origin)}, ${lastWatering.duration ?? '—'} s, ${GardenModel.ago(lastWatering.at)}` : 'Sin riegos registrados';
     return `<div class="plant-hero plant-photo-${plant.number}"><a class="garden-back" href="${withGarden('huerto', garden.id)}">← Mi huerto</a>
-      <div class="page-heading"><div><h1>Planta ${plant.number}${plant.name === `Planta ${plant.number}` ? '' : ` · «${escaparHTML(plant.name)}»`}</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${since} · ${sown}</p></div>${button('edit', 'Editar')}</div></div>
+      <div class="page-heading"><div><h1>Planta ${plant.number}${plant.name === `Planta ${plant.number}` ? '' : ` · ${escaparHTML(plant.name)}`}</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${since} · ${sown}</p></div>${button('edit', 'Editar')}</div></div>
       <div class="user-chart-toolbar"><h2>Humedad del sustrato</h2><div class="user-range-control" role="group" aria-label="Periodo">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>
       ${chart('Humedad del sustrato', series, '%', range, 'plant')}
       <div class="plant-columns"><section class="bento-panel"><h2>Línea de vida</h2>${stages.length ? `<ol class="user-history-list">${stages.map(item => `<li><span>${icon('leaf')}</span><div><h3>${STAGES[item.stage] || item.stage}</h3><p>${AppViews.date(item.since)}</p></div></li>`).join('')}</ol>${stages.length === 1 ? '<p class="user-small-copy">Cambia la etapa en Editar para ir llenando su línea de vida.</p>' : ''}` : '<p>Aún no hay etapas registradas.</p>'}</section>
@@ -399,7 +399,7 @@ const TechnicalViews = (() => {
     const {garden, data, range, log} = state;
     if(!garden.device) return noDevice(state.gardens, garden, 'Panel técnico', 'telemetria');
     const toolbar = `<div class="user-chart-toolbar"><div class="toolbar-title"><h2>Histórico de lecturas</h2>${button('reload', `${icon('refresh')}<span class="sr-only">Actualizar</span>`, 'light', 'aria-label="Actualizar" title="Actualizar"')}</div><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>`;
-    return `${selector(state.gardens, garden, 'telemetria')}${screenTitle('Panel técnico', garden.name)}${statusLine(garden.device)}${cards(data)}${toolbar}${charts(data)}${plantTable(data.plants)}${waterCard(data.plants)}<div data-log-panel>${logPanel(log)}</div>`;
+    return `${selector(state.gardens, garden, 'telemetria')}<div class="home-head">${screenTitle('Panel técnico', garden.name)}${statusLine(garden.device)}</div>${cards(data)}${toolbar}${charts(data)}${plantTable(data.plants)}${waterCard(data.plants)}<div data-log-panel>${logPanel(log)}</div>`;
   }
 
   const waterConfirmation = (plant, seconds) => ({titulo:`¿Regar ${plant}?`, texto:`Se enviará la orden a tu equipo para regar ${seconds} segundos. Si el depósito no tiene agua, no regará.`, accion:'Regar'});
@@ -422,7 +422,11 @@ const CareViews = (() => {
   const typeOptions = selected => Object.entries(TYPES).map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
   // Chips del tipo: muestran el <select id="care-type"> (que sigue en el formulario) y lo cambian con su mismo evento «change».
   const chip = (action, content, attrs) => button(action, content, 'light', attrs).replace('class="button ', 'class="button care-chip ');
-  const typeChips = selected => `<div class="care-chips care-type-chips" role="group" aria-labelledby="care-type-label">${Object.entries(TYPES).map(([value, label]) => chip('care-type', `${icon(CARE_ICONS[value])}<span>${label}</span>`, `data-type="${value}" aria-pressed="${value === selected}"`)).join('')}</div>`;
+  // En «Registrar un cuidado» no se ofrece la recarga del depósito: vive en la sección «Depósito de agua».
+  const FORM_TYPES = Object.fromEntries(Object.entries(TYPES).filter(([value]) => value !== 'rellenar_deposito'));
+  const FORM_DEFAULT = 'sustrato';
+  const formTypeOptions = selected => Object.entries(FORM_TYPES).map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
+  const typeChips = selected => `<div class="care-chips care-type-chips" role="group" aria-labelledby="care-type-label">${Object.entries(FORM_TYPES).map(([value, label]) => chip('care-type', `${icon(CARE_ICONS[value])}<span>${label}</span>`, `data-type="${value}" aria-pressed="${value === selected}"`)).join('')}</div>`;
   // Planta como botones: cada uno pone su valor en el <select id="care-plant"> (que sigue en el formulario). «Todo el huerto» solo en inspección.
   const plantName = plant => escaparHTML(plant.name || `Planta ${plant.number}`);
   const plantChips = plants => `<div class="care-chips care-plant-chips" role="group" aria-labelledby="care-plant-label">${chip('care-plant', '<span>Todo el huerto</span>', 'data-plant="" data-whole aria-pressed="false" hidden')}${plants.map(plant => chip('care-plant', `<span>${plantName(plant)}</span>`, `data-plant="${escaparHTML(String(plant.number))}" aria-pressed="false"`)).join('')}</div>`;
@@ -431,27 +435,27 @@ const CareViews = (() => {
   const whenTabs = () => `<div class="care-chips care-when-chips" role="group" aria-labelledby="care-when-label">${WHEN.map(([value, label, mark]) => chip('care-when', `${icon(mark)}<span>${label}</span>`, `data-when="${value}" aria-pressed="${value === 'now'}"`)).join('')}</div>`;
   const WHEN_HINT = {field:'Déjalo vacío para registrar ahora, o escribe un día de hasta 7 días atrás.', pick:'Puedes elegir un día de hasta 7 días atrás.'};
 
-  const quickRefill = tank => refillButton('care-quick', `${icon('tank')}<span>Rellené el depósito</span>`, tank, 'care-quick-refill', 'data-type="rellenar_deposito"');
-  function form(plants, tank = null) {
-    const refill = quickRefill(tank);
+  function form(plants) {
     return `<section class="bento-panel garden-form care-register" aria-labelledby="care-title"><h2 id="care-title">Registrar un cuidado</h2>
       <form data-garden-form="care" novalidate>
-        <div class="care-type-field"><label for="care-type" id="care-type-label">¿Qué hiciste?</label>${typeChips('rellenar_deposito')}<select id="care-type" name="type" class="care-hidden-select" tabindex="-1" aria-hidden="true">${typeOptions('rellenar_deposito')}</select></div>
-        <div class="care-field care-plant-field" data-care-plant hidden><span class="care-label" id="care-plant-label">¿En qué planta?</span>${plantChips(plants)}<select id="care-plant" name="plant" class="care-hidden-select" tabindex="-1" aria-hidden="true">${plantOptions(plants, false)}</select></div>
+        <div class="care-type-field"><label for="care-type" id="care-type-label">¿Qué hiciste?</label>${typeChips(FORM_DEFAULT)}<select id="care-type" name="type" class="care-hidden-select" tabindex="-1" aria-hidden="true">${formTypeOptions(FORM_DEFAULT)}</select></div>
+        <div class="care-field care-plant-field" data-care-plant><span class="care-label" id="care-plant-label">¿En qué planta?</span>${plantChips(plants)}<select id="care-plant" name="plant" class="care-hidden-select" tabindex="-1" aria-hidden="true">${plantOptions(plants, false)}</select></div>
         <div class="care-fields">
-          <div class="care-when" data-care-when data-when-mode="field"><span class="care-label care-when-label" id="care-when-label">¿Cuándo?</span>${whenTabs()}
-            <div class="care-when-date" data-care-when-date>${dateField('when', '¿Cuándo?', WHEN_HINT.field)}</div></div>
+          <div class="care-when" data-care-when data-when-mode="now"><span class="care-label care-when-label" id="care-when-label">¿Cuándo?</span>${whenTabs()}
+            <div class="care-when-date" data-care-when-date hidden>${dateField('when', '¿Cuándo?', WHEN_HINT.pick)}</div></div>
           <div class="care-field" data-care-chiles hidden><label for="care-chiles">Chiles cosechados (opcional)</label>
             <div class="care-stepper">${button('care-chiles', icon('minus'), 'light', 'data-step="-1" aria-label="Quitar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}<input id="care-chiles" name="chiles" type="number" min="0" max="999" inputmode="numeric" placeholder="0" readonly>${button('care-chiles', icon('plus'), 'light', 'data-step="1" aria-label="Agregar un chile" aria-controls="care-chiles"').replace('class="button ', 'class="button care-step ')}</div>
             <p class="care-stepper-live sr-only" aria-live="polite" data-care-chiles-live></p></div>
         </div>
         <div class="care-register-footer">
           <p class="care-register-help">¿Dudas sobre cómo revisar el sustrato? <a class="care-guide-link" href="#mantenimiento/sustrato" data-care-guide-link="${CareGuideService.SUBSTRATE_KEY}">Ver guía de sustrato</a></p>
-          <div class="care-register-actions" data-care-refill>${refill.button}<button class="button btn-liquid-brand care-submit" type="submit">Registrar</button></div>
-        </div><div data-care-refill-reason>${refill.reason}</div></form></section>`;
+          <div class="care-register-actions"><button class="button btn-liquid-brand care-submit" type="submit">Registrar</button></div>
+        </div></form></section>`;
   }
 
-  // Fila de estado (solo lectura): el último registro no anulado de cada tipo, tomado del historial ya cargado.
+  // Fila de estado (solo lectura): el último registro no anulado de cada tipo. Lo da el servidor («latest», sin depender de la
+  // página); si no viene, se toma del historial ya cargado. Las horas se muestran en la zona del navegador: la app supone
+  // que la persona está en Yucatán (el depósito usa America/Merida explícitamente).
   const STATUS_CARDS = [['rellenar_deposito', 'Último relleno de depósito'], ['cosecha', 'Última cosecha'], ['sustrato', 'Última revisión de sustrato'], ['inspeccion', 'Última inspección']];
   const plain = text => String(text).replace(/[\u00a0\u202f]/g, ' ');
   function stamp(value) {
@@ -468,9 +472,11 @@ const CareViews = (() => {
     const ready = cares?.status === 'ready';
     const plantName = number => { const found = plants.find(plant => Number(plant.number) === Number(number)); return found ? escaparHTML(found.name) : `Planta ${escaparHTML(String(number))}`; };
     const card = ([type, label]) => {
-      const last = ready ? cares.items.filter(item => item.type === type && !item.voided).sort((a, b) => new Date(b.doneAt) - new Date(a.doneAt))[0] : null;
+      const last = !ready ? null : cares.latest ? cares.latest[type] || null : cares.items.filter(item => item.type === type && !item.voided).sort((a, b) => new Date(b.doneAt) - new Date(a.doneAt))[0];
       const value = !cares ? 'Cargando…' : !ready ? 'No disponible' : last ? stamp(last.doneAt) : 'Sin registros';
-      const detail = last ? `${last.plant ? plantName(last.plant) : 'Todo el huerto'}${last.chiles != null ? ` · ${escaparHTML(String(last.chiles))} chiles` : ''}` : '';
+      // El depósito no es de una planta: en vez de «Todo el huerto» solo se dice si lo detectó el equipo.
+      const detail = !last ? '' : type === 'rellenar_deposito' ? (last.origin === 'equipo' ? escaparHTML(GardenModel.detectedLabel(last)) : '')
+        : `${last.plant ? plantName(last.plant) : 'Todo el huerto'}${last.chiles != null ? ` · ${escaparHTML(String(last.chiles))} chiles` : ''}`;
       return `<li class="care-status-card"><p class="care-status-label">${label}</p><p class="care-status-value">${value}</p>${detail ? `<p class="care-status-detail">${detail}</p>` : ''}</li>`;
     };
     return `<ul class="care-status-grid">${STATUS_CARDS.map(card).join('')}</ul>`;
@@ -511,7 +517,7 @@ const CareViews = (() => {
     if(state.status === 'error') return failed;
     if(!state.gardens.length) return noGarden('Mantenimiento');
     const {garden, plants} = state;
-    return `${selector(state.gardens, garden, 'mantenimiento')}${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}<div data-care-tank>${tankSection(state.tank)}</div><section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section>${form(plants, state.tank?.tank)}${filters(plants)}${CareGuideViews.slot()}`;
+    return `${selector(state.gardens, garden, 'mantenimiento')}<div class="home-head">${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}</div><section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section><div data-care-tank>${tankSection(state.tank)}</div>${form(plants)}${filters(plants)}${CareGuideViews.slot()}`;
   }
 
   // Sección «Depósito de agua» (arriba de Mantenimiento): estado, lo que toca hacer según la fase que decide el servidor
@@ -557,13 +563,8 @@ const CareViews = (() => {
       <p class="tank-status"><strong>${main}</strong></p>${tankNotice(tank)}${tankActions(tank)}<div class="tank-lines">${lines}${empty}</div>
       <p class="tank-capacity user-small-copy">${tank.hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : 'Depósito de 19 L'}</p>${tankLoads(tank, loads)}</section>`;
   }
-  // Tras registrar o recargar el estado: el botón «Rellené el depósito», su motivo y el historial del depósito.
+  // Tras registrar o recargar el estado: vuelve a pintar la sección «Depósito de agua».
   function syncTank(root, data) {
-    const refill = quickRefill(data?.status === 'ready' ? data.tank : null);
-    const old = root.querySelector('[data-care-refill] [data-garden-action="care-quick"]');
-    if(old) old.outerHTML = refill.button;
-    const reason = root.querySelector('[data-care-refill-reason]');
-    if(reason) reason.innerHTML = refill.reason;
     const box = root.querySelector('[data-care-tank]');
     if(box) box.innerHTML = tankSection(data);
   }
@@ -650,25 +651,19 @@ const CareViews = (() => {
     form.querySelectorAll('[data-care-range]').forEach(field => { field.hidden = value !== 'rango'; });
     [since, until].forEach(field => field.dispatchEvent(new Event('input', {bubbles:true})));
   }
-  function prepare(root, type) {
-    const form = root.querySelector('[data-garden-form="care"]');
-    form.elements.type.value = type;
-    adjust(root, type);
-    form.elements.plant.focus();
-  }
 
   function reset(root) {
     root.querySelector('[data-garden-form="care"]').reset();
     const box = root.querySelector('[data-care-when]');
-    if(box) box.dataset.whenMode = 'field';
-    adjust(root, 'rellenar_deposito');
+    if(box) box.dataset.whenMode = 'now';
+    adjust(root, FORM_DEFAULT);
   }
   function resetFilters(root) {
     root.querySelector('[data-garden-form="care-filter"]').reset();
     period(root, '');
   }
 
-  return Object.freeze({screen, list, status, tankSection, syncTank, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, prepare, reset, resetFilters, types:TYPES});
+  return Object.freeze({screen, list, status, tankSection, syncTank, adjust, pickType, pickPlant, pickWhen, stepChiles, openDate, period, reset, resetFilters, types:TYPES});
 })();
 
 const SupportViews = (() => {
@@ -681,39 +676,83 @@ const SupportViews = (() => {
   const CHECK_RESULTS = {correcto:['✔ Correcto', 'verde'], falla:['✖ Falla', 'rojo'], sin_respuesta:['⏱ Sin respuesta', 'ambar'], no_instalado:['— No instalado', 'gris']};
   const when = value => AppViews.date(value);
 
-  function diagnosticCard(diagnostic) {
+  // Revisión del equipo para administración (y la lista simple de componentes): sin cambios de diseño.
+  function diagnosticPanel(diagnostic) {
     if(!diagnostic) return '';
     const failures = GardenModel.problems(diagnostic.checks);
     const overall = diagnostic.state === 'en_curso' ? 'Revisando tu equipo…' : diagnostic.state === 'sin_respuesta' ? 'Tu equipo no respondió a la revisión.'
       : failures === 0 ? 'Todo funciona' : `Encontramos ${failures} problema${failures === 1 ? '' : 's'}`;
-    const items = diagnostic.checks.map(check => { const [label, tone] = CHECK_RESULTS[check.result] || ['—', 'gris']; return `<li><span>${CHECKS[check.component] || escaparHTML(check.component)}</span>${tag(label, tone)}${check.detail ? `<small>${escaparHTML(check.detail)}</small>` : ''}</li>`; }).join('');
+    const items = (diagnostic.checks || []).map(check => { const [label, tone] = CHECK_RESULTS[check.result] || ['—', 'gris']; return `<li><span>${CHECKS[check.component] || escaparHTML(check.component)}</span>${tag(label, tone)}${check.detail ? `<small>${escaparHTML(check.detail)}</small>` : ''}</li>`; }).join('');
     return `<article class="bento-panel diagnostic-card" aria-live="polite"><h3>${overall}</h3><p class="user-small-copy">Revisión del ${when(diagnostic.startedAt)}</p>${items ? `<ul class="diagnostic-list">${items}</ul>` : ''}</article>`;
   }
 
-  const lastLine = diagnostic => !diagnostic ? 'Aún no has revisado tu equipo.'
-    : diagnostic.state === 'completado' ? `Última revisión: ${GardenModel.ago(diagnostic.startedAt)} · ${GardenModel.problems(diagnostic.checks) === 0 ? 'Todo funciona' : `Encontramos ${GardenModel.problems(diagnostic.checks)} problema${GardenModel.problems(diagnostic.checks) === 1 ? '' : 's'}`}`
-      : diagnostic.state === 'en_curso' ? 'Revisión en curso…' : 'La última revisión no tuvo respuesta.';
-
-  // «1 · Revisa…»: el número va en su propia marca; el separador se conserva para lectores de pantalla.
-  const step = number => `<span class="support-step">${number}</span><span class="support-step-sep"> · </span>`;
-  function check(data, diagnostic) {
-    return `<section class="bento-panel garden-form support-step-card" aria-labelledby="support-check-title"><h2 id="support-check-title">${step(1)}Revisa tu equipo</h2><p>Comprueba sensores, bombas, lámpara y conexión.</p>
-      ${button('diagnose', `${icon('activity')}<span>Revisar mi equipo</span>`, 'light')}<p class="user-small-copy">${lastLine(data.lastDiagnostic)}</p><div data-order-card></div><div data-diagnostic>${diagnosticCard(diagnostic)}</div></section>`;
+  // ── Ficha «Revisa tu equipo» (solo presentación): estado general, botón y componentes agrupados. ──
+  const GROUPS = [['Conexión', ['conexion']], ['Sensores', ['sensor_ambiente', 'sensor_luz', 'sensor_sustrato_1', 'sensor_sustrato_2', 'sensor_sustrato_3', 'flotador']],
+    ['Actuadores', ['bomba_1', 'bomba_2', 'bomba_3', 'lampara', 'ventilador']]];
+  const BADGES = {correcto:['Correcto', 'is-ok', 'check'], no_instalado:['No instalado', 'is-neutral', 'minus'], falla:['Falla', 'is-alert', 'close'], sin_respuesta:['Sin respuesta', 'is-alert', 'alert']};
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  // Conteo por resultado: «6 correctos · 1 no instalado · 1 con falla».
+  function tally(checks) {
+    const count = result => checks.filter(check => check.result === result).length;
+    return {ok:count('correcto'), absent:count('no_instalado'), failed:count('falla'), silent:count('sin_respuesta'), total:checks.length};
+  }
+  const extras = t => [t.absent ? `${t.absent} no instalado${t.absent === 1 ? '' : 's'}` : '', t.failed ? `${t.failed} con falla` : '', t.silent ? `${t.silent} sin respuesta` : ''].filter(Boolean);
+  const overallCount = t => [t.ok ? plural(t.ok, 'correcto', 'correctos') : '', ...extras(t)].filter(Boolean).join(' · ');
+  const groupCount = t => t.ok === t.total ? `${t.ok} de ${t.total} correcto${t.total === 1 ? '' : 's'}` : [`${t.ok} de ${t.total}`, ...extras(t)].join(' · ');
+  function badge(result) {
+    const [label, tone, mark] = BADGES[result] || ['Sin dato', 'is-neutral', 'minus'];
+    return `<span class="support-badge ${tone}">${icon(mark)}<span>${label}</span></span>`;
+  }
+  function groups(checks) {
+    const known = GROUPS.flatMap(([, items]) => items);
+    const sets = [...GROUPS.map(([name, items]) => [name, checks.filter(check => items.includes(check.component))
+      .sort((a, b) => items.indexOf(a.component) - items.indexOf(b.component))]), ['Otros', checks.filter(check => !known.includes(check.component))]]
+      .filter(([, items]) => items.length);
+    return sets.map(([name, items]) => `<section class="support-group" aria-label="${name}"><div class="support-group-head"><h4>${name}</h4><p>${groupCount(tally(items))}</p></div>
+      <ul class="support-components">${items.map(check => `<li><span class="support-component-name">${CHECKS[check.component] || escaparHTML(check.component)}</span>${badge(check.result)}${check.detail ? `<small>${escaparHTML(check.detail)}</small>` : ''}</li>`).join('')}</ul></section>`).join('');
+  }
+  // Ocupa el hueco [data-diagnostic]: lo vuelve a pintar el controlador al revisar el equipo.
+  function diagnosticCard(diagnostic) {
+    const checks = diagnostic?.checks || [];
+    const failures = diagnostic ? GardenModel.problems(checks) : 0;
+    const [tone, mark, title] = !diagnostic ? ['is-pending', 'activity', 'Aún no has revisado tu equipo']
+      : diagnostic.state === 'en_curso' ? ['is-pending', 'clock', 'Revisando tu equipo…']
+      : diagnostic.state === 'sin_respuesta' ? ['is-alert', 'alert', 'Tu equipo no respondió a la revisión.']
+      : failures === 0 ? ['is-ok', 'check', 'Todo funciona'] : ['is-alert', 'close', `Encontramos ${failures} problema${failures === 1 ? '' : 's'}`];
+    const ago = diagnostic ? GardenModel.ago(diagnostic.startedAt) : null;
+    const whenLine = !diagnostic ? 'Comprueba sensores, bombas, lámpara y conexión.'
+      : `${diagnostic.state === 'en_curso' ? 'Iniciada' : 'Última revisión'}: ${when(diagnostic.startedAt)}${ago ? ` · ${ago}` : ''}`;
+    const count = checks.length ? overallCount(tally(checks)) : '';
+    return `<div class="support-check-result" aria-live="polite"><div class="support-status ${tone}"><span class="support-status-mark" aria-hidden="true">${icon(mark)}</span>
+      <div class="support-status-text"><h3>${title}</h3><p class="support-status-when">${whenLine}</p>${count ? `<p class="support-status-count">${count}</p>` : ''}</div>
+      ${button('diagnose', `${icon('activity')}<span>Revisar mi equipo</span>`, 'brand').replace('class="button ', 'class="button support-primary ')}</div>
+      ${checks.length ? `<div class="support-groups">${groups(checks)}</div>` : ''}</div>`;
   }
 
+  function check(data, diagnostic) {
+    return `<section class="bento-panel support-card support-check-card" aria-labelledby="support-check-title"><h2 id="support-check-title">Revisa tu equipo</h2>
+      <div data-diagnostic>${diagnosticCard(diagnostic)}</div><div data-order-card></div></section>`;
+  }
+
+  // ── Ficha «Solicita una revisión técnica»: radios reales con el mismo name="incident" (el controlador lee form.elements.incident.value). ──
   function requestForm(data) {
-    const attachable = data.lastDiagnostic?.state === 'completado';
-    return `<section class="bento-panel garden-form support-step-card" aria-labelledby="support-request-title"><h2 id="support-request-title">${step(2)}Solicita una revisión técnica</h2>
-      <form data-garden-form="support" novalidate><label for="support-incident">¿Qué problema tiene?</label>
-      <select id="support-incident" name="incident">${Object.entries(GardenModel.INCIDENTS).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select>
-      <label for="support-note">Cuéntanos más (opcional)</label><textarea id="support-note" name="note" maxlength="500" rows="4"></textarea><p class="user-small-copy"><span data-note-count>0</span>/500</p>
-      ${attachable ? '<label class="legal-check"><input type="checkbox" name="attach"><span>Adjuntar la última revisión de mi equipo</span></label>' : ''}
-      <label class="legal-check"><input type="checkbox" name="consent" required><span>Autorizo al equipo de soporte a revisar mi equipo durante 24 horas. Puedo revocarlo cuando quiera.</span></label>
-      <button class="button btn-liquid-brand" type="submit" disabled>Solicitar revisión</button></form></section>`;
+    const last = data.lastDiagnostic, attachable = last?.state === 'completado';
+    const failures = attachable ? GardenModel.problems(last.checks) : 0;
+    const attached = attachable ? `Se enviará: ${when(last.startedAt)} · ${failures === 0 ? 'Todo funciona' : `${failures} problema${failures === 1 ? '' : 's'}`}` : '';
+    const options = Object.entries(GardenModel.INCIDENTS).map(([value, label], index) => `<label class="support-option"><input type="radio" name="incident" value="${value}"${index === 0 ? ' checked' : ''}><span class="support-radio" aria-hidden="true">${icon('check')}</span><span>${label}</span></label>`).join('');
+    return `<section class="bento-panel support-card support-request-card" aria-labelledby="support-request-title"><h2 id="support-request-title">Solicita una revisión técnica</h2>
+      <p class="support-sub">Cuéntanos qué falla y el equipo revisará tu instalación.</p>
+      <form data-garden-form="support" class="support-form" novalidate>
+      <fieldset class="support-incidents" id="support-incident"><legend class="support-label">¿Qué problema tiene?</legend><div class="support-options">${options}</div></fieldset>
+      <div class="support-field"><label class="support-label" for="support-note">Cuéntanos más <span>(opcional)</span></label><textarea id="support-note" name="note" maxlength="500" rows="4"></textarea><p class="support-note-count"><span data-note-count>0</span>/500</p></div>
+      ${attachable ? `<label class="support-check support-check-attach"><input type="checkbox" name="attach"><span class="support-check-text"><span>Adjuntar la última revisión de mi equipo</span><small>${escaparHTML(attached)}</small></span></label>` : ''}
+      <label class="support-check support-check-consent"><input type="checkbox" name="consent" required><span class="support-check-text"><span>Autorizo al equipo de soporte a revisar mi equipo durante 24 horas</span><small>Puedes revocarlo cuando quieras.</small></span></label>
+      <button class="button btn-liquid-brand support-submit" type="submit" disabled>Solicitar revisión</button>
+      <p class="support-submit-hint">Marca la autorización para poder enviar la solicitud.</p></form></section>`;
   }
 
   function activeCase(data) {
-    const caso = data.active, [label, tone] = STATES[caso.state];
+    const caso = data.active, [label, tone] = STATES[caso.state] || ['En proceso', 'gris'];
     const authorization = caso.revokedAt ? 'Acceso revocado. Soporte ya no puede ver ni controlar tu equipo.'
       : Date.parse(caso.authorizedUntil) > Date.now() ? `Autorización vigente · vence en ${GardenModel.lapse(caso.authorizedUntil)}` : 'La autorización venció.';
     const orders = data.orders.length ? `<ul class="user-history-list">${data.orders.map(order => `<li><span>${icon('tool')}</span><div><p>${when(order.createdAt)} · ${escaparHTML(orderTitle(order))}</p>${orderStateTag(order.state)}${order.error ? `<small>${escaparHTML(order.error)}</small>` : ''}</div></li>`).join('')}</ul>` : '<p>Soporte todavía no ha hecho nada en tu equipo.</p>';
@@ -735,10 +774,10 @@ const SupportViews = (() => {
     const {garden, data, diagnostic} = state;
     if(!data.hasDevice) return noDevice(state.gardens, garden, 'Soporte técnico', 'soporte');
     const head = `${selector(state.gardens, garden, 'soporte')}${screenTitle('Soporte técnico', garden.name)}`;
-    return `${head}${data.active ? activeCase(data) : `<div class="support-steps">${check(data, diagnostic)}${requestForm(data)}</div>`}${history(data.history)}`;
+    return `${head}${data.active ? activeCase(data) : `<div class="support-cards">${check(data, diagnostic)}${requestForm(data)}</div>`}${history(data.history)}`;
   }
 
-  return Object.freeze({screen, diagnosticCard, activeCase,
+  return Object.freeze({screen, diagnosticCard, diagnosticPanel, activeCase,
     confirmations:{
       revoke:{titulo:'¿Revocar el acceso de soporte?', texto:'Soporte dejará de ver y controlar tu equipo de inmediato. Tu caso seguirá abierto.', accion:'Revocar acceso', peligro:true},
       cancel:{titulo:'¿Cancelar tu solicitud?', texto:'Se cerrará el caso y se revocará el acceso. No se puede deshacer.', accion:'Cancelar solicitud', peligro:true}},

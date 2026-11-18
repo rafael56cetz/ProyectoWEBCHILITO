@@ -380,10 +380,29 @@ def _filtrar_cuidados(consulta, planta, tipo, desde, hasta):
     return consulta
 
 
+# Tipos de las fichas «Último…» de Mantenimiento.
+TIPOS_RESUMEN = ('rellenar_deposito', 'cosecha', 'sustrato', 'inspeccion')
+
+
+def _ultimos_cuidados(vigentes):
+    """El último cuidado no anulado de cada tipo de las fichas, sin depender de la página del historial."""
+    validos = vigentes.filter(Q(rev_tipo__isnull=True) | ~Q(rev_tipo='anulacion')).order_by('-realizado_en', '-registrado_en')
+    ultimos = {}
+    for tipo in TIPOS_RESUMEN:
+        cuidado = validos.filter(tipo_vigente=tipo).first()
+        ultimos[tipo] = _cuidado_dto(cuidado) if cuidado else None
+    return ultimos
+
+
 def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
     huerto = s.huerto_propio(actor, huerto_id)
-    consulta = _filtrar_cuidados(_cuidados_vigentes().filter(huerto_id=huerto.pk), planta, tipo, desde, hasta)
-    return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en'), pagina, _cuidado_dto)}
+    vigentes = _cuidados_vigentes().filter(huerto_id=huerto.pk)
+    consulta = _filtrar_cuidados(vigentes, planta, tipo, desde, hasta)
+    respuesta = {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en'), pagina, _cuidado_dto)}
+    # El resumen solo acompaña al historial sin filtros, página 1: es lo que pinta las fichas «Último…».
+    if pagina == 1 and not any((planta, tipo, desde, hasta)):
+        respuesta['latest'] = _ultimos_cuidados(vigentes)
+    return respuesta
 
 
 # ── Depósito: estado del flotador, reglas de la recarga manual y duración de cada carga ──

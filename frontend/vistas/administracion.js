@@ -141,7 +141,7 @@ const ConsoleViews = (() => {
   }
 
   // Todas las órdenes de soporte del caso, de cualquier sesión, con su estado: una pendiente se sigue viendo al volver.
-  const orderList = (orders, diagnostic = null) => (orders.length ? orders.map(orderCard).join('') : '<p>Todavía no hay órdenes en este caso.</p>') + SupportViews.diagnosticCard(diagnostic);
+  const orderList = (orders, diagnostic = null) => (orders.length ? orders.map(orderCard).join('') : '<p>Todavía no hay órdenes en este caso.</p>') + SupportViews.diagnosticPanel(diagnostic);
   const ordersPanel = orders => `<section class="bento-panel" aria-labelledby="console-orders-title"><h2 id="console-orders-title">Órdenes del caso</h2><div data-console-orders>${orderList(orders)}</div></section>`;
 
   function readings(data) {
@@ -184,7 +184,7 @@ const ConsoleViews = (() => {
     const mine = caso.state === 'en_atencion' && caso.mine;
     return `<section class="bento-panel console-detail"><h2>Caso <span class="folio">${escaparHTML(caso.folio)}</span> ${tag(label, tone)}</h2>
         <dl class="user-facts">${facts.map(([name, value]) => `<div><dt>${name}</dt><dd>${value}</dd></div>`).join('')}</dl>${closed}
-        ${diagnostic ? `<h3>Autodiagnóstico adjunto</h3>${SupportViews.diagnosticCard(diagnostic)}` : ''}<div class="app-actions">${action}</div></section>
+        ${diagnostic ? `<h3>Autodiagnóstico adjunto</h3>${SupportViews.diagnosticPanel(diagnostic)}` : ''}<div class="app-actions">${action}</div></section>
       ${mine && session ? sessionFrame(caso, session) : ''}${orders.length || mine ? ordersPanel(orders) : ''}${mine ? resolution(caso) : ''}`;
   }
 

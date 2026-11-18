@@ -389,6 +389,8 @@ suite('Mi huerto y retirada de despliegues', async () => {
   vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
   const M = vm.runInContext('GardenModel', context), S = vm.runInContext('GardenService', context);
   const NOW = Date.parse('2026-11-08T12:00:00Z');
+  assert.equal(M.ago('2026-11-07T06:00:00Z', NOW), 'hace 1 día', 'singular entre 24 y 47 h');
+  assert.equal(M.ago('2026-11-05T12:00:00Z', NOW), 'hace 3 días');
   // Línea de estado 3.2: sale de la conexión del equipo y de su última lectura.
   const device = c => ({connection:'en_linea', lastReadingAt:'2026-11-08T11:58:00Z', lastConnectionAt:'2026-11-08T11:58:00Z', firmware:'1.0.3', ...c});
   assert.equal(M.connection(null, NOW), null);
@@ -456,7 +458,7 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(!conEtapas([etapa('sin_sembrar', '2026-11-01'), etapa('germinacion', '2026-11-05')]).includes(AVISO_LINEA), 'con 2 etapas no aparece');
   assert.ok(!conEtapas([etapa('sin_sembrar', '2026-11-01'), etapa('germinacion', '2026-11-05'), etapa('plantula', '2026-11-10')]).includes(AVISO_LINEA), 'con 3 etapas no aparece');
   assert.ok(!conEtapas([]).includes(AVISO_LINEA), 'sin etapas no aparece');
-  assert.ok(page.includes('<h1>Planta 1 · «&lt;i&gt;x&lt;/i&gt;»</h1>'), 'un nombre propio sí se muestra, escapado');
+  assert.ok(page.includes('<h1>Planta 1 · &lt;i&gt;x&lt;/i&gt;</h1>'), 'un nombre propio sí se muestra, escapado y sin comillas angulares');
   const hostil = V.plantPage({garden, plant:{...plants[0], stage:'<u>etapa</u>'}, stages:[], series:[], range:'24h', care:[], lastWatering:{origin:'<u>origen</u>', duration:3, at:'2026-11-14T10:00:00Z'}, hasDevice:true});
   assert.ok(!hostil.includes('<u>') && hostil.includes('&lt;u&gt;etapa'), 'etapa y origen del riego se escapan');
   assert.ok(V.plantDialogs(plants[0], true).water.includes('Si el depósito no tiene agua, tu equipo no regará.'));
@@ -510,22 +512,31 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants}).includes('¿Qué hiciste?'));
   // Rediseño: los chips muestran el tipo, pero el <select id="care-type" name="type"> y los atajos siguen en el formulario.
   const careScreen = Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants});
-  assert.equal((careScreen.match(/data-garden-action="care-type"/g) || []).length, 5, 'un chip por tipo de cuidado');
+  assert.equal((careScreen.match(/data-garden-action="care-type"/g) || []).length, 4, 'un chip por tipo de cuidado (sin recarga del depósito)');
   assert.equal((careScreen.match(/data-garden-action="care-type"[^>]*aria-pressed="true"/g) || []).length, 1, 'un solo tipo elegido al abrir');
   assert.ok(/<select id="care-plant" name="plant"[^>]*>/.test(careScreen) && (careScreen.match(/data-garden-action="care-plant"/g) || []).length === data.plants.length + 1, 'un botón por planta más «Todo el huerto»');
   assert.ok(careScreen.includes('data-when="now"') && careScreen.includes('data-when="yesterday"') && careScreen.includes('data-when="pick"'), 'Ahora, Ayer y Elegir día');
   assert.ok(careScreen.includes('data-step="-1"') && careScreen.includes('data-step="1"') && /id="care-chiles" name="chiles"[^>]*readonly/.test(careScreen), 'chiles con − y +');
   assert.ok(careScreen.includes('id="filter-period"') && careScreen.includes('Últimos 7 días'), 'periodo en el historial');
-  assert.ok(careScreen.includes('data-type="rellenar_deposito" aria-pressed="true"'), 'el elegido es el del select');
+  assert.ok(careScreen.includes('data-type="sustrato" aria-pressed="true"'), 'el elegido es el del select');
   assert.ok(/<select id="care-type" name="type"[^>]*>/.test(careScreen), 'el select del tipo sigue en el formulario');
-  // Los chips reemplazan a «Registrar cosecha» y «Revisé el sustrato»; «Rellené el depósito» (registro en un clic) se conserva.
-  assert.equal((careScreen.match(/data-garden-action="care-quick"/g) || []).length, 1, 'solo queda el atajo del depósito');
-  assert.ok(careScreen.includes('data-type="rellenar_deposito"') && careScreen.includes('data-care-guide-link'));
+  // «Registrar un cuidado» ya no ofrece la recarga del depósito ni el atajo «Rellené el depósito»: vive en «Depósito de agua».
+  const careForm = careScreen.slice(careScreen.indexOf('care-register'), careScreen.indexOf('care-history'));
+  assert.ok(!careScreen.includes('data-garden-action="care-quick"') && !careScreen.includes('Rellené el depósito') && !careForm.includes('value="rellenar_deposito"') && !careForm.includes('data-type="rellenar_deposito"'), 'sin recarga en el formulario');
+  assert.ok(careScreen.includes('data-care-guide-link'));
+  assert.ok(careScreen.indexOf('data-care-status') < careScreen.indexOf('data-care-tank') && careScreen.indexOf('data-care-tank') < careScreen.indexOf('care-register'), 'orden: últimos cuidados, depósito, registrar');
   assert.ok(careScreen.includes('data-care-status') && careScreen.includes('Último relleno de depósito'), 'fila de estado arriba del formulario');
   const careStatus = Care.status({status:'ready', page:1, total:2, items:[
     {id:'a', type:'sustrato', plant:3, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:true, corrected:false},
     {id:'b', type:'cosecha', plant:2, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:false}]}, []);
   assert.ok(careStatus.includes('Planta 2 · 7 chiles'), 'la última cosecha con planta y chiles');
+  const refillStatus = origin => Care.status({status:'ready', page:1, total:1, items:[{id:'r', type:'rellenar_deposito', plant:null, chiles:null, origin, doneAt:'2026-11-08T09:00:00Z', voided:false}]}, []);
+  assert.ok(!refillStatus('persona').includes('Todo el huerto') && !refillStatus('equipo').includes('Todo el huerto'), 'el relleno no dice «Todo el huerto»');
+  assert.ok(refillStatus('equipo').includes('Detectada por tu equipo'), 'el relleno detectado lo dice');
+  // Con «latest» del servidor las fichas no dependen de la página: aquí la página 1 no trae cosechas.
+  const fromServer = Care.status({status:'ready', page:1, total:30, items:[{id:'i', type:'inspeccion', plant:null, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:false}],
+    latest:{cosecha:{id:'c', type:'cosecha', plant:2, chiles:4, doneAt:'2026-11-04T10:00:00Z', voided:false}, inspeccion:null, sustrato:null, rellenar_deposito:null}}, []);
+  assert.ok(fromServer.includes('Planta 2 · 4 chiles') && (fromServer.match(/Sin registros/g) || []).length === 3, 'las fichas usan «latest»');
   assert.equal((careStatus.match(/Sin registros/g) || []).length, 3, 'lo anulado no cuenta y sin registros se dice');
   assert.ok(careList.includes('is-corrected'), 'la fila corregida trae su clase para el estilo');
   const idle = {hasDevice:true, active:null, history:[], orders:[], lastDiagnostic:null};
@@ -667,7 +678,7 @@ suite('depósito con flotador', async () => {
   const section = html => html.match(/<section class="bento-panel tank-history tank-section[\s\S]*?<\/section>/)[0];
   for(const key of Object.keys(STATES)) {
     const html = care(STATES[key]);
-    assert.ok(html.indexOf('tank-section') > 0 && html.indexOf('tank-section') < html.indexOf('data-care-status') && html.indexOf('tank-section') < html.indexOf('care-register'), `sección arriba (${key})`);
+    assert.ok(html.indexOf('data-care-status') > 0 && html.indexOf('data-care-status') < html.indexOf('tank-section') && html.indexOf('tank-section') < html.indexOf('care-register'), `sección después de los últimos cuidados (${key})`);
     assert.equal(html.split('Historial del depósito').length - 1, STATES[key].hasDevice ? 1 : 0, `un solo historial (${key})`);
     assert.equal((html.match(/aria-labelledby="tank-section-title"/g) || []).length, 1, `una sola sección (${key})`);
     assert.ok(section(html).includes(STATES[key].hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : '>Depósito de 19 L<'), `capacidad (${key})`);
@@ -699,12 +710,10 @@ suite('depósito con flotador', async () => {
     assert.ok(!html.includes('¿Ya lo rellenaste?') && !/refill-confirm|refill-discard/.test(html), 'solo nivel bajo: no pregunta por una recarga');
     assert.ok(tile(home('rellenar', tank(data))).includes(BADGE), 'solo nivel bajo: la ficha lleva a Mantenimiento');
   }
-  // Atajo «Rellené el depósito»: el mismo botón de siempre, desactivado con su motivo, sin repetir la sección.
-  const blockedCare = care(tank({averageSeconds:3 * 86400 + 4 * 3600, completedLoads:1}));
-  assert.ok(/data-garden-action="care-quick"[^>]*disabled aria-describedby="care-quick-reason"/.test(blockedCare) && blockedCare.includes('id="care-quick-reason"'));
-  assert.ok(!/data-garden-action="care-quick"[^>]*disabled/.test(care(tank({canRefill:true, refillBlock:null}))));
+  // Sin el atajo «Rellené el depósito» en el formulario; sin datos del depósito no hay sección.
+  assert.ok(!care(tank({averageSeconds:3 * 86400 + 4 * 3600, completedLoads:1})).includes('care-quick'));
   const noTank = Care.screen({status:'ready', gardens:[garden], garden, plants, tank:null});
-  assert.ok(noTank.includes('data-type="rellenar_deposito"') && !noTank.includes('tank-section"'), 'sin datos del depósito el atajo sigue y no hay sección');
+  assert.ok(noTank.includes('Registrar un cuidado') && !noTank.includes('tank-section"'), 'sin datos del depósito no hay sección');
   const row = item => Care.list({status:'ready', page:1, total:1, items:[{id:'a', type:'rellenar_deposito', plant:null, chiles:null, doneAt:'2026-11-18T14:00:00Z', voided:false, corrected:false, ...item}]});
   assert.ok(row({origin:'equipo'}).includes('Detectada por tu equipo'));
   assert.ok(!row({origin:'persona'}).includes('Detectada por tu equipo'));
@@ -736,15 +745,19 @@ suite('depósito con flotador', async () => {
   const control = bloque('controladores/huerto.js', 'Huerto'), source = read('controladores/huerto.js');
   const careControl = source.slice(source.indexOf('const CareController'), source.indexOf('const SupportController'));
   assert.ok(!/recordRefill|decideRefill|refill-confirm/.test(control.slice(control.indexOf('const GardenSummaryController'), control.indexOf('const GardenCreateController'))), 'Mi huerto sin acciones del depósito');
-  assert.match(careControl, /async function recordRefill\(\) \{\n\s+if\(await confirmar\(GardenViews\.confirmations\.refill\)\) await register\(\{type:'rellenar_deposito'\}\);/, '«Ya lo rellené» confirma antes de registrar');
-  assert.match(careControl, /action === 'care-quick' && type === 'rellenar_deposito'\) \{ if\(await confirmar\(GardenViews\.confirmations\.refill\)\) await register/, '«Rellené el depósito» usa la misma confirmación');
+  assert.match(careControl, /async function recordRefill\(\) \{\n\s+if\(working \|\| !await confirmar\(GardenViews\.confirmations\.refill\) \|\| working\) return;\n\s+working = true;\n\s+try \{ await register\(\{type:'rellenar_deposito'\}\); \} finally \{ working = false; \}/, '«Ya lo rellené» confirma antes de registrar y no se envía dos veces');
+  assert.match(careControl, /async function submitCare\(form\) \{\n\s+if\(working\) return;\n\s+const invalid = dates\.validate\(form\);/, 'registrar: sin doble envío y valida solo su formulario');
+  assert.match(careControl, /working = true;\n\s+try \{ if\(await register\(values\)\) CareViews\.reset\(root\); \} finally \{ working = false; \}/);
+  assert.match(careControl, /async function submitFilter\(form\) \{\n\s+const invalid = dates\.validate\(form\);/, 'el filtro valida solo su formulario');
+  assert.ok(!/care-quick|CareViews\.prepare/.test(careControl), 'sin el atajo retirado');
+  assert.match(careControl, /const id = \+\+caresSerial;[\s\S]*?id !== caresSerial\) return;/, 'el historial descarta respuestas viejas');
   assert.match(careControl, /if\(discard && !await confirmar\(GardenViews\.confirmations\['refill-discard'\]\)\) return;/);
   assert.match(careControl, /else if\(action === 'refill'\) await recordRefill\(\);/);
   assert.match(careControl, /action === 'refill-confirm' \|\| action === 'refill-discard'\) && !working\) await decideRefill/);
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.38'], 'todos los estáticos en mvc.38');
+  assert.deepEqual([...versions], ['?v=mvc.39'], 'todos los estáticos en mvc.39');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 

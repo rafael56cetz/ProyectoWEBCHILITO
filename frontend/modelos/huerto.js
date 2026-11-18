@@ -69,7 +69,7 @@ const GardenModel = (() => {
     if(minutes < 1) return 'hace menos de 1 min';
     if(minutes < 60) return `hace ${minutes} min`;
     if(minutes < 1440) return `hace ${Math.floor(minutes / 60)} h`;
-    return `hace ${Math.floor(minutes / 1440)} días`;
+    return `hace ${plural(Math.floor(minutes / 1440), 'día', 'días')}`;
   }
   // Línea de estado 3.2: tono y texto salen de la conexión del equipo y de su última lectura.
   function connection(device, now = Date.now()) {
@@ -102,7 +102,7 @@ const GardenModel = (() => {
     const [year, month, date] = value.split('-').map(Number);
     return {valid:true, at:new Date(year, month - 1, date, 12).toISOString()};
   }
-  const problems = checks => checks.filter(check => ['falla', 'sin_respuesta'].includes(check.result)).length;
+  const problems = (checks = []) => (checks || []).filter(check => ['falla', 'sin_respuesta'].includes(check.result)).length;
   // Tiempo que queda de una autorización: «18 h 42 min».
   function lapse(until, now = Date.now()) {
     const minutes = Math.max(0, Math.floor((Date.parse(until) - now) / 60000));
