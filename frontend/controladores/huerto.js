@@ -81,7 +81,7 @@ const GardenSummaryController = (() => {
     }
     // Tras una orden resuelta se vuelve a leer el huerto (p. ej. el estado de la lámpara) sin borrar la tarjeta.
     async function refreshQuietly(order) {
-      const detail = await service.detail(state.detail.garden.id, life.signal);
+      const detail = await service.detail(state.detail.garden.id, life.signal, {quiet:true});
       if(life.signal.aborted || detail.status !== 'ready') return;
       state = {...state, detail};
       paint();
@@ -340,9 +340,9 @@ const TechnicalController = (() => {
     let tracker = null, serial = 0, logSerial = 0, dataSerial = 0;
     const paint = () => GardenViews.paint(root, TechnicalViews.screen(state));
     const paintLog = () => GardenViews.fillSlot(root, '[data-log-panel]', TechnicalViews.logPanel(state.log));
-    async function loadLog(type, page) {
+    async function loadLog(type, page, {quiet = false} = {}) {
       const id = ++logSerial;
-      const result = await service.log(state.garden.id, type, page);
+      const result = await service.log(state.garden.id, type, page, {quiet});
       if(life.signal.aborted || id !== logSerial) return;
       state.log = result.status === 'ready' ? {type, status:'ready', items:result.items, page:result.page, total:result.total} : {type, status:'error', items:[], page:1, total:0};
     }
@@ -374,7 +374,7 @@ const TechnicalController = (() => {
       if(life.signal.aborted) return;
       if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code)); return; }
       tracker?.stop();
-      tracker = GardenOrderCard.track({root, order:result.command, service, signal:life.signal, onResolved:async () => { await loadLog(state.log.type, 1); paintLog(); }});
+      tracker = GardenOrderCard.track({root, order:result.command, service, signal:life.signal, onResolved:async () => { await loadLog(state.log.type, 1, {quiet:true}); paintLog(); }});
     }
     root.addEventListener('click', async event => {
       const trigger = event.target.closest('[data-garden-action]');

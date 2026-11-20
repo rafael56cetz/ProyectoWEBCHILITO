@@ -61,20 +61,20 @@ const ConsoleController = (() => {
       if(state.detail) ConsoleViews.lockOrders(root, state.detail.orders);
     }
 
-    async function loadInbox(page) {
-      const result = await service.inbox(state.tab, page);
+    async function loadInbox(page, {quiet = false} = {}) {
+      const result = await service.inbox(state.tab, page, {quiet});
       if(life.signal.aborted) return;
       state = result.status === 'ready' ? {...state, status:'ready', counts:result.counts, inbox:{items:result.items, page:result.page, total:result.total}} : {...state, status:'error'};
     }
-    async function loadCase() {
-      const result = await service.detail(folio);
+    async function loadCase({quiet = false} = {}) {
+      const result = await service.detail(folio, {quiet});
       if(life.signal.aborted) return;
       state = result.status === 'ready' ? {...state, status:'ready', detail:{case:result.case, diagnostic:result.diagnostic, session:result.session, orders:result.orders}}
         : {...state, status:result.code === 'not-found' || result.code === 'invalid-input' ? 'not-found' : 'error', detail:null};
     }
-    async function refresh({page = state.inbox.page} = {}) {
+    async function refresh({page = state.inbox.page, quiet = false} = {}) {
       const id = ++serial;
-      await (folio ? loadCase() : loadInbox(page));
+      await (folio ? loadCase({quiet}) : loadInbox(page, {quiet}));
       if(life.signal.aborted || id !== serial) return;
       paint();
       if(sessionId()) startPolling(); else stopPolling();
@@ -99,7 +99,7 @@ const ConsoleController = (() => {
     async function sessionEnded(reason) {
       stopPolling();
       mostrarAviso('info', ConsoleViews.closingText(reason));
-      await refresh();
+      await refresh({quiet:true});
     }
 
     async function closeSession() {
@@ -182,11 +182,12 @@ const InquiryController = (() => {
     async function refresh() {
       if(busy || document.visibilityState !== 'visible') return;
       const result = await service.list(state, page, {background:true});
-      if(!life.signal.aborted && !busy && result.status === 'ready' && signature(result) !== shown) await load();
+      // La recarga también va como sondeo: una consulta nueva no alarga la sesión de quien no está tocando la consola.
+      if(!life.signal.aborted && !busy && result.status === 'ready' && signature(result) !== shown) await load({quiet:true});
     }
-    async function load() {
+    async function load({quiet = false} = {}) {
       view.loading();
-      const result = await service.list(state, page);
+      const result = await service.list(state, page, {background:quiet});
       if(life.signal.aborted) return;
       view.filter(state);
       if(result.status !== 'ready') { view.failed(result.status); return; }

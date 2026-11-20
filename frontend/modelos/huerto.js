@@ -23,7 +23,8 @@ const GardenService = (() => {
   return Object.freeze({
     validId,
     list: signal => call(base, {signal}),
-    detail: (id, signal) => get(garden(id), {signal}),
+    // `quiet`: lectura automática tras un sondeo (orden resuelta). No cuenta como actividad de la sesión.
+    detail: (id, signal, {quiet = false} = {}) => get(garden(id), {signal, headers:quiet ? background : undefined}),
     create: name => post(base, name ? {name} : {}),
     rename: (id, name) => post(garden(id, '/renombrar'), {name}),
     archive: id => post(garden(id, '/archivar')),
@@ -38,7 +39,7 @@ const GardenService = (() => {
     orderState: (orderId, signal) => get(validUuid(orderId) ? `/api/comandos/${orderId}` : null, {signal, headers:background}),
     care: (id, values) => post(garden(id, '/cuidados'), values),
     telemetry: (id, range, signal) => get(garden(id, `/telemetria${query({rango:range})}`), {signal}),
-    log: (id, type, page) => get(garden(id, `/bitacora${query({tipo:type, page:Number(page) || 1})}`)),
+    log: (id, type, page, {quiet = false} = {}) => get(garden(id, `/bitacora${query({tipo:type, page:Number(page) || 1})}`), {headers:quiet ? background : undefined}),
     cares: (id, filters, page) => get(garden(id, `/cuidados${query({...filters, page:Number(page) || 1})}`)),
     tank: (id, signal) => get(garden(id, '/deposito'), {signal}),
     // Recarga detectada por el flotador: la confirma o la descarta el dueño (solo una pendiente por huerto).

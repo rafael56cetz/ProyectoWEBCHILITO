@@ -15,8 +15,9 @@ const ConsoleService = (() => {
   const post = (url, body = {}) => AdminHTTP.call(url, {method:'POST', body});
   return Object.freeze({
     results, bombSeconds,
-    inbox: (state, page) => AdminHTTP.call(cases + AdminHTTP.query({estado:state, page})),
-    detail: folio => AdminHTTP.call(/^CS-[0-9A-F]{8}$/.test(folio) ? `${cases}/${folio}` : null),
+    // `quiet`: recarga automática tras un sondeo (sesión técnica cerrada). No cuenta como actividad de la sesión.
+    inbox: (state, page, {quiet = false} = {}) => AdminHTTP.call(cases + AdminHTTP.query({estado:state, page}), quiet ? {headers:{'X-Chilito-Sondeo':'1'}} : {}),
+    detail: (folio, {quiet = false} = {}) => AdminHTTP.call(/^CS-[0-9A-F]{8}$/.test(folio) ? `${cases}/${folio}` : null, quiet ? {headers:{'X-Chilito-Sondeo':'1'}} : {}),
     attend: id => post(path(cases, id, '/atender')),
     connect: id => post(path(cases, id, '/conectar')),
     resolve: (id, result, note) => post(path(cases, id, '/resolver'), {result, note}),

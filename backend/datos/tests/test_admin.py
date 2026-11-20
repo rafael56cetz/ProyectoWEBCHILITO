@@ -1,11 +1,13 @@
 """Administración nueva sobre PostgreSQL temporal: equipos, administradores, ventas (aquí) con cuenta con y sin capacidad."""
 import json
+import time as time_module
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.db import connection
 from django.test import Client, TestCase
@@ -16,6 +18,7 @@ from datos.models import (Auditoria, Comando, Cuidado, Dispositivo, DispositivoE
                           SoporteCaso, SoporteSesion, Venta)
 from huerto.services import ZONA_MERIDA
 from tests import cuenta, publicar_textos
+from web import sesion
 from web.models import Idempotencia
 
 MAC = '02:00:00:00:aa:{:02x}'
@@ -581,6 +584,43 @@ class Consola(BaseAdmin):
         cerrada = SoporteSesion.objects.get(pk=sesion)
         self.assertEqual((cerrada.motivo_cierre, cerrada.cerrada_en is not None), ('cierre_sesion', True))
         self.assertTrue(Auditoria.objects.filter(actor=self.ana, accion='cerrar_sesion_tecnica', detalle={'motivo': 'cierre_sesion'}).exists())
+
+    @staticmethod
+    def inactiva(cliente, segundos):
+        """Lleva la última actividad registrada de la sesión del cliente `segundos` atrás (marca del servidor)."""
+        datos = cliente.session
+        datos[sesion.VISTO] = int(time_module.time()) - segundos
+        datos.save()
+        return datos.session_key
+
+    def test_vencer_por_inactividad_cierra_la_sesion_tecnica(self):
+        # ASVS V7: al vencer en el servidor se borra la sesión de la cuenta y se termina la sesión técnica de soporte.
+        tecnica = self.conectar()
+        llave = self.inactiva(self.admin_ana, 601)
+        self.assertEqual(self.admin_ana.get('/api/cuenta').status_code, 401)
+        self.assertFalse(Session.objects.filter(session_key=llave).exists())
+        cerrada = SoporteSesion.objects.get(pk=tecnica)
+        self.assertEqual((cerrada.motivo_cierre, cerrada.cerrada_en is not None), ('cierre_sesion', True))
+        self.assertTrue(Auditoria.objects.filter(actor=self.ana, accion='cerrar_sesion_tecnica', detalle={'motivo': 'cierre_sesion'}).exists())
+
+    def test_una_capacidad_real_aplica_los_10_minutos(self):
+        # Sin simular is_admin: la concesión directa basta para el límite de administrador; la persona dueña conserva sus 15 min.
+        self.inactiva(self.admin_ana, 601)
+        self.inactiva(self.persona, 601)
+        self.assertEqual(self.admin_ana.get('/api/cuenta').status_code, 401)
+        self.assertEqual(self.persona.get('/api/cuenta').status_code, 200)
+        self.inactiva(self.admin_beto, 599)
+        self.assertEqual(self.admin_beto.get('/api/cuenta').status_code, 200)
+
+    def test_el_sondeo_no_mantiene_viva_la_consola(self):
+        # La consola abierta sin tocarla sondea con X-Chilito-Sondeo: eso no renueva la actividad y la sesión vence igual.
+        tecnica = self.conectar()
+        self.inactiva(self.admin_ana, 540)
+        self.assertEqual(self.admin_ana.get(f'/api/admin/sesiones/{tecnica}', HTTP_X_CHILITO_SONDEO='1').status_code, 200)
+        datos = self.admin_ana.session
+        self.assertLessEqual(datos[sesion.VISTO], int(time_module.time()) - 540)
+        self.inactiva(self.admin_ana, 601)
+        self.assertEqual(self.admin_ana.get(f'/api/admin/sesiones/{tecnica}', HTTP_X_CHILITO_SONDEO='1').status_code, 401)
 
     def test_una_sola_sesion_abierta_por_administrador(self):
         self.conectar()

@@ -297,6 +297,18 @@ suite('contrato de adaptadores', async () => {
   assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/accion`); assert.deepEqual(JSON.parse(calls.at(-1).options.body), {type:'probar_bomba', plant:1, duration:3});
   await evaluate("ConsoleService.detail('CS-1A2B3C4D')");
   assert.equal(calls.at(-1).path, '/api/admin/soporte/CS-1A2B3C4D');
+  // Recargas automáticas tras un sondeo (quiet): van como sondeo y no alargan la sesión. Las que pide la persona, no.
+  const sondeo = () => calls.at(-1).options.headers['X-Chilito-Sondeo'];
+  assert.equal(sondeo(), undefined);
+  await evaluate("ConsoleService.detail('CS-1A2B3C4D', {quiet:true})"); assert.equal(sondeo(), '1');
+  await evaluate("ConsoleService.inbox('abierto', 1)"); assert.equal(sondeo(), undefined);
+  await evaluate("ConsoleService.inbox('abierto', 1, {quiet:true})"); assert.equal(sondeo(), '1');
+  await evaluate("GardenService.detail('1')"); assert.equal(sondeo(), undefined);
+  await evaluate("GardenService.detail('1', undefined, {quiet:true})"); assert.equal(calls.at(-1).path, '/api/huertos/1'); assert.equal(sondeo(), '1');
+  await evaluate("GardenService.log('1', 'riego', 1)"); assert.equal(sondeo(), undefined);
+  await evaluate("GardenService.log('1', 'riego', 1, {quiet:true})"); assert.match(calls.at(-1).path, /^\/api\/huertos\/1\/bitacora/); assert.equal(sondeo(), '1');
+  await evaluate("InquiryService.list('', 1)"); assert.equal(sondeo(), undefined);
+  await evaluate("InquiryService.list('', 1, {background:true})"); assert.equal(sondeo(), '1');
   await evaluate(`ConsoleService.endSession('${caso}')`);
   assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/cerrar`); assert.equal(calls.at(-1).options.keepalive, undefined);
   assert.equal(evaluate("typeof AdminService"), 'undefined');
@@ -793,7 +805,7 @@ suite('depósito con flotador', async () => {
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.41'], 'todos los estáticos en mvc.41');
+  assert.deepEqual([...versions], ['?v=mvc.46'], 'todos los estáticos en mvc.46');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 
