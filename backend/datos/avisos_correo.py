@@ -43,12 +43,12 @@ def _mensaje(aviso):
                   f'Incidente: {INCIDENTES.get(caso.incidente, "Otro")}\n'
                   f'Fecha: {timezone.localtime(caso.creado_en):%Y-%m-%d %H:%M}\n\n'
                   f'Consúltalo en el panel: {_enlace("admin/soporte")}\n')
-        return soporte, f'[El Chilito] Nuevo caso de soporte {caso.folio}', cuerpo, None
+        return soporte, f'[YouGarden] Nuevo caso de soporte {caso.folio}', cuerpo, None
     consulta = aviso.consulta
     cuerpo = (f'Consulta {consulta.folio}\n'
               f'Nombre: {consulta.nombre or "Sin indicar"}\nCorreo: {consulta.correo}\n\n{consulta.mensaje}\n\n'
               f'Gestiónala en el panel: {_enlace("admin/solicitudes")}\n')
-    return soporte, '[El Chilito] Pregunta sobre el producto', cuerpo, consulta.correo
+    return soporte, '[YouGarden] Pregunta sobre el producto', cuerpo, consulta.correo
 
 
 def enviar_de_consulta(consulta):

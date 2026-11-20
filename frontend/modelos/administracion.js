@@ -70,7 +70,7 @@ const InquiryService = (() => {
     replyHref(item) {
       const valid = value => typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
       if(!valid(item.email)) return null;
-      const query = new URLSearchParams({view:'cm', fs:'1', to:item.email, su:`Re: [El Chilito] Pregunta sobre el producto (${item.folio})`});
+      const query = new URLSearchParams({view:'cm', fs:'1', to:item.email, su:`Re: [YouGarden] Pregunta sobre el producto (${item.folio})`});
       const account = ChilitoHTTP.configuration?.supportContact;
       if(valid(account)) query.set('authuser', account);
       return 'https://mail.google.com/mail/?'+query;
@@ -84,15 +84,34 @@ const AdminHTTP = (() => {
   const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value);
   const validUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
   const query = values => { const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== '' && value != null)); return params.size ? `?${params}` : ''; };
-  async function call(path, {method = 'GET', body, signal, headers} = {}) {
+  // Acciones críticas (M-2): el servidor pide confirmar la contraseña si no se hizo en los últimos 5 minutos
+  // (403 «reauthentication-required»). El controlador registra cómo pedirla; tras confirmarla se reintenta una sola vez.
+  let reauthenticate = async () => false;
+  const asksReauthentication = (http, code) => http === 403 && code === 'reauthentication-required';
+  async function call(path, {method = 'GET', body, signal, headers} = {}, retried = false) {
     if(!path) return {status:'error', code:'invalid-input'};
     try {
       const response = await ChilitoHTTP.request(path, {method, body, signal, headers});
       if(response.http === 401) { ChilitoHTTP.sessionExpired(); return {status:'error', code:'unauthenticated'}; }
+      if(!retried && asksReauthentication(response.http, response.body?.code) && await reauthenticate()) return call(path, {method, body, signal, headers}, true);
       return response.http === 200 ? response.body : {status:'error', code:response.body?.code || 'unavailable'};
     } catch { return {status:'error', code:'network'}; }
   }
-  return Object.freeze({validId, validUuid, query, call});
+  // Descarga de un archivo (CSV): misma regla de reautenticación; el archivo vuelve como Blob para que la vista lo guarde.
+  async function download(path, retried = false) {
+    try {
+      const response = await fetch(path, {credentials:'same-origin', cache:'no-store', redirect:'error', headers:{Accept:'text/csv, application/json'}});
+      if(response.status === 401) { ChilitoHTTP.sessionExpired(); return {status:'error', code:'unauthenticated'}; }
+      if(response.status !== 200) {
+        let code = 'unavailable';
+        try { code = (await response.json())?.code || code; } catch { /* sin cuerpo JSON */ }
+        if(!retried && asksReauthentication(response.status, code) && await reauthenticate()) return download(path, true);
+        return {status:'error', code};
+      }
+      return {status:'ready', blob:await response.blob()};
+    } catch { return {status:'error', code:'network'}; }
+  }
+  return Object.freeze({validId, validUuid, query, call, download, onReauthentication(handler) { reauthenticate = handler; }});
 })();
 
 // ── Ventas ──
@@ -163,10 +182,23 @@ const LegalAdminService = (() => {
 // ── Consentimientos ──
 const ConsentService = (() => {
   const base = '/api/admin/consentimientos';
+  // «Hoy» es el día de Mérida, el mismo que usa el servidor para filtrar por fecha.
+  const today = () => MaintenanceDates.parse(new Intl.DateTimeFormat('en-CA', {timeZone:'America/Merida', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date())) || MaintenanceDates.today();
+  const BACK = {hoy:0, 7:6, 30:29};
+  // Rangos rápidos: «todo», «hoy», «7» y «30» (días, incluido hoy). El nombre del rango nunca viaja al servidor; solo desde/hasta.
+  function range(preset) {
+    if(!Object.hasOwn(BACK, preset)) return {desde:'', hasta:''};
+    const end = today();
+    return {desde:MaintenanceDates.format(MaintenanceDates.shift(end, -BACK[preset])), hasta:MaintenanceDates.format(end)};
+  }
   return Object.freeze({
+    range,
     list: (filters, page) => AdminHTTP.call(base + AdminHTTP.query({...filters, page})),
+    // Padrón de cuentas: estado (todas, activas o inactivas), búsqueda por correo y fechas de creación.
+    accounts: (filters, page) => AdminHTTP.call(`${base}/cuentas` + AdminHTTP.query({...filters, page})),
     summary: () => AdminHTTP.call(`${base}/resumen`),
-    // La exportación es una descarga del navegador, no una llamada: aquí solo se arma su dirección.
-    exportUrl: filters => `${base}/exportar${AdminHTTP.query(filters)}`
+    exportUrl: filters => `${base}/exportar${AdminHTTP.query(filters)}`,
+    // Exportar exige contraseña reciente: se descarga con fetch para poder pedirla y reintentar.
+    download: filters => AdminHTTP.download(`${base}/exportar${AdminHTTP.query(filters)}`)
   });
 })();

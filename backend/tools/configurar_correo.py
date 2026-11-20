@@ -17,7 +17,7 @@ if not password:raise SystemExit('No se guardó configuración vacía')
 value={'CHILITO_SMTP_ENABLED':'1','CHILITO_SMTP_HOST':a.host,'CHILITO_SMTP_PORT':str(a.puerto),
  'CHILITO_SMTP_USER':a.remitente,'CHILITO_SMTP_PASSWORD':password,
  'CHILITO_SMTP_RECIPIENT_MODE':'any-valid' if a.registro_publico else 'restricted',
- 'CHILITO_SMTP_ALLOWED_RECIPIENTS':a.destinatarios,'CHILITO_FROM_EMAIL':'El Chilito <'+a.remitente+'>'}
+ 'CHILITO_SMTP_ALLOWED_RECIPIENTS':a.destinatarios,'CHILITO_FROM_EMAIL':'YouGarden <'+a.remitente+'>'}
 destination.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
 fd,name=tempfile.mkstemp(prefix='.smtp-',dir=destination.parent)
 try:

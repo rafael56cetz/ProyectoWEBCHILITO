@@ -42,12 +42,13 @@ const PrivacyData = (() => {
     welcome: values => post('/api/cuenta/bienvenida', values),
     acceptLegal: documents => post('/api/legales/aceptar', {documents}),
     acceptances: () => send('/api/cuenta/aceptaciones'),
-    cancelDeletion: () => post('/api/cuenta/eliminar/cancelar', {}),
-    // Pide borrar la cuenta con la contraseña: una contraseña incorrecta es 400 y se distingue de un fallo del servicio.
+    // Borra la cuenta de inmediato con la contraseña. 200 = ya no existe. Una contraseña incorrecta es 400 y se distingue de un
+    // fallo del servicio; 409 = cuenta con capacidades o con historial administrativo en registros ajenos.
     async requestDeletion(password) {
       try {
         const response = await ChilitoHTTP.request('/api/cuenta/eliminar', {method:'POST', body:{password}});
-        if(response.http === 200) return response.body;
+        if(response.http === 200 && response.body?.status === 'deleted') return {status:'deleted'};
+        if(response.http === 409) return {status:response.body?.code === 'cuenta-con-historial-administrativo' ? 'admin-history' : 'admin-account'};
         return {status:{400:'wrong-password', 401:'unauthenticated', 429:'limited'}[response.http] || 'unavailable'};
       } catch { return {status:'unavailable'}; }
     }
@@ -92,6 +93,9 @@ const AppModel = (() => {
   const supportMailUrl=()=>{const contact=ChilitoHTTP.configuration?.supportContact;
     return typeof contact==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)?'https://mail.google.com/mail/?authuser='+encodeURIComponent(contact):null;};
   const adminHome=session=>allowedAdmin(session)[0]?.id||'huerto';
+  // Quien administra a los administradores o los textos legales nunca queda atrapado en «Aceptar textos»: sin el panel
+  // nadie podría corregir ni publicar los textos. Se le recuerda que los tiene pendientes (aviso y campana).
+  const legalGateExempt=session=>['gestionar_administradores','gestionar_legales'].some(cap=>(session?.capabilities||[]).includes(cap));
   // Panel de cada sesión completa. El servidor sigue decidiendo qué puede abrirse.
   const panelHome=session=>session?.role==='admin'?(session.profile?.mfaRequired?'#cuenta/seguridad':'#'+adminHome(session)):'#huerto';
   const alias=session=>{const value=session?.profile?.profile?.alias;return typeof value==='string'?value.trim():'';};
@@ -121,10 +125,8 @@ const AppModel = (() => {
     if(items.some(item => !item) || new Set(items.map(item => item.id)).size !== items.length) return {status:'error', items:[], page:1, total:0};
     return {status:items.length ? 'ready' : 'empty', items, page:Number.isInteger(data.page) ? data.page : 1, total:Number.isInteger(data.total) ? data.total : items.length};
   }
-  // Fecha en que se borrará la cuenta, si la persona la pidió (la fija el servidor).
-  const deletionDate = session => dateValid(session?.profile?.deletionDate) ? session.profile.deletionDate : null;
   return {
-    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminMenu,adminRedirects,adminHome,panelHome,alias,addressed,gardenGreeting,notices,notice,idValid,deletionDate,NOTICE_FILTERS,
+    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminMenu,adminRedirects,adminHome,panelHome,legalGateExempt,alias,addressed,gardenGreeting,notices,notice,idValid,NOTICE_FILTERS,
     isPrivate(screen) { return screen === 'admin' || destinations.some(item=>item.id===screen); },
     profile(data={}) { return data.status==='ready' && text(data.email) && data.verified===true
       ? {email:data.email,verified:true,status:'ready',firstName:(data.profile||data).firstName||'',lastName:(data.profile||data).lastName||'',alias:(data.profile||data).alias||'',greeting:(data.profile||data).greeting||''} : {email:null,verified:null,status:'error'}; },
@@ -145,8 +147,7 @@ const AppService = (() => {
     'mark-read':p => ({path:`/api/avisos/${p.id}/leido`, method:'POST', needsId:true}),
     'mark-resolved':p => ({path:`/api/avisos/${p.id}/resuelto`, method:'POST', needsId:true}),
     'mark-all-read':() => ({path:'/api/avisos/leer-todos', method:'POST'}),
-    counter:() => ({path:'/api/avisos/contador', headers:background}),
-    'cancel-deletion':() => ({path:'/api/cuenta/eliminar/cancelar', method:'POST'})
+    counter:() => ({path:'/api/avisos/contador', headers:background})
   };
   function adapt(action, body) {
     if(action === 'profile') return AppModel.profile(body);

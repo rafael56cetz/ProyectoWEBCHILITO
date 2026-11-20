@@ -29,15 +29,19 @@ def _esperar(texto):
         cursor.execute('SELECT pg_advisory_xact_lock(%s)', [_bloqueo(texto)])
 
 
-def dentro_de_cuota(actor, ruta):
+# Peticiones por minuto y cuenta. «read-heavy»: lecturas costosas (exportación CSV y telemetría), B-2.
+LIMITES_POR_MINUTO = {'write': 60, 'technical': 15, 'read-heavy': 30}
+
+
+def dentro_de_cuota(actor, ruta, alcance=None):
     tramo = int(timezone.now().timestamp()) // 60
-    alcance = 'technical' if '/soporte/' in ruta or '/sesiones/' in ruta else 'write'
+    alcance = alcance or ('technical' if '/soporte/' in ruta or '/sesiones/' in ruta else 'write')
     clave = f'web-rate:{actor.pk}:{alcance}:{tramo}'
     with transaction.atomic():
         _esperar(clave)
         total = cache.get(clave, 0) + 1
         cache.set(clave, total, 120)
-    return total <= (15 if alcance == 'technical' else 60)
+    return total <= LIMITES_POR_MINUTO[alcance]
 
 
 def _sin_secretos(valor):

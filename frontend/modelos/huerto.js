@@ -64,6 +64,9 @@ const GardenModel = (() => {
     conexion:'Conexión inestable', otro:'Otro problema'});
   const CARE_NEEDS_PLANT = ['sustrato', 'germinacion', 'cosecha'];
   const CARE_WINDOW_DAYS = 7;
+  // El huerto elegido se recuerda en la visita (también al recargar), para no llevar su número en la dirección.
+  const KEY = 'huerto-elegido';
+  const store = () => { try { return typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { return null; } };
   let chosen = null;
   function ago(value, now = Date.now()) {
     const minutes = Math.floor((now - Date.parse(value)) / 60000);
@@ -88,11 +91,13 @@ const GardenModel = (() => {
     const values = plants.map(plant => plant.moisture).filter(Number.isFinite);
     return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
   }
+  // Un huerto está vinculado cuando tiene su equipo. Sin equipo se ve todo, pero no se registra ni se ordena nada.
+  const linked = garden => Boolean(garden?.device);
   function pick(gardens, requested) {
-    return gardens.find(item => item.id === requested) || gardens.find(item => item.id === chosen) || gardens[0] || null;
+    return gardens.find(item => item.id === requested) || gardens.find(item => item.id === (chosen ?? store()?.getItem(KEY))) || gardens[0] || null;
   }
-  const remember = id => { chosen = id; };
-  const reset = () => { chosen = null; };
+  const remember = id => { chosen = id; try { store()?.setItem(KEY, id); } catch {} };
+  const reset = () => { chosen = null; try { store()?.removeItem(KEY); } catch {} };
   // El código se escribe en el equipo como XXXX-XXXX; aquí solo se agrupa para mostrarlo.
   const groupCode = code => typeof code === 'string' ? code.replace(/^(.{4})(.{4})$/, '$1-$2') : '';
   // «Cuándo» del cuidado: vacío o hoy es ahora (lo fija el servidor); otro día, a mediodía. Hasta 7 días atrás y nunca futuro.
@@ -247,7 +252,7 @@ const GardenModel = (() => {
   // Algo por hacer en Mantenimiento: nivel bajo sin recarga registrada o una recarga detectada por confirmar.
   const tankPending = (tank, now = Date.now()) => tankStage(tank) === 'rellenar' || Boolean(pendingRefill(tank, now));
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
-    pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
+    pick, linked, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
     CYCLE_REASONS, cycleRange, cycleTitle, meridaWhen, meridaDay, meridaShort, meridaForecast, refillMarks, tankFacts, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
 })();
 

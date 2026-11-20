@@ -19,6 +19,8 @@ const GardenViews = (() => {
     'deposito-resuelta':'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.',
     'deposito-espera':'Ya registraste una recarga hace menos de 12 horas.',
     'cuidado-ciclo-anterior':'Esa fecha es de un ciclo que ya terminaste. Elige una fecha desde que empezó el ciclo actual.',
+    'huerto-requerido':'Primero crea tu huerto y vincula tu equipo. Mientras tanto, puedes recorrer las secciones.',
+    'huerto-sin-vincular':'Vincula el equipo de este huerto para registrar cuidados, editar plantas o dar órdenes. Mientras tanto puedes ver toda su información.',
     'rate-limited':'Demasiados intentos. Espera un momento.'};
   const errorText = (code, fallback = 'No se pudo completar la solicitud. Inténtalo de nuevo.') => ERRORS[code] || fallback;
   const tag = (text, tone = 'gris') => `<span class="badge tone-${tone}">${escaparHTML(text)}</span>`;
@@ -34,8 +36,8 @@ const GardenViews = (() => {
     const {phrase} = AppModel.gardenGreeting(name);
     // Mismo texto que «Hola, alias · huerto», con un peso distinto para cada parte.
     const garden = gardenName ? `<span class="garden-welcome-garden">${name ? '<span class="garden-welcome-dot"> · </span>' : ''}${escaparHTML(gardenName)}</span>` : '';
-    const title = name ? `<span class="garden-welcome-hello">Hola, </span><span class="garden-welcome-name">${escaparHTML(name)}</span>${garden}` : garden || 'Te damos la bienvenida a El Chilito';
-    const lead = name && !gardenName ? '<p class="garden-welcome-lead">Te damos la bienvenida a El Chilito.</p>' : '';
+    const title = name ? `<span class="garden-welcome-hello">Hola, </span><span class="garden-welcome-name">${escaparHTML(name)}</span>${garden}` : garden || 'Te damos la bienvenida a YouGarden';
+    const lead = name && !gardenName ? '<p class="garden-welcome-lead">Te damos la bienvenida a YouGarden.</p>' : '';
     return `<div class="garden-welcome"><h1>${title}</h1>${lead}<p class="garden-welcome-phrase">${escaparHTML(phrase)}</p></div>`;
   }
   // Título de Panel técnico, Mantenimiento y Soporte con la misma tipografía del saludo: pantalla y, debajo, el huerto.
@@ -59,27 +61,42 @@ const GardenViews = (() => {
     return status ? `<div class="user-status-line tone-${status.tone}"><span class="user-status-mark" aria-hidden="true">${icon(status.tone === 'rojo' ? 'off' : 'wifi')}</span><p>${escaparHTML(status.text)}</p></div>` : '';
   }
 
-  const emptyGarden = name => `${welcome(name)}
-    <section class="bento-panel garden-empty"><div class="garden-empty-art" aria-hidden="true">${[1, 2, 3].map(plantDrawing).join('')}</div>
-      <h2>Aún no tienes un huerto</h2>
-      <p>Crea tu huerto en la página y después conecta tu equipo El Chilito con el código que te daremos.</p>
-      <a class="button btn-liquid-brand" href="#huerto/nuevo">Crear mi huerto</a>
-      <a class="garden-empty-link" href="#consiguelo">¿Todavía no tienes tu equipo? Conoce El Chilito${icon('external')}</a></section>
-    <section class="bento-panel user-care"><span class="icon-medallion">${icon('leaf')}</span><h3>Guías de cuidado</h3><p>Aprende cómo cuidar tus plantas de habanero antes de empezar.</p><a class="button btn-liquid-light" href="#mantenimiento/guias">Ver guías</a></section>`;
+  // Sin huerto activo: cada sección se ve con su estructura real, pero dentro de un <fieldset disabled> (solo lectura).
+  // El servidor rechaza igualmente cualquier escritura con 403 «huerto-requerido».
+  const PREVIEW_PLANTS = Object.freeze([1, 2, 3].map(number => Object.freeze({number, name:`Planta ${number}`, stage:'sin_sembrar', moisture:null, daysSown:null, adc:null, measuredAt:null})));
+  // Sin huerto (o con el huerto elegido sin vincular): aviso arriba y, fuera del bloqueo, el único paso que falta.
+  const lockNote = (what, garden = null) => garden
+    ? `<section class="bento-panel garden-empty garden-lock-note" id="garden-lock-note" role="status"><h2>Tu huerto «${escaparHTML(garden.name)}» aún no está vinculado</h2>
+    <p>Puedes ver toda su información. Para ${what}, primero vincula el equipo de este huerto.</p>
+    <a class="button btn-liquid-brand" href="${withGarden('huerto/vincular', garden.id)}">Vincular equipo</a></section>`
+    : `<section class="bento-panel garden-empty garden-lock-note" id="garden-lock-note" role="status"><h2>Aún no tienes un huerto</h2>
+    <p>Puedes recorrer esta sección para conocer cómo funciona. Para ${what}, primero crea tu huerto y vincula tu equipo.</p>
+    <a class="button btn-liquid-brand" href="#huerto/nuevo">Crear mi huerto</a></section>`;
+  const locked = (html, note = 'garden-lock-note') => `<fieldset class="garden-locked" disabled aria-describedby="${note}"><legend class="sr-only">Vista previa: sin huerto no se puede operar</legend>${html}</fieldset>`;
 
-  function plantCard(plant, gardenId) {
+  const emptyGarden = name => `${welcome(name)}
+    <section class="bento-panel garden-empty" id="garden-lock-note"><div class="garden-empty-art" aria-hidden="true">${[1, 2, 3].map(plantDrawing).join('')}</div>
+      <h2>Aún no tienes un huerto</h2>
+      <p>Crea tu huerto en la página y después conecta tu equipo YouGarden con el código que te daremos.</p>
+      <a class="button btn-liquid-brand" href="#huerto/nuevo">Crear mi huerto</a>
+      <a class="garden-empty-link" href="#consiguelo">¿Todavía no tienes tu equipo? Conoce YouGarden${icon('external')}</a></section>
+    <section class="bento-panel user-care"><span class="icon-medallion">${icon('leaf')}</span><h3>Guías de cuidado</h3><p>Aprende cómo cuidar tus plantas de habanero antes de empezar.</p><a class="button btn-liquid-light" href="#mantenimiento/guias">Ver guías</a></section>
+    ${locked(`<section aria-labelledby="plants-title"><div class="panel-heading"><h2 id="plants-title">Así se verán tus tres plantas</h2></div><div class="plant-grid">${PREVIEW_PLANTS.map(plant => plantCard(plant, '', false)).join('')}</div></section>${quickActions({lamp:null})}`)}`;
+
+  function plantCard(plant, gardenId, linked = true) {
     const dry = Number.isFinite(plant.moisture) && plant.moisture < 35;
     const sown = plant.daysSown === null ? 'Sin fecha de siembra' : `Sembrada hace ${plant.daysSown} días`;
-    const moisture = Number.isFinite(plant.moisture) ? `<strong>${number(plant.moisture)}<small>%</small></strong><div class="sensor-track" aria-hidden="true"><span style="width:${plant.moisture}%"></span></div>` : '<strong class="absent">Sin lectura</strong>';
+    const moisture = Number.isFinite(plant.moisture) ? `<strong>${number(plant.moisture)}<small>%</small></strong><div class="sensor-track" aria-hidden="true"><span data-width="${Math.max(0, Math.min(100, Number(plant.moisture)))}"></span></div>` : '<strong class="absent">Sin lectura</strong>';
     return `<article class="plant-card plant-photo-${plant.number}${dry ? ' is-dry' : ''}"><div class="card-top">${tag(STAGES[plant.stage] || plant.stage)}${dry ? tag('Seca', 'ambar') : ''}</div>
       <div class="plant-name"><h3>${escaparHTML(plant.name)}</h3><p>${sown}</p></div>
       <div class="plant-reading"><span>${icon('drop')}Humedad del sustrato</span>${moisture}</div>
-      <a class="button btn-liquid-light" href="${withGarden(`huerto/plantas/${plant.number}`, gardenId)}">Ver planta<span class="sr-only">: ${escaparHTML(plant.name)}</span></a></article>`;
+      ${linked ? `<a class="button btn-liquid-light" href="#huerto/plantas/${plant.number}">Ver planta<span class="sr-only">: ${escaparHTML(plant.name)}</span></a>` : ''}</article>`;
   }
-  const plantsSection = (detail, title) => `<section aria-labelledby="plants-title"><div class="panel-heading"><h2 id="plants-title">${title}</h2></div><div class="plant-grid">${detail.plants.map(plant => plantCard(plant, detail.garden.id)).join('')}</div></section>`;
+  const plantsSection = (detail, title, linked = true) => `<section aria-labelledby="plants-title"><div class="panel-heading"><h2 id="plants-title">${title}</h2></div><div class="plant-grid">${detail.plants.map(plant => plantCard(plant, detail.garden.id, linked)).join('')}</div></section>`;
 
   function connectCard(garden) {
-    return `<section class="bento-panel garden-connect"><h2>Conecta tu equipo</h2>
+    return `<section class="bento-panel garden-connect"><h2 id="connect-title">Conecta tu equipo</h2>
+      <p class="user-small-copy">Hasta vincularlo puedes ver tus plantas y su depósito, pero no editarlas ni registrar cuidados.</p>
       <ol class="garden-steps"><li><strong>Genera tu código</strong><span>Vence en 10 minutos y solo sirve una vez.</span></li>
       <li><strong>Conéctate a la red Huerto-Setup de tu equipo</strong><span>Desde tu celular o computadora.</span></li>
       <li><strong>Escribe tu Wi-Fi y el código</strong><span>Después verás aquí cuando tu equipo quede conectado.</span></li></ol>
@@ -153,7 +170,8 @@ const GardenViews = (() => {
     if(status === 'error') return failed;
     if(!gardens.length) return emptyGarden(name);
     const head = selector(gardens, detail.garden);
-    if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${detail.tank ? tankPanel(detail.tank, detail.garden.id) : ''}${plantsSection(detail, 'Tus tres plantas')}`;
+    // B: huerto sin vincular. Se ve su depósito y sus plantas, bloqueados y sin «Ver planta», hasta conectar el equipo.
+    if(!detail.garden.device) return `${head}${welcome(name, detail.garden.name)}${connectCard(detail.garden)}${locked(`${detail.tank ? tankPanel(detail.tank, detail.garden.id) : ''}${plantsSection(detail, 'Tus tres plantas', false)}`, 'connect-title')}`;
     return `${head}<div class="home-head">${welcome(name, detail.garden.name)}${statusLine(detail.garden.device)}</div>${deviceNote(detail.garden.device)}${metrics(detail)}${plantsSection(detail, 'Tus tres plantas')}${summaryCard(detail.summary)}${quickActions(detail)}`;
   }
 
@@ -186,7 +204,7 @@ const GardenViews = (() => {
     const waiting = expired ? '<p role="alert">El código venció. Genera otro.</p>'
       : `<p role="status" class="link-waiting">Esperando a tu equipo… (vence en <span data-countdown>${GardenModel.clock(seconds)}</span>)</p>`;
     return `${head}<section class="bento-panel garden-form">${code ? codeBox(code, {seconds}) : ''}
-      <ol class="garden-steps"><li>Enchufa tu equipo El Chilito. Si ya lo habías configurado, mantén presionado su botón de configuración hasta que la pantalla lo indique.</li>
+      <ol class="garden-steps"><li>Enchufa tu equipo YouGarden. Si ya lo habías configurado, mantén presionado su botón de configuración hasta que la pantalla lo indique.</li>
       <li>En tu celular o computadora, conéctate a la red Wi-Fi <strong>Huerto-Setup-XXXX</strong> con la contraseña de la etiqueta del equipo.</li>
       <li>Abre <strong>192.168.4.1</strong> en tu navegador.</li><li>Escribe el nombre y la contraseña de tu Wi-Fi y el código que ves arriba.</li><li>Vuelve aquí: veremos cuando tu equipo quede conectado.</li></ol>
       ${waiting}<div class="app-actions">${button('generate', 'Generar otro código', 'brand')}<a class="button btn-liquid-light" href="${withGarden('huerto', garden.id)}">Cancelar</a></div>
@@ -294,7 +312,7 @@ const GardenViews = (() => {
     const sown = plant.sowingDate ? `Sembrada el ${AppViews.date(plant.sowingDate)}${plant.daysSown === null ? '' : ` (hace ${plant.daysSown} días)`}` : 'Sin fecha de siembra';
     const cycleLine = cycle ? `<p class="plant-cycle-current">${escaparHTML(`Ciclo ${cycle.number} · ${GardenModel.cycleRange(cycle)}`)}</p>` : '';
     const watering = lastWatering ? `Último riego: ${{automatico:'automático', usuario:'tuyo', soporte:'de soporte'}[lastWatering.origin] || escaparHTML(lastWatering.origin)}, ${lastWatering.duration ?? '—'} s, ${GardenModel.ago(lastWatering.at)}` : 'Sin riegos registrados';
-    return `<div class="plant-hero plant-photo-${plant.number}"><a class="garden-back" href="${withGarden('huerto', garden.id)}">← Mi huerto</a>
+    return `<div class="plant-hero plant-photo-${plant.number}"><a class="garden-back" href="#huerto">← Mi huerto</a>
       <div class="page-heading"><div><h1>Planta ${plant.number}${plant.name === `Planta ${plant.number}` ? '' : ` · ${escaparHTML(plant.name)}`}</h1><p>${escaparHTML(STAGES[plant.stage] || plant.stage)}${since} · ${sown}</p>${cycleLine}</div><div class="app-actions">${button('edit', 'Editar')}${cycle ? button('end-cycle', 'Terminar ciclo', 'light', 'data-danger="true"') : ''}</div></div></div>
       <div class="user-chart-toolbar"><h2>Humedad del sustrato</h2><div class="user-range-control" role="group" aria-label="Periodo">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>
       ${chart('Humedad del sustrato', series, '%', range, 'plant')}
@@ -333,11 +351,17 @@ const GardenViews = (() => {
     endCycle: (number, name, reason) => ({titulo:`¿Terminar el ciclo ${number} de ${name}?`,
       texto:`Motivo: ${GardenModel.CYCLE_REASONS[reason] || reason}. La planta volverá a «Sin sembrar». No se puede deshacer.`, accion:'Terminar ciclo', peligro:true})};
 
+  // Anchos de las barras (humedad): se fijan por CSSOM tras pintar. La CSP no admite atributos style en el HTML.
+  function widths(node) {
+    node.querySelectorAll?.('[data-width]').forEach(bar => { const value = Number(bar.dataset.width); if(Number.isFinite(value)) bar.style.width = `${value}%`; });
+  }
+
   return Object.freeze({
+    PREVIEW_PLANTS, lockNote, locked,
     tag, button, stat, selector, screenTitle, statusLine, loading, noGarden, codeBox, noDevice, orderTitle, orderStateTag, lineChart, chart,
     errorText, refillButton, summary, summaryList, orderCard, newGarden, linkWizard, plantPage, plantDialogs, pastCycles, myGardens, renameDialog, confirmations, failed,
-    paint(root, html) { root.innerHTML = html; },
-    fillSlot(root, selector, html) { const slot = root.querySelector(selector); if(slot) slot.innerHTML = html; },
+    paint(root, html) { root.innerHTML = html; widths(root); },
+    fillSlot(root, selector, html) { const slot = root.querySelector(selector); if(slot) { slot.innerHTML = html; widths(slot); } },
     countdown(root, seconds) { root.querySelectorAll('[data-countdown]').forEach(node => { node.textContent = GardenModel.clock(seconds); }); },
     dialog: root => root.querySelector('.garden-dialog'),
     openDialog(root, html) {
@@ -355,7 +379,7 @@ const GardenViews = (() => {
 // ── Operacion ──
 // Panel técnico, Mantenimiento y Soporte del huerto elegido. Todo dato del servidor entra con escaparHTML.
 const TechnicalViews = (() => {
-  const {button, stat, selector, screenTitle, statusLine, noGarden, noDevice, orderTitle, orderStateTag, lineChart, loading, failed} = GardenViews;
+  const {button, stat, selector, screenTitle, statusLine, noDevice, orderTitle, orderStateTag, lineChart, loading, failed, PREVIEW_PLANTS, lockNote, locked} = GardenViews;
   const ORIGINS = {usuario:'Tú', soporte:'Soporte', automatico:'Automático'};
   const EVENTS = {alta:'Alta del equipo', vinculado:'Vinculado', desvinculado:'Desvinculado', conectado:'Conectado', desconectado:'Desconectado',
     error:'Error', reinicio:'Reinicio', credencial_rotada:'Credencial renovada', firmware_actualizado:'Firmware actualizado', retirado:'Retirado'};
@@ -415,14 +439,26 @@ const TechnicalViews = (() => {
   const logPanel = log => `<div class="user-section-heading"><div><h2>Bitácora del equipo</h2><p>Órdenes, actuaciones y eventos de tu equipo.</p></div></div>
     <section class="bento-panel user-log-panel"><div class="user-range-control" role="group" aria-label="Tipo de registro">${LOG_TABS.map(([type, label]) => button('log-tab', label, log.type === type ? 'brand' : 'light', `data-log="${type}" aria-pressed="${log.type === type}"`)).join('')}</div><div data-log-body>${logTable(log)}</div></section>`;
 
+  // Sin huerto: la misma pantalla, vacía y dentro de un <fieldset disabled>.
+  function preview(state = null) {
+    const garden = state?.garden || null;
+    const plants = garden && state.data?.plants?.length ? state.data.plants : PREVIEW_PLANTS, range = '24h';
+    const data = {latest:null, hasLight:false, plants, range, garden:{device:{connection:'nunca', lastConnectionAt:null}},
+      series:{plants:plants.map(plant => ({number:plant.number, points:[]})), temperature:[], humidity:[], light:[]}};
+    const head = garden ? `${selector(state.gardens, garden, 'telemetria')}${screenTitle('Panel técnico', garden.name)}` : screenTitle('Panel técnico', 'Tu huerto');
+    return `${head}${lockNote('ver tus lecturas o regar tus plantas', garden)}${locked(`${cards(data)}${toolbar(range)}${charts(data)}${plantTable(plants)}${waterCard(plants)}${logPanel({type:'ordenes', status:'ready', items:[], page:1, total:0})}`)}`;
+  }
+
   function screen(state) {
     if(state.status === 'loading') return loading;
     if(state.status === 'error') return failed;
-    if(!state.gardens.length) return noGarden('Panel técnico');
+    if(!state.gardens.length) return preview();
     const {garden, data, range, log} = state;
-    if(!garden.device) return noDevice(state.gardens, garden, 'Panel técnico', 'telemetria');
-    const toolbar = `<div class="user-chart-toolbar"><div class="toolbar-title"><h2>Histórico de lecturas</h2>${button('reload', `${icon('refresh')}<span class="sr-only">Actualizar</span>`, 'light', 'aria-label="Actualizar" title="Actualizar"')}</div><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>`;
-    return `${selector(state.gardens, garden, 'telemetria')}<div class="home-head">${screenTitle('Panel técnico', garden.name)}${statusLine(garden.device)}</div>${cards(data)}${toolbar}${charts(data)}${plantTable(data.plants)}${waterCard(data.plants)}<div data-log-panel>${logPanel(log)}</div>`;
+    if(!GardenModel.linked(garden)) return preview(state);
+    return `${selector(state.gardens, garden, 'telemetria')}<div class="home-head">${screenTitle('Panel técnico', garden.name)}${statusLine(garden.device)}</div>${cards(data)}${toolbar(range)}${charts(data)}${plantTable(data.plants)}${waterCard(data.plants)}<div data-log-panel>${logPanel(log)}</div>`;
+  }
+  function toolbar(range) {
+    return `<div class="user-chart-toolbar"><div class="toolbar-title"><h2>Histórico de lecturas</h2>${button('reload', `${icon('refresh')}<span class="sr-only">Actualizar</span>`, 'light', 'aria-label="Actualizar" title="Actualizar"')}</div><div class="user-range-control" role="group" aria-label="Periodo del histórico">${GardenModel.RANGES.map(value => button('range', {'1h':'1 h', '24h':'24 h', '7d':'7 días', '30d':'30 días'}[value], range === value ? 'brand' : 'light', `data-range="${value}" aria-pressed="${range === value}"`)).join('')}</div></div>`;
   }
 
   const waterConfirmation = (plant, seconds) => ({titulo:`¿Regar ${plant}?`, texto:`Se enviará la orden a tu equipo para regar ${seconds} segundos. Si el depósito no tiene agua, no regará.`, accion:'Regar'});
@@ -433,7 +469,7 @@ const TechnicalViews = (() => {
 })();
 
 const CareViews = (() => {
-  const {tag, button, selector, screenTitle, noGarden, loading, failed, refillButton} = GardenViews;
+  const {tag, button, selector, screenTitle, loading, failed, refillButton, PREVIEW_PLANTS, lockNote, locked} = GardenViews;
   const TYPES = {rellenar_deposito:'Rellenar depósito', sustrato:'Revisar sustrato', germinacion:'Germinación', cosecha:'Cosecha', inspeccion:'Inspección'};
   // Solo presentación: el ícono de cada tipo en los chips y en el historial.
   const CARE_ICONS = {rellenar_deposito:'drop', sustrato:'layers', germinacion:'sprout', cosecha:'leaf', inspeccion:'eye'};
@@ -538,9 +574,17 @@ const CareViews = (() => {
   function screen(state) {
     if(state.status === 'loading') return loading;
     if(state.status === 'error') return failed;
-    if(!state.gardens.length) return noGarden('Mantenimiento');
+    if(!state.gardens.length) {
+      // Sin huerto: estructura visible y bloqueada; las guías de cuidado (solo lectura) siguen disponibles.
+      const plants = PREVIEW_PLANTS, tank = {status:'ready', tank:{hasWater:null}, loads:[]};
+      return `${screenTitle('Mantenimiento', 'Tu huerto', 'Registra los cuidados que realizas y consulta tu historial.')}${lockNote('registrar cuidados')}${locked(`<section class="care-status" aria-label="Últimos cuidados">${status({status:'ready', items:[], latest:{}}, plants)}</section><div>${tankSection(tank)}</div>${form(plants)}${filters(plants).replace('<div data-care-list></div>', list({status:'ready', items:[], page:1, total:0}))}`)}${CareGuideViews.slot()}`;
+    }
     const {garden, plants} = state;
-    return `${selector(state.gardens, garden, 'mantenimiento')}<div class="home-head">${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}</div><section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section><div data-care-tank>${tankSection(state.tank)}</div>${form(plants)}${filters(plants)}${CareGuideViews.slot()}`;
+    const head = `${selector(state.gardens, garden, 'mantenimiento')}<div class="home-head">${screenTitle('Mantenimiento', garden.name, 'Registra los cuidados que realizas y consulta tu historial.')}</div>`;
+    const body = `<section class="care-status" aria-label="Últimos cuidados" data-care-status>${status()}</section><div data-care-tank>${tankSection(state.tank)}</div>${form(plants)}${filters(plants)}`;
+    // Huerto sin vincular: su información real se ve, pero bloqueada; las guías (lectura) quedan fuera del bloqueo.
+    if(!GardenModel.linked(garden)) return `${head}${lockNote('registrar cuidados o recargas del depósito', garden)}${locked(body)}${CareGuideViews.slot()}`;
+    return `${head}${body}${CareGuideViews.slot()}`;
   }
 
   // Sección «Depósito de agua» (arriba de Mantenimiento): estado, lo que toca hacer según la fase que decide el servidor
@@ -703,7 +747,7 @@ const CareViews = (() => {
 })();
 
 const SupportViews = (() => {
-  const {tag, button, selector, screenTitle, noGarden, noDevice, loading, failed, orderTitle, orderStateTag} = GardenViews;
+  const {tag, button, selector, screenTitle, noDevice, loading, failed, orderTitle, orderStateTag, lockNote, locked} = GardenViews;
   const STATES = {abierto:['En espera', 'ambar'], en_atencion:['En revisión', 'verde']};
   const RESULTS = {solucionado:'Problema solucionado', sin_falla:'No se encontró ninguna falla', sin_respuesta:'Sin respuesta', otro:'Otro resultado'};
   const CHECKS = {conexion:'Conexión', sensor_ambiente:'Sensor de ambiente (SHT31)', sensor_luz:'Sensor de luz', sensor_sustrato_1:'Sustrato planta 1',
@@ -806,9 +850,9 @@ const SupportViews = (() => {
   function screen(state) {
     if(state.status === 'loading') return loading;
     if(state.status === 'error') return failed;
-    if(!state.gardens.length) return noGarden('Soporte técnico');
+    if(!state.gardens.length) return `${screenTitle('Soporte técnico', 'Tu huerto')}${lockNote('revisar tu equipo o pedir una revisión técnica')}${locked(`<div class="support-cards">${check({}, null)}${requestForm({lastDiagnostic:null})}</div>`)}`;
     const {garden, data, diagnostic} = state;
-    if(!data.hasDevice) return noDevice(state.gardens, garden, 'Soporte técnico', 'soporte');
+    if(!data.hasDevice) return `${selector(state.gardens, garden, 'soporte')}${screenTitle('Soporte técnico', garden.name)}${lockNote('revisar tu equipo o pedir una revisión técnica', garden)}${locked(`<div class="support-cards">${check({}, null)}${requestForm({lastDiagnostic:null})}</div>`)}`;
     const head = `${selector(state.gardens, garden, 'soporte')}${screenTitle('Soporte técnico', garden.name)}`;
     return `${head}${data.active ? activeCase(data) : `<div class="support-cards">${check(data, diagnostic)}${requestForm(data)}</div>`}${history(data.history)}`;
   }

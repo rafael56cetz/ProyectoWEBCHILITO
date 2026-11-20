@@ -52,7 +52,7 @@ class ContactoProducto(TestCase):
         self.assertEqual(mail.outbox[0].to, ['soporte@example.test'])
         self.assertEqual(mail.outbox[0].reply_to, ['ana@example.test'])
         self.assertIn('¿Cuánto costará?', mail.outbox[0].body)
-        self.assertEqual(mail.outbox[0].subject, '[El Chilito] Pregunta sobre el producto')
+        self.assertEqual(mail.outbox[0].subject, '[YouGarden] Pregunta sobre el producto')
         consulta = ConsultaProducto.objects.get()
         self.assertEqual((consulta.estado, consulta.correo), ('nueva', 'ana@example.test'))
         self.assertEqual(CorreoPendiente.objects.get(consulta=consulta).estado, 'aceptado_smtp')
@@ -199,3 +199,73 @@ class CookiesPermanecen(TestCase):
         valor = services.decidir_cookies(self.peticion(), None, True)
         publicar_textos('1.1')
         self.assertFalse(services.estado_cookies(valor, None)['decided'])
+
+    def test_dos_cuentas_alternando_en_el_mismo_navegador_deciden_una_sola_vez(self):
+        a, b = cuenta('a@example.test'), cuenta('b@example.test')
+        valor = services.decidir_cookies(self.peticion(a), None, True)
+        self.assertFalse(services.estado_cookies(valor, b)['decided'])      # no hereda la decisión ajena
+        valor = services.decidir_cookies(self.peticion(b), valor, False)
+        decisiones = Decision.objects.filter(acto='cookies').count()
+        for _ in range(3):
+            for usuario, acepta in ((a, True), (b, False)):
+                estado = services.estado_cookies(valor, usuario)
+                self.assertEqual((estado['decided'], estado['statistics']), (True, acepta))
+        self.assertEqual(Decision.objects.filter(acto='cookies').count(), decisiones)
+
+
+class CookiesCicloCompleto(TestCase):
+    """Un solo navegador: visitante → cuenta normal → administrador, entrando y saliendo varias veces."""
+    SALIR = '/_allauth/browser/v1/auth/session'
+
+    @classmethod
+    def setUpTestData(cls):
+        publicar_textos()
+
+    def setUp(self):
+        cache.clear()
+        self.navegador = Client(HTTP_HOST='127.0.0.1')
+        self.usuaria = cuenta('ciclo-usuaria@example.test')
+        self.admin = cuenta('ciclo-admin@example.test', 'ver_consentimientos')
+
+    def decidido(self):
+        respuesta = self.navegador.get('/api/privacidad/cookies')
+        self.assertEqual(respuesta.status_code, 200)
+        return respuesta.json()['decided']
+
+    def decidir(self, acepta):
+        respuesta = self.navegador.post('/api/privacidad/cookies', json.dumps({'statistics': acepta}), content_type='application/json')
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+
+    def entrar(self, usuario):
+        self.navegador.force_login(usuario, backend='django.contrib.auth.backends.ModelBackend')
+
+    def salir(self):
+        # Client.logout() borraría todas las cookies del navegador; se usa el cierre real.
+        self.navegador.delete(self.SALIR)
+        self.assertEqual(self.navegador.get('/api/cuenta/aceptaciones').status_code, 401)
+
+    def test_no_vuelve_a_pedir_cookies_y_la_bitacora_queda_correcta(self):
+        self.assertFalse(self.decidido())                 # primera visita: se muestra el aviso
+        self.decidir(False)                               # visitante anónimo
+        self.assertTrue(self.decidido())
+        self.entrar(self.usuaria)
+        self.assertTrue(self.decidido())                  # hereda la del navegador sin cuenta
+        self.decidir(True)                                # con sesión: queda con su correo
+        self.salir()
+        self.assertTrue(self.decidido())
+        self.entrar(self.admin)
+        self.assertTrue(self.decidido())                  # hereda la del navegador sin cuenta, nunca la de la usuaria
+        self.decidir(False)                               # la cambia desde «Configurar cookies»: queda con su correo
+        self.salir()
+        for _ in range(2):
+            for usuario in (self.usuaria, self.admin):
+                with self.subTest(cuenta=usuario.email):
+                    self.entrar(usuario)
+                    self.assertTrue(self.decidido())
+                    self.salir()
+                    self.assertTrue(self.decidido())
+        visor = Client(HTTP_HOST='127.0.0.1')
+        visor.force_login(cuenta('ciclo-visor@example.test', 'ver_consentimientos'), backend='django.contrib.auth.backends.ModelBackend')
+        filas = visor.get('/api/admin/consentimientos?documento=cookies').json()['items']
+        self.assertEqual(sorted((f['account'], f['decision']) for f in filas),
+                         sorted([('Visitante anónimo', 'Rechazó'), ('ciclo-usuaria@example.test', 'Aceptó'), ('ciclo-admin@example.test', 'Rechazó')]))

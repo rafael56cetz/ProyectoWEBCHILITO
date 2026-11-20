@@ -18,12 +18,12 @@ def garden(request, data, huerto_id):
     return services.detalle(request.user, huerto_id)
 
 
-@endpoint(('POST',), ('name',))
+@endpoint(('POST',), ('name',), huerto=True)
 def garden_rename(request, data, huerto_id):
     return services.renombrar(request.user, huerto_id, data.get('name'))
 
 
-@endpoint(('POST',))
+@endpoint(('POST',), huerto=True)
 def garden_archive(request, data, huerto_id):
     return services.archivar(request.user, huerto_id)
 
@@ -34,7 +34,7 @@ def garden_summaries(request, data, huerto_id):
     return services.resumenes_ia(request.user, huerto_id, pagina)
 
 
-@endpoint(('POST',))
+@endpoint(('POST',), huerto=True)
 def link_code(request, data, huerto_id):
     return services.generar_codigo(request.user, huerto_id)
 
@@ -45,12 +45,12 @@ def link_state(request, data, huerto_id):
     return services.estado_vinculacion(request.user, huerto_id)
 
 
-@endpoint(('POST',))
+@endpoint(('POST',), huerto=True)
 def unlink(request, data, huerto_id):
     return services.desvincular(request.user, huerto_id)
 
 
-@endpoint(('GET', 'POST'), ('name', 'sowingDate', 'stage'))
+@endpoint(('GET', 'POST'), ('name', 'sowingDate', 'stage'), vinculado=True)
 def plant(request, data, huerto_id, numero):
     if request.method == 'POST':
         return services.editar_planta(request.user, huerto_id, numero, data)
@@ -58,17 +58,17 @@ def plant(request, data, huerto_id, numero):
     return services.detalle_planta(request.user, huerto_id, numero, request.GET.get('rango', '24h'))
 
 
-@endpoint(('POST',), ('reason', 'note'))
+@endpoint(('POST',), ('reason', 'note'), vinculado=True)
 def plant_end_cycle(request, data, huerto_id, numero):
     return services.terminar_ciclo(request.user, huerto_id, numero, data.get('reason'), data.get('note'))
 
 
-@endpoint(('POST',), ('type', 'plant', 'duration'))
+@endpoint(('POST',), ('type', 'plant', 'duration'), vinculado=True)
 def commands(request, data, huerto_id):
     return services.crear_comando(request.user, huerto_id, data.get('type'), data.get('plant'), data.get('duration'))
 
 
-@endpoint(('GET', 'POST'), ('type', 'plant', 'chiles', 'doneAt'))
+@endpoint(('GET', 'POST'), ('type', 'plant', 'chiles', 'doneAt'), vinculado=True)
 def cares(request, data, huerto_id):
     if request.method == 'POST':
         return services.registrar_cuidado(request.user, huerto_id, data.get('type'), data.get('plant'), data.get('chiles'), data.get('doneAt'))
@@ -84,17 +84,17 @@ def tank(request, data, huerto_id):
 
 
 # Recarga detectada por el flotador: el dueño la confirma (crea el cuidado) o dice que no fue una recarga.
-@endpoint(('POST',))
+@endpoint(('POST',), vinculado=True)
 def tank_confirm(request, data, huerto_id, deteccion_id):
     return services.confirmar_recarga(request.user, huerto_id, deteccion_id)
 
 
-@endpoint(('POST',))
+@endpoint(('POST',), vinculado=True)
 def tank_discard(request, data, huerto_id, deteccion_id):
     return services.descartar_recarga(request.user, huerto_id, deteccion_id)
 
 
-@endpoint()
+@endpoint(cuota_lectura=True)
 def telemetry(request, data, huerto_id):
     bounds(request, allowed=('rango',))
     return services.telemetria(request.user, huerto_id, request.GET.get('rango', '24h'))

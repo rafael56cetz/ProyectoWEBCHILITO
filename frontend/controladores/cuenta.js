@@ -390,6 +390,8 @@ const AuthController = (() => {
         show('El correo o la contraseña no son correctos. Revisa tus datos e inténtalo de nuevo.', true);
       } else if (action === 'register' && status === 'registration-disabled') {
         show('El registro no está disponible en este momento.', true);
+      } else if (action === 'register' && status === 'legal-not-published') {
+        show('El registro se abrirá cuando se publiquen los términos y condiciones y el aviso de privacidad. Inténtalo más tarde.', true);
       } else if (action === 'register' && status === 'email-not-authorized') {
         setError('email', 'Este correo no está autorizado para la prueba local. Revisa que coincida con la dirección que indicaste.');
         view.focusField('email');
@@ -588,12 +590,11 @@ const LegalAcceptController = (() => {
 })();
 
 // ── Eliminacion ──
-// Pedir o cancelar el borrado de la cuenta. El servidor guarda la fecha y lo confirma; aquí nunca se supone un éxito.
+// Borrar la cuenta de inmediato. Solo el 200 del servidor cuenta como éxito; después, `onDeletion` sale del área privada.
 const AccountDataController = (() => {
   function mount(host, {onDeletion = async () => {}} = {}) {
     const view = AccountDataViews.mount(host);
     let alive = true, working = false;
-    const showDeletion = () => view.deletion(AppModel.deletionDate(AuthService.session));
     async function request() {
       const password = view.password();
       if(working || !password) return;
@@ -603,32 +604,15 @@ const AccountDataController = (() => {
       working = false;
       if(!alive) return;
       view.busy(false);
-      if(result.status !== 'accepted') { view.fail(result.status); return; }
+      if(result.status !== 'deleted') { view.fail(result.status); return; }
       view.closeDialog();
+      mostrarAviso('exito', 'Tu cuenta se eliminó definitivamente.');
       await onDeletion();
-      if(!alive) return;
-      showDeletion();
-      mostrarAviso('exito', 'Pedimos eliminar tu cuenta. Puedes cancelarlo antes de la fecha indicada.');
     }
-    async function cancel() {
-      if(working || !await confirmar(AppViews.confirmaciones.cancelarEliminacion)) return;
-      working = true;
-      const result = await PrivacyData.cancelDeletion();
-      working = false;
-      if(!alive) return;
-      if(result.status !== 'accepted') { mostrarAviso('error', 'No se pudo cancelar la eliminación. Inténtalo de nuevo.'); return; }
-      await onDeletion();
-      if(!alive) return;
-      showDeletion();
-      mostrarAviso('exito', 'Eliminación cancelada. Tu cuenta se conserva.');
-    }
-    view.panel.addEventListener('click', event => {
-      if(event.target.closest('[data-delete-open]')) view.openDialog();
-      else if(event.target.closest('[data-delete-cancel]')) cancel();
-    });
+    view.panel.addEventListener('click', event => { if(event.target.closest('[data-delete-open]')) view.openDialog(); });
     view.form.addEventListener('submit', event => { event.preventDefault(); request(); });
     view.dialog.addEventListener('click', event => { if(event.target.closest('[data-delete-close]')) view.closeDialog(); });
-    showDeletion();
+    view.deletion();
     view.accepted({status:'loading', items:[]});
     PrivacyData.acceptances().then(result => {
       if(alive) view.accepted(result.status === 'ready' ? {status:'ready', items:result.items || []} : {status:'error', items:[]});

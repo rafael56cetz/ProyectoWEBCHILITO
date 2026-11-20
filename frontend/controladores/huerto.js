@@ -101,6 +101,8 @@ const GardenSummaryController = (() => {
       if(!trigger) return;
       const {gardenAction: action, type} = trigger.dataset;
       if(action === 'reload') await load();
+      else if(!state.gardens?.length) return;     // sin huerto: vista previa de solo lectura
+      else if(action !== 'summaries' && !GardenModel.linked(state.detail?.garden)) return;   // huerto sin vincular
       else if(action === 'summaries') await showSummaries();
       else if(action === 'order' && !working) await runOrder({type});
       else if(action === 'order-confirm' && !working) await confirmOrder(type);
@@ -206,6 +208,8 @@ const PlantController = (() => {
         const {garden} = await GardenContext.resolve({service, route, signal:life.signal});
         if(life.signal.aborted) return;
         if(!garden) { location.hash = '#huerto'; return; }
+        // Huerto sin vincular: sus plantas se ven en Mi huerto, pero su ficha (editar, terminar ciclo, regar) no se abre.
+        if(!GardenModel.linked(garden)) { mostrarAviso('info', 'Vincula el equipo de este huerto para abrir sus plantas.'); location.hash = '#huerto'; return; }
         gardenId = garden.id;
       }
       const result = await service.plant(gardenId, route.extra, range);
@@ -381,6 +385,7 @@ const TechnicalController = (() => {
       if(!trigger) return;
       const {gardenAction: action, range, log, page} = trigger.dataset;
       if(action === 'reload') await load();
+      else if(!GardenModel.linked(state.garden)) return;   // sin huerto o sin vincular: vista de solo lectura
       else if(action === 'range') { state.range = range; const loaded = await loadData(); if(loaded) paint(); else if(loaded === false) mostrarAviso('error', 'No se pudo cargar el periodo.'); }
       else if(action === 'log-tab') { await loadLog(log, 1); paintLog(); }
       else if(action === 'log-page') { await loadLog(state.log.type, Number(page)); paintLog(); }
@@ -388,7 +393,7 @@ const TechnicalController = (() => {
     root.addEventListener('submit', event => {
       event.preventDefault();
       const form = event.target.closest('[data-garden-form="water"]');
-      if(form) water(form);
+      if(form && GardenModel.linked(state.garden)) water(form);
     }, {signal:life.signal});
     load();
     return {redraw() {}, dispose() { serial++; tracker?.stop(); life.abort(); }};
@@ -420,10 +425,11 @@ const CareController = (() => {
       state = {status:context.ok && detail.status === 'ready' ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null, plants:detail.plants || [],
         tank:tank?.status === 'ready' ? tank : null};
       GardenViews.paint(root, CareViews.screen(state));
-      if(state.status !== 'ready' || !state.garden) return;
-      dates = DateFilterViews.mount(root, life.signal);
+      if(state.status !== 'ready') return;
       guides = CareGuideUserController.attach({root, signal:life.signal, screen:'mantenimiento', detail:route.detail});
       guides.paint(true);
+      if(!state.garden) return;                   // sin huerto: solo las guías; el resto es vista previa
+      dates = DateFilterViews.mount(root, life.signal);
       await loadCares(1);
     }
     async function loadTank() {
@@ -487,6 +493,7 @@ const CareController = (() => {
       if(!trigger) return;
       const {gardenAction: action, type, page} = trigger.dataset;
       if(action === 'reload') await load();
+      else if(!GardenModel.linked(state.garden)) return;   // sin huerto o sin vincular: vista de solo lectura
       else if(action === 'care-type') CareViews.pickType(root, type);
       else if(action === 'care-plant') CareViews.pickPlant(root, trigger.dataset.plant);
       else if(action === 'care-when') CareViews.pickWhen(root, trigger.dataset.when);
@@ -500,6 +507,7 @@ const CareController = (() => {
     root.addEventListener('submit', event => {
       event.preventDefault();
       const kind = event.target.closest('[data-garden-form]')?.dataset.gardenForm;
+      if(!GardenModel.linked(state.garden)) return;
       if(kind === 'care') submitCare(event.target);
       else if(kind === 'care-filter') submitFilter(event.target);
     }, {signal:life.signal});
@@ -582,6 +590,7 @@ const SupportController = (() => {
       const trigger = event.target.closest('[data-garden-action]');
       if(!trigger || working) return;
       const {gardenAction: action, case: caseId} = trigger.dataset;
+      if(action !== 'reload' && !state.data?.hasDevice) return;   // sin huerto o sin vincular: vista de solo lectura
       working = true;
       try {
         if(action === 'reload') await load();
@@ -592,7 +601,7 @@ const SupportController = (() => {
     root.addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.target.closest('[data-garden-form="support"]');
-      if(!form || working || !form.elements.consent.checked) return;
+      if(!form || working || !state.data?.hasDevice || !form.elements.consent.checked) return;
       working = true;
       try { await openCase(form); } finally { working = false; }
     }, {signal:life.signal});

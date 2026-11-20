@@ -108,7 +108,7 @@ class EndpointsDelUsuario(AyudasHuerto, TestCase):
         self.assertEqual(self.post(f'/api/huertos/{huerto}/renombrar', {'name': 'Huerto-Balcón 1'}).status_code, 200)
 
     def test_planta_1_es_valido(self):
-        huerto = self.crear_huerto()
+        huerto = self.huerto_vinculado()
         ruta = f'/api/huertos/{huerto}/plantas/1'
         self.assertEqual(Planta.objects.get(huerto_id=huerto, numero=1).nombre, 'Planta 1', 'nombre de fábrica')
         self.assertEqual(self.post(ruta, {'name': 'Planta 1'}).status_code, 200)
@@ -117,7 +117,7 @@ class EndpointsDelUsuario(AyudasHuerto, TestCase):
         self.assertEqual(Planta.objects.get(huerto_id=huerto, numero=1).nombre, 'Chile 2')
 
     def test_chiles(self):
-        huerto = self.crear_huerto()
+        huerto = self.huerto_vinculado()
         ruta = f'/api/huertos/{huerto}/cuidados'
         for chiles in ('abc', '7', 7.5, -1, 1000, True):
             with self.subTest(chiles=chiles):

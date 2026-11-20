@@ -7,7 +7,7 @@ const EquipmentViews = (() => {
   const act = (...args) => AdminTableViews.button(...args);
   const STATES = {disponible:['Disponible', 'gris'], vinculado:['Vinculado', 'verde'], retirado:['Retirado', 'rojo']};
   const LINKS = {nunca:['Sin conexión aún', 'gris'], en_linea:['En línea', 'verde'], desconectado:['Desconectado', 'rojo']};
-  const ERRORS = {'equipo-duplicado':'Ya existe un equipo con ese identificador o esa MAC.', 'equipo-no-vinculado':'Este equipo no está vinculado a ningún huerto.',
+  const ERRORS = {'reauthentication-required':'Para esta acción hay que confirmar tu contraseña. Vuelve a intentarlo y escríbela cuando se te pida.', 'equipo-duplicado':'Ya existe un equipo con ese identificador o esa MAC.', 'equipo-no-vinculado':'Este equipo no está vinculado a ningún huerto.',
     'equipo-retirado':'Un equipo retirado no recibe credenciales nuevas.', 'equipo-no-disponible':'Solo se retira un equipo disponible. Desvincúlalo primero.',
     'rate-limited':'Demasiados intentos. Espera un momento.'};
   const errorText = (code, fallback = 'No se pudo completar la operación. Inténtalo de nuevo.') => ERRORS[code] || fallback;

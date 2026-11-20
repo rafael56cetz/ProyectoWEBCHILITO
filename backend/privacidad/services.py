@@ -9,20 +9,23 @@ import hmac
 import ipaddress
 import re
 import secrets
-from datetime import timedelta
 
 from allauth.account.adapter import get_adapter
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import SESSION_KEY, get_user_model
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.sessions.models import Session
 from django.core import signing
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection, transaction
+from django.db import DatabaseError, connection, transaction
+from django.middleware.csrf import rotate_token
 from django.utils import timezone
 
-from datos.services import DIAS_PARA_ELIMINAR, aceptaciones_pendientes, auditar, identity
+from datos.services import aceptaciones_pendientes, auditar, capabilities, identity
 from huerto.models import Huerto
 from web import validacion as v
+from web.respuestas import ReglaDeNegocio
 
 from . import politicas
 from .documentos_html import sanear_html
@@ -32,6 +35,7 @@ COOKIE_PREFERENCIA = 'chilito_preferencia'
 COOKIE_ESTADISTICA = 'chilito_estadistica'
 SAL_PREFERENCIA = 'privacidad.preferencia'
 SAL_ESTADISTICA = 'privacidad.estadistica'
+MAXIMO_SUJETOS_NAVEGADOR = 10
 SECCIONES = frozenset(('inicio', 'proyecto', 'prototipo', 'funcionamiento', 'huerto', 'panel_tecnico',
                        'mantenimiento', 'soporte', 'avisos', 'cuenta', 'privacidad'))
 DOCUMENTOS_PUBLICOS = {'privacidad': 'aviso_privacidad', 'terminos': 'terminos', 'cookies': 'politica_cookies'}
@@ -88,10 +92,21 @@ def _firmado(valor, sal, vigencia):
         return None
 
 
-def _sujeto_navegador(valor, *, bloquear=False):
-    identificador = _firmado(valor, SAL_PREFERENCIA, politicas.PREFERENCIA_COOKIES_SEGUNDOS)
+def _ids_navegador(valor):
+    """Sujetos que recuerda este navegador, del más reciente al más antiguo: el anónimo y uno por cuenta que decidió aquí.
+    Acepta el formato anterior de la cookie (un solo id)."""
+    contenido = _firmado(valor, SAL_PREFERENCIA, politicas.PREFERENCIA_COOKIES_SEGUNDOS)
+    ids = [contenido] if isinstance(contenido, str) else contenido if isinstance(contenido, list) else []
+    return [identificador for identificador in ids if isinstance(identificador, str)][:MAXIMO_SUJETOS_NAVEGADOR]
+
+
+def _sujetos_navegador(valor, *, bloquear=False):
+    ids = _ids_navegador(valor)
+    if not ids:
+        return []
     consulta = Sujeto.objects.select_for_update() if bloquear else Sujeto.objects
-    return consulta.filter(pk=identificador, ambito='navegador').first() if identificador else None
+    encontrados = {str(sujeto.pk): sujeto for sujeto in consulta.filter(pk__in=ids, ambito='navegador')}
+    return [encontrados[identificador] for identificador in ids if identificador in encontrados]
 
 
 def _usuario_id(actor):
@@ -101,19 +116,22 @@ def _usuario_id(actor):
 def _sujeto_vigente(valor, actor, *, bloquear=False):
     """Sujeto cuya decisión aplica a este navegador: consultar y contar.
 
-    La preferencia es del navegador y sobrevive al cierre de sesión. Lo único que no
-    se hereda es la decisión vinculada a otra cuenta que esté con sesión abierta.
+    La preferencia es del navegador y sobrevive al cierre de sesión (sin sesión vale la más reciente). Con sesión vale
+    la de la cuenta; si la cuenta aún no decidió aquí, la del navegador sin cuenta. Nunca la de otra cuenta.
     """
-    sujeto = _sujeto_navegador(valor, bloquear=bloquear)
+    sujetos = _sujetos_navegador(valor, bloquear=bloquear)
     usuario_id = _usuario_id(actor)
-    ajeno = sujeto is not None and usuario_id is not None and sujeto.usuario_id not in (None, usuario_id)
-    return None if ajeno else sujeto
+    if usuario_id is None:
+        return sujetos[0] if sujetos else None
+    return (next((sujeto for sujeto in sujetos if sujeto.usuario_id == usuario_id), None)
+            or next((sujeto for sujeto in sujetos if sujeto.usuario_id is None), None))
 
 
 def _sujeto_para_decidir(valor, actor):
-    """Sujeto que puede registrar una decisión nueva: la base exige que la cuenta coincida con el titular."""
-    sujeto = _sujeto_navegador(valor, bloquear=True)
-    return sujeto if sujeto is not None and sujeto.usuario_id in (None, _usuario_id(actor)) else None
+    """Sujeto que registra una decisión nueva: el de la cuenta con sesión, o el anónimo sin ella.
+    El anónimo no se vincula a una cuenta: sus decisiones siguen siendo de un visitante anónimo en la bitácora."""
+    usuario_id = _usuario_id(actor)
+    return next((sujeto for sujeto in _sujetos_navegador(valor, bloquear=True) if sujeto.usuario_id == usuario_id), None)
 
 
 def _finalidad():
@@ -153,9 +171,6 @@ def decidir_cookies(request, valor, acepta):
     sujeto = _sujeto_para_decidir(valor, actor)
     if sujeto is None:
         sujeto = Sujeto.objects.create(ambito='navegador', usuario=usuario)
-    elif usuario is not None and sujeto.usuario_id is None:
-        sujeto.usuario = usuario
-        sujeto.save(update_fields=['usuario'])
     finalidad = _finalidad()
     decision = Decision.objects.create(sujeto=sujeto, acto='cookies', decision=acepta, documento=politica, finalidad=finalidad,
                                        usuario=usuario, ip_recortada=ip_recortada(request),
@@ -164,7 +179,8 @@ def decidir_cookies(request, valor, acepta):
         decision=decision, actualizada_en=timezone.now())
     if not actualizadas:
         Preferencia.objects.create(sujeto=sujeto, finalidad=finalidad, decision=decision)
-    return signing.dumps(str(sujeto.pk), salt=SAL_PREFERENCIA)
+    otros = [identificador for identificador in _ids_navegador(valor) if identificador != str(sujeto.pk)]
+    return signing.dumps([str(sujeto.pk), *otros][:MAXIMO_SUJETOS_NAVEGADOR], salt=SAL_PREFERENCIA)
 
 
 def nuevo_identificador():
@@ -195,17 +211,47 @@ def contar_seccion(actor, valor_preferencia, identificador, seccion):
     return True
 
 
+class TextosLegalesNoPublicados(ValidationError):
+    """No hay términos o aviso de privacidad publicados: el registro está cerrado hasta publicarlos."""
+
+    def __init__(self):
+        super().__init__('Textos legales no publicados', code='legal-no-publicado')
+
+
+ACTOS_DE_REGISTRO = (('aceptacion_terminos', 'terminos'), ('lectura_aviso', 'aviso_privacidad'))
+
+
+def textos_de_registro_publicados():
+    return all(documento_vigente(tipo) is not None for _, tipo in ACTOS_DE_REGISTRO)
+
+
+def arranque_legal_permitido():
+    """Arranque inicial: CHILITO_BYPASS_LEGAL_CHECK activo, sin textos de registro publicados y sin ninguna cuenta.
+    La base (web.0008) repite las tres condiciones; con textos publicados u otra cuenta, la variable no tiene efecto."""
+    return (getattr(settings, 'CHILITO_BYPASS_LEGAL_CHECK', False) and not textos_de_registro_publicados()
+            and not get_user_model().objects.exists())
+
+
 def registrar_actos_de_registro(usuario, request):
     """Guarda por separado la aceptación de términos y la lectura del aviso, con su versión vigente.
 
     Debe llamarse dentro de la transacción que crea la cuenta. Sin un documento vigente la
     base lo rechaza y la cuenta no se crea: no se registra un acto sin versión.
+
+    Única excepción, el arranque inicial (`arranque_legal_permitido`, ya con la cuenta nueva como la única): se crea el
+    sujeto sin actos y se avisa a la base para esta transacción. Los textos quedan pendientes de aceptar al publicarse.
     """
+    documentos = [(acto, documento_vigente(tipo)) for acto, tipo in ACTOS_DE_REGISTRO]
+    if any(documento is None for _, documento in documentos):
+        unica = not get_user_model().objects.exclude(pk=usuario.pk).exists()
+        if not (getattr(settings, 'CHILITO_BYPASS_LEGAL_CHECK', False) and unica):
+            raise TextosLegalesNoPublicados
+        Sujeto.objects.create(ambito='cuenta', usuario=usuario)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT set_config('chilito.arranque_legal', 'on', true)")
+        return
     sujeto = Sujeto.objects.create(ambito='cuenta', usuario=usuario)
-    for acto, tipo in (('aceptacion_terminos', 'terminos'), ('lectura_aviso', 'aviso_privacidad')):
-        documento = documento_vigente(tipo)
-        if documento is None:
-            raise ValidationError('Textos legales no publicados')
+    for acto, documento in documentos:
         Decision.objects.create(sujeto=sujeto, acto=acto, decision=True, documento=documento, usuario=usuario,
                                 ip_recortada=ip_recortada(request), navegador=navegador_resumido(request))
 
@@ -247,33 +293,54 @@ def aceptaciones(actor):
                                          for decision in decisiones]}
 
 
-def _plazo(momento):
-    return (momento + timedelta(days=DIAS_PARA_ELIMINAR)).isoformat()
+class CuentaAdministrativa(ReglaDeNegocio):
+    def __init__(self):
+        super().__init__('cuenta-administrativa', 'Tu cuenta tiene capacidades de administración. Pide que te las retiren '
+                                                  'antes de eliminarla.')
+
+
+class CuentaConHistorialAdministrativo(ReglaDeNegocio):
+    def __init__(self):
+        super().__init__('cuenta-con-historial-administrativo', 'Tu cuenta atendió registros de otras personas y no puede '
+                                                                'eliminarse desde aquí. Escribe a soporte.')
+
+
+def _cerrar_otras_sesiones(usuario_id):
+    """Borra las sesiones guardadas de la cuenta (otros navegadores). La de esta petición la vacía quien llama.
+
+    También las caducadas: aún guardan el id y la huella de la contraseña de la cuenta hasta la purga periódica, que las
+    mantiene pocas."""
+    ajenas = [sesion.pk for sesion in Session.objects.iterator() if str(sesion.get_decoded().get(SESSION_KEY)) == str(usuario_id)]
+    Session.objects.filter(pk__in=ajenas).delete()
 
 
 @transaction.atomic
-def solicitar_eliminacion(actor, password):
-    """Pide borrar la cuenta; la base la anonimiza a los 15 días. Exige la contraseña y siempre fija `now()`."""
-    usuario = get_user_model().objects.select_for_update().get(pk=identity(actor).pk)
+def eliminar_cuenta(request, password):
+    """Borra la cuenta y todo lo suyo, de inmediato y sin vuelta atrás (chilito_eliminar_cuenta, en la base).
+
+    Exige la contraseña actual. No admite cuentas con capacidades, lo que incluye al último superadministrador. La sesión
+    se cierra en esta misma transacción. No se registra nada que identifique a la persona: el correo no va a los logs."""
+    usuario = get_user_model().objects.select_for_update().get(pk=identity(request.user).pk)
     if not isinstance(password, str) or not 0 < len(password) <= 256 or not usuario.check_password(password):
         raise ValidationError('Contraseña no válida')
-    if usuario.anonimizacion_solicitada_en is None:
-        usuario.anonimizacion_solicitada_en = timezone.now()
-        usuario.save(update_fields=['anonimizacion_solicitada_en'])
-        auditar(usuario, 'solicitar_eliminacion', entidad='cuenta', entidad_id=usuario.pk)
-    return {'status': 'accepted', 'deletionRequestedAt': usuario.anonimizacion_solicitada_en.isoformat(),
-            'deletionDate': _plazo(usuario.anonimizacion_solicitada_en)}
-
-
-@transaction.atomic
-def cancelar_eliminacion(actor):
-    usuario = get_user_model().objects.select_for_update().get(pk=identity(actor).pk)
-    if usuario.anonimizacion_solicitada_en is None or usuario.anonimizada_en is not None:
-        raise ValidationError('No hay una eliminación que cancelar')
-    usuario.anonimizacion_solicitada_en = None
-    usuario.save(update_fields=['anonimizacion_solicitada_en'])
-    auditar(usuario, 'cancelar_eliminacion', entidad='cuenta', entidad_id=usuario.pk)
-    return {'status': 'accepted'}
+    if capabilities(usuario):
+        raise CuentaAdministrativa
+    try:
+        with transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute('SELECT chilito_eliminar_cuenta(%s)', [usuario.pk])
+    except DatabaseError as fallo:
+        mensaje = getattr(getattr(getattr(fallo, '__cause__', None), 'diag', None), 'message_primary', '') or ''
+        if mensaje.startswith('La cuenta tiene historial administrativo'):
+            raise CuentaConHistorialAdministrativo from None
+        if mensaje.startswith('Una cuenta con capacidades'):
+            raise CuentaAdministrativa from None
+        raise
+    _cerrar_otras_sesiones(usuario.pk)
+    # Sin user_logged_out: sus receptores volverían a fijar como actor a la cuenta que ya no existe.
+    request.session.flush()
+    request.user = AnonymousUser()
+    rotate_token(request)
+    return {'status': 'deleted', 'message': 'Tu cuenta y todos sus datos se eliminaron definitivamente.'}
 
 
 def _limpiar(datos):

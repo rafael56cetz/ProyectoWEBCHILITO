@@ -43,7 +43,7 @@ class BaseCiclos(AyudasHuerto, TestCase):
 
 class Ciclos(BaseCiclos):
     def test_cada_planta_nace_con_su_ciclo_1_abierto(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         for numero in (1, 2, 3):
             [ciclo] = self.ciclos(huerto_id, numero)
             self.assertEqual((ciclo.numero, ciclo.fin, ciclo.motivo, ciclo.nota), (1, None, None, ''))
@@ -53,7 +53,7 @@ class Ciclos(BaseCiclos):
     def test_ciclo_1_de_las_plantas_existentes(self):
         """El relleno de la migración: desde la primera etapa (medianoche de Mérida) o desde la creación del huerto.
         (Una planta sin ciclo ya no puede existir: se prueba la misma expresión que usa la migración.)"""
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         primera = PlantaEtapa.objects.filter(planta=self.planta(huerto_id, 1)).first()
         with connection.cursor() as cursor:
             cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')
@@ -73,7 +73,7 @@ class Ciclos(BaseCiclos):
                          'cada etapa queda ligada a su ciclo')
 
     def test_terminar_ciclo_sin_borrar_nada(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         ruta = f'/api/huertos/{huerto_id}/plantas/1'
         hace_10 = (timezone.localdate() - timedelta(days=10)).isoformat()
         self.assertEqual(self.post(ruta, {'name': 'Chile bravo', 'sowingDate': hace_10, 'stage': 'germinacion'}).status_code, 200)
@@ -116,12 +116,13 @@ class Ciclos(BaseCiclos):
         self.assertEqual(PlantaCiclo.objects.filter(planta=planta).count(), 3)
 
     def test_terminar_desde_sin_sembrar_tambien_abre_la_linea_de_vida(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         self.assertEqual(self.terminar(huerto_id, reason='otro').status_code, 200)
         self.assertEqual([e['stage'] for e in self.ficha(huerto_id)['stages']], ['sin_sembrar'])
 
     def test_solo_el_dueno_y_datos_validos(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
+        self.crear_huerto(cliente=self.cliente(self.otra))         # la otra cuenta tiene su propio huerto
         self.assertEqual(self.terminar(huerto_id, cliente=self.cliente(self.otra)).status_code, 404)
         self.assertEqual(self.terminar(huerto_id, cliente=self.cliente()).status_code, 401)
         for datos, codigo in (({'reason': 'aburrida'}, 'motivo-no-valido'), ({'reason': None}, 'motivo-no-valido'),
@@ -133,7 +134,7 @@ class Ciclos(BaseCiclos):
         self.assertEqual(len(self.ciclos(huerto_id)), 1)
 
     def test_la_base_exige_al_dueno_y_no_deja_cambiar_ni_borrar(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         planta = self.planta(huerto_id)
         for actor in (None, self.otra.pk):
             with self.subTest(actor=actor), self.assertRaises(DatabaseError), transaction.atomic(), connection.cursor() as cursor:
@@ -152,7 +153,7 @@ class Ciclos(BaseCiclos):
             cursor.execute("SELECT chilito_terminar_ciclo(%s, 'se_aburrio', '')", [planta.pk])
 
     def test_un_cuidado_no_se_fecha_antes_del_ciclo_actual(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         ayer = (timezone.now() - timedelta(days=1)).isoformat()
         self.assertEqual(self.post(f'/api/huertos/{huerto_id}/cuidados', {'type': 'sustrato', 'plant': 1, 'doneAt': ayer}).status_code, 200,
                          'en el ciclo 1 se admite (abarca lo anterior)')
@@ -173,7 +174,20 @@ class Recomendaciones(BaseCiclos):
         Planta.objects.filter(huerto_id=self.huerto_id, numero=numero).update(etapa=etapa, etapa_desde=timezone.localdate() - timedelta(days=dias))
 
     def abrir_mi_huerto(self):
+        """Abrir «Mi huerto» y que pase la tarea periódica. Desde B-1 el GET ya no revisa nada: lo hace la tarea."""
         self.assertEqual(self.client.get(f'/api/huertos/{self.huerto_id}').status_code, 200)
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT chilito_revisar_recomendaciones()')
+
+    def test_abrir_mi_huerto_no_escribe(self):
+        """B-1: un GET no crea avisos aunque haya una recomendación pendiente; la crea la tarea periódica."""
+        self.etapa('germinacion', 30)
+        for ruta in (f'/api/huertos/{self.huerto_id}', f'/api/huertos/{self.huerto_id}/plantas/1'):
+            self.assertEqual(self.client.get(ruta).status_code, 200)
+        self.assertFalse(self.recomendaciones().exists(), 'el GET no escribe')
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT chilito_revisar_recomendaciones()')
+        self.assertEqual(self.recomendaciones().count(), 1)
 
     def test_germinacion_de_mas_de_21_dias_una_vez_por_ciclo(self):
         self.etapa('germinacion', 21)

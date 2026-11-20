@@ -67,7 +67,7 @@ const ConsoleViews = (() => {
   const AUTHORIZATION = {vigente:['Vigente', 'verde'], revocada:['Revocada', 'rojo'], vencida:['Vencida', 'gris']};
   const CLOSINGS = {revocada:'La persona revocó el acceso. La sesión se cerró.', vencida:'La autorización venció. La sesión se cerró.',
     caso_cerrado:'El caso se cerró. La sesión terminó.', manual:'La sesión técnica se cerró.', cierre_sesion:'La sesión técnica se cerró.'};
-  const ERRORS = {'caso-ya-atendido':'Este caso ya lo atiende otra persona o ya está cerrado.', 'caso-no-tuyo':'Solo quien atiende el caso puede conectarse, dar órdenes o resolverlo.',
+  const ERRORS = {'reauthentication-required':'Para esta acción hay que confirmar tu contraseña. Vuelve a intentarlo y escríbela cuando se te pida.', 'caso-ya-atendido':'Este caso ya lo atiende otra persona o ya está cerrado.', 'caso-no-tuyo':'Solo quien atiende el caso puede conectarse, dar órdenes o resolverlo.',
     'autorizacion-no-vigente':'La persona ya no autoriza el acceso o la autorización venció.', 'sesion-abierta':'Ya tienes una sesión técnica abierta. Ciérrala antes de conectarte a otro caso.',
     'sesion-cerrada':'La sesión técnica ya se cerró o la persona retiró su autorización.', 'caso-cerrado':'Este caso ya está cerrado.',
     'orden-en-curso':'Ya hay una orden igual esperando la respuesta del equipo.', 'not-found':'Ese caso o esa sesión ya no existe.',
@@ -391,7 +391,7 @@ const AdminAccessViews = (() => {
     eliminar_borrador_legal:'Eliminó un borrador legal', exportar_consentimientos:'Exportó consentimientos', alta_equipo:'Dio de alta un equipo', rotar_credencial:'Rotó una credencial',
     retirar_equipo:'Retiró un equipo', desvincular_dispositivo:'Desvinculó un equipo', registrar_venta:'Registró una venta', registrar_pago:'Registró un pago', entregar_venta:'Marcó una entrega',
     editar_nota_venta:'Editó la nota de una venta', cancelar_venta:'Canceló una venta'};
-  const ERRORS = {'capacidad-reservada':'La capacidad de super administrador solo se asigna desde la base de datos.', 'capacidad-propia':'No puedes cambiar tus propias capacidades.',
+  const ERRORS = {'reauthentication-required':'Para esta acción hay que confirmar tu contraseña. Vuelve a intentarlo y escríbela cuando se te pida.', 'capacidad-reservada':'La capacidad de super administrador solo se asigna desde la base de datos.', 'capacidad-propia':'No puedes cambiar tus propias capacidades.',
     'cuenta-no-encontrada':'No hay una cuenta con ese correo.', 'cuenta-no-elegible':'La cuenta debe estar activa y con el correo verificado.'};
   const errorText = (code, fallback = 'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.') => ERRORS[code] || fallback;
   const label = code => LABELS[code] || code;
@@ -533,18 +533,27 @@ const LegalAdminViews = (() => {
 })();
 
 // ── Consentimientos ──
-// Bitácora de consentimientos (5.9): solo lectura. La IP ya viene recortada de la base.
+// Bitácora de consentimientos (5.9) y padrón de cuentas: solo lectura. La IP ya viene recortada de la base.
+// Los valores de los filtros rápidos son constantes de esta vista; todo dato del servidor entra escapado.
 const ConsentViews = (() => {
   const T = AdminTableViews;
   const {tag} = GardenViews;
   const options = (items, selected = '') => items.map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`).join('');
   const share = ({accepted, accounts, version}) => version ? `${accepted} de ${accounts} cuentas (versión ${escaparHTML(version)})` : 'Sin versión publicada';
+  const TABS = [['bitacora', 'Bitácora de consentimientos'], ['cuentas', 'Cuentas registradas']];
+  const DOCUMENTS = [['', 'Todos'], ['terminos', 'Términos y condiciones'], ['aviso', 'Aviso de privacidad'], ['cookies', 'Política de cookies']];
+  const RANGES = [['todo', 'Todo'], ['hoy', 'Hoy'], ['7', 'Últimos 7 días'], ['30', 'Últimos 30 días']];
+  const STATES = [['todas', 'Todas'], ['activas', 'Activas'], ['inactivas', 'Inactivas']];
+
+  // Botones rápidos: un grupo segmentado por criterio. El activo lleva aria-pressed="true".
+  const chips = (action, label, items, active) => `<div class="quick-filter"><span class="quick-filter-label">${label}</span><div class="user-range-control" role="group" aria-label="${label}">${items
+    .map(([value, text]) => T.button(action, text, value === active ? 'brand' : 'light', `data-value="${value}" aria-pressed="${value === active}"`)).join('')}</div></div>`;
 
   function filters(values) {
     return `<form class="care-filters" data-admin-form="consent-filter" novalidate>
       <div><label for="cs-document">Documento</label><select id="cs-document" name="documento">${options([['', 'Todos'], ['terminos', 'Términos'], ['aviso', 'Aviso'], ['cookies', 'Cookies']], values.documento)}</select></div>
       <div><label for="cs-decision">Decisión</label><select id="cs-decision" name="decision">${options([['', 'Todas'], ['acepto', 'Aceptó'], ['rechazo', 'Rechazó']], values.decision)}</select></div>
-      ${T.dateField('since', 'Desde')}${T.dateField('until', 'Hasta')}
+      ${T.dateField('since', 'Desde', values.desde || '')}${T.dateField('until', 'Hasta', values.hasta || '')}
       <div><label for="cs-account">Buscar correo</label><input id="cs-account" name="cuenta" type="search" maxlength="60" value="${escaparHTML(values.cuenta || '')}"></div>
       <div><label for="cs-version">Versión</label><input id="cs-version" name="version" type="text" inputmode="decimal" maxlength="11" placeholder="1.1" data-campo="version" value="${escaparHTML(values.version || '')}"></div>
       <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Filtrar</button>${T.button('clear', 'Limpiar')}</div></form>`;
@@ -553,23 +562,51 @@ const ConsentViews = (() => {
   // La exportación es una descarga: si el filtro rebasa el tope del servidor, se avisa aquí en lugar de descargar un error.
   function exportAction({exportUrl, list, exportLimit}) {
     if(list.total > exportLimit) return `<div><button class="button btn-liquid-light" type="button" disabled>Exportar CSV</button><p class="user-small-copy">Acota el filtro: se exportan hasta ${exportLimit} filas.</p></div>`;
-    return `<a class="button btn-liquid-light" href="${escaparHTML(exportUrl)}" download="consentimientos.csv">Exportar CSV</a>`;
+    return `<button class="button btn-liquid-light" type="button" data-admin-action="export" data-export-url="${escaparHTML(exportUrl)}">Exportar CSV</button>`;
   }
 
   function row(item) {
     return `<tr><td>${T.merida(item.at)}</td><td>${escaparHTML(item.account)}</td><td>${escaparHTML(item.what)}</td><td>${escaparHTML(item.version)}</td><td>${tag(item.decision, item.decision === 'Aceptó' ? 'verde' : 'rojo')}</td><td>${item.ip ? escaparHTML(item.ip) : '—'}</td><td>${item.browser ? escaparHTML(item.browser) : '—'}</td><td>${T.button('row', 'Ver', 'light', `data-id="${item.id}"`)}</td></tr>`;
   }
 
-  function screen(state) {
-    if(state.status !== 'ready') return T.status(state.status);
+  // Encabezado común: las dos vistas se alternan sin perder sus filtros; «Actualizar» vuelve a consultar la vista abierta.
+  function header(tab, extra = '') {
+    return `${AppViews.heading('Consentimientos', 'Quién aceptó qué, cuándo y desde dónde, y qué cuentas existen.')}${T.tabs(TABS, tab, `<div class="tabs-actions">${T.button('refresh', 'Actualizar')}${extra}</div>`)}`;
+  }
+
+  function logScreen(state) {
+    if(state.status !== 'ready') return header('bitacora') + T.status(state.status);
     const {summary, list} = state;
     const stats = summary.statistics.percent === null ? 'Sin navegadores' : `${summary.statistics.percent}% (${summary.statistics.accepted} de ${summary.statistics.browsers})`;
     const cards = [['Términos vigentes aceptados', share(summary.terms)], ['Aviso vigente aceptado', share(summary.privacy)], ['Navegadores con estadísticas', stats]]
       .map(([label, value]) => AppViews.kpi(label, value, ' class="consent-figure"')).join('');
+    const quick = `<div class="quick-filters">${chips('quick-document', 'Documento', DOCUMENTS, state.filters.documento || '')}${chips('quick-range', 'Fecha', RANGES, state.range || 'todo')}</div>`;
     const body = list.items.length ? T.table('Bitácora de consentimientos', ['Fecha y hora (Mérida)', 'Cuenta', 'Qué', 'Versión', 'Decisión', 'IP', 'Navegador', ''], list.items.map(row)) : AppViews.empty('No hay registros con estos filtros', 'Cambia o limpia los filtros para ver más.');
-    return `<div class="page-heading"><div><h1>Bitácora de consentimientos</h1><p>Quién aceptó qué, cuándo y desde dónde.</p></div>${exportAction(state)}</div>
-      <section class="user-summary-metrics" aria-label="Resumen de consentimientos">${cards}</section><section class="bento-panel">${filters(state.filters)}${body}${T.pager(list)}</section>${T.dialog}`;
+    return `${header('bitacora', exportAction(state))}
+      <section class="user-summary-metrics" aria-label="Resumen de consentimientos">${cards}</section><section class="bento-panel">${quick}${filters(state.filters)}${body}${T.pager(list)}</section>${T.dialog}`;
   }
+
+  // Padrón de cuentas. Activa = activa, sin anonimizar y con el correo verificado; una cuenta recién creada es inactiva hasta verificarlo.
+  function accountRow(item) {
+    const active = item.status === 'activa';
+    const note = item.emailVerified ? '' : ' <span class="user-small-copy">correo sin verificar</span>';
+    return `<tr><td>${escaparHTML(item.email)}</td><td>${tag(active ? 'Activa' : 'Inactiva', active ? 'verde' : 'gris')}${note}</td><td>${T.exact(item.createdAt)}</td><td>${T.button('account-consents', 'Ver en bitácora', 'light', `data-email="${escaparHTML(item.email)}"`)}</td></tr>`;
+  }
+
+  function accountsScreen(accounts) {
+    if(accounts.status !== 'ready') return header('cuentas') + T.status(accounts.status);
+    const {list, totals, filters: values} = accounts;
+    const cards = [['Total', totals.total], ['Activas', totals.activas], ['Inactivas', totals.inactivas]].map(([label, value]) => AppViews.kpi(label, Number(value) || 0)).join('');
+    const quick = `<div class="quick-filters">${chips('quick-status', 'Estado', STATES, values.estado || 'todas')}${chips('quick-range', 'Fecha de creación', RANGES, accounts.range || 'todo')}</div>`;
+    const search = `<form class="care-filters" data-admin-form="accounts-filter" role="search" novalidate>
+      <div><label for="ac-search">Buscar correo</label><input id="ac-search" name="busqueda" type="search" maxlength="254" autocomplete="off" spellcheck="false" value="${escaparHTML(values.busqueda || '')}"></div>
+      <div class="app-actions"><button class="button btn-liquid-brand" type="submit">Buscar</button>${T.button('clear', 'Limpiar')}</div></form>`;
+    const body = list.items.length ? T.table('Cuentas registradas', ['Correo electrónico', 'Estado', 'Fecha y hora de creación (Mérida)', ''], list.items.map(accountRow)) : AppViews.empty('No hay cuentas con estos filtros', 'Cambia o limpia los filtros para ver más.');
+    return `${header('cuentas')}
+      <section class="user-summary-metrics" aria-label="Resumen de cuentas">${cards}</section><section class="bento-panel">${quick}${search}${body}${T.pager(list, 'accounts-page')}</section>`;
+  }
+
+  const screen = state => state.tab === 'cuentas' ? accountsScreen(state.accounts) : logScreen(state);
 
   function detail(item) {
     const facts = [['Fecha y hora (Mérida)', T.merida(item.at)], ['Cuenta', escaparHTML(item.account)], ['Ámbito', escaparHTML(item.scope)], ['Qué', escaparHTML(item.what)], ['Versión', escaparHTML(item.version)],
@@ -578,6 +615,5 @@ const ConsentViews = (() => {
     return `<h2 id="admin-dialog-title">Registro de consentimiento</h2><dl class="user-facts">${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><div class="app-dialog-actions">${history}${T.button('close-dialog', 'Cerrar')}</div>`;
   }
 
-  return Object.freeze({screen, detail,
-    resetFilters: root => root.querySelector('[data-admin-form="consent-filter"]').reset()});
+  return Object.freeze({screen, detail});
 })();

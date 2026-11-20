@@ -296,7 +296,7 @@ GUIA_FIN_CICLO = """El habanero es una planta perenne: en un clima cálido, como
 
 Después de una cosecha abundante es normal que la planta descanse unas semanas antes de volver a florecer. Mientras siga con hojas sanas y tallo firme, sigue cuidándola: puede volver a producir.
 
-En El Chilito, el ciclo de una planta lo terminas tú, desde su ficha, con «Terminar ciclo». Hazlo cuando quieras empezar de nuevo en ese lugar: porque terminaste con ella, porque murió, porque la semilla no germinó o por pudrición o plaga. La planta vuelve a «Sin sembrar» y conserva su nombre.
+En YouGarden, el ciclo de una planta lo terminas tú, desde su ficha, con «Terminar ciclo». Hazlo cuando quieras empezar de nuevo en ese lugar: porque terminaste con ella, porque murió, porque la semilla no germinó o por pudrición o plaga. La planta vuelve a «Sin sembrar» y conserva su nombre.
 
 Terminar un ciclo no borra nada. Su línea de vida y sus cuidados quedan en «Ciclos anteriores» para que puedas consultarlos. No se puede deshacer."""
 

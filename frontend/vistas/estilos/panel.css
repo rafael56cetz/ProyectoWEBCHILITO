@@ -424,9 +424,6 @@ body[data-role=admin] .app-actions .button { white-space:normal; }
 /* Operación: campana con contador, aviso de eliminación, avisos, gráficas de varias series, bitácora y soporte */
 .bell-link { position:relative; }
 .bell-badge[hidden] { display:none; }
-.deletion-banner { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;padding:12px 18px;border-radius:var(--radio-tarjeta);border:1px solid var(--insignia-ambar-borde);background:var(--insignia-ambar-fondo);color:var(--insignia-ambar-texto); }
-.deletion-banner[hidden] { display:none; }
-.deletion-banner p { margin:0;font-weight:600; }
 .notice-list { display:grid;gap:0;margin:0 0 18px;padding:0;list-style:none; }
 .notice-dot { width:10px;height:10px;border-radius:50%;border:2px solid var(--claro-verde); }
 .notice-row.is-unread .notice-dot { background:var(--claro-verde); }
@@ -556,6 +553,14 @@ body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .maint-
 /* Pestañas del ancho de su contenido; la acción principal queda a la derecha de la misma fila. */
 .tabs-bar { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--esp-3);margin:0 0 var(--esp-5); }
 .tabs-bar > .button { margin-left:auto; }
+/* Varias acciones a la derecha de las pestañas (Consentimientos: «Actualizar» y «Exportar CSV»). */
+.tabs-bar > .tabs-actions { display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--esp-2);margin-left:auto; }
+.tabs-actions .user-small-copy { margin:var(--esp-1) 0 0; }
+
+/* Filtros rápidos: una fila por criterio, cada una con su etiqueta y su control segmentado. */
+.quick-filters { display:flex;flex-wrap:wrap;gap:var(--esp-3) var(--esp-5);margin:0 0 var(--esp-4); }
+.quick-filter { display:flex;flex-direction:column;gap:var(--esp-1);min-width:0;max-width:100%; }
+.quick-filter-label { font-size:13px;font-weight:600;line-height:1.3; }
 
 /* Estado vacío dentro de una tarjeta: ícono, frase y acción. */
 .app-empty { display:flex;align-items:center;gap:var(--esp-3);padding:var(--esp-5) var(--esp-4);border:1px dashed var(--claro-linea);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo); }

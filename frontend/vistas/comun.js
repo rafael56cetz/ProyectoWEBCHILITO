@@ -118,6 +118,37 @@ const confirmar = (() => {
   };
 })();
 
+// Contraseña para confirmar una acción crítica (M-2). Resuelve la contraseña escrita, o null si se cancela.
+const pedirContrasena = (() => {
+  let dialogo = null;
+  function crear() {
+    dialogo = document.createElement('dialog');
+    dialogo.className = 'bento-panel app-dialog confirmar-dialogo';
+    dialogo.setAttribute('aria-labelledby','reautenticar-titulo');
+    dialogo.innerHTML = '<form method="dialog" class="dialog-form" novalidate><h2 id="reautenticar-titulo">Confirma tu contraseña</h2><p id="reautenticar-texto">Esta acción es sensible. Escribe tu contraseña para continuar; no te la volveremos a pedir durante 5 minutos.</p>'
+      + '<label for="reautenticar-clave">Contraseña</label><input id="reautenticar-clave" name="password" type="password" autocomplete="current-password" maxlength="256" required>'
+      + '<div class="app-dialog-actions"><button class="button btn-liquid-light" type="button" data-reautenticar="cancelar">Cancelar</button><button class="button btn-liquid-brand" type="submit" value="aceptar">Confirmar</button></div></form>';
+    dialogo.addEventListener('click',evento => { if(evento.target.closest('[data-reautenticar="cancelar"]')) dialogo.close('cancelar'); });
+    document.body.append(dialogo);
+  }
+  return function pedirContrasena() {
+    if(!dialogo) crear();
+    const previo = document.activeElement, campo = dialogo.querySelector('#reautenticar-clave');
+    campo.value = '';
+    return new Promise(resolver => {
+      dialogo.addEventListener('close',() => {
+        const clave = dialogo.returnValue === 'aceptar' && campo.value ? campo.value : null;
+        campo.value = '';
+        resolver(clave);
+        previo?.focus({preventScroll:true});
+      },{once:true});
+      dialogo.returnValue = '';
+      dialogo.showModal();
+      campo.focus();
+    });
+  };
+})();
+
 // ── Panel ──
 const AppViews = (() => {
   const date = value => `<time${value && Number.isFinite(new Date(value).getTime()) ? ` datetime="${escaparHTML(new Date(value).toISOString())}"` : ''}>${escaparHTML(AppModel.date(value))}</time>`;
@@ -140,8 +171,8 @@ const AppViews = (() => {
     const noticesLink=`<a class="button compact btn-liquid-nav account-icon-link bell-link" href="#avisos" aria-label="Avisos" title="Avisos"${selected==='avisos'?' aria-current="page"':''}>${icon('bell')}<span class="bell-badge" data-bell-count hidden></span></a>`;
     const menuButton=`<button class="button compact btn-liquid-nav private-menu-toggle" type="button" data-app-action="toggle-menu" aria-controls="garden-navigation" aria-expanded="false" aria-label="Abrir menú de navegación"><span class="private-menu-open-icon">${icon('menu')}</span><span class="private-menu-close-icon">${icon('close')}</span><span>Menú</span></button>`;
     // Sin barra superior: logotipo y botón de ocultar viven en el panel; perfil, avisos (solo usuario) y menú flotan arriba.
-    const topbar=`<div class="private-topbar"><div class="topbar-start">${brand('#inicio','El Chilito, inicio','topbar-brand')}</div><div class="topbar-actions">${accountLink}${noticesLink}${menuButton}</div></div>`;
-    const sidebarTop=`<div class="sidebar-top">${brand('#inicio','El Chilito, inicio','sidebar-brand')}</div><a class="sidebar-home" href="#inicio">${icon('home')}<span>Ver página principal</span></a>${isAdmin?'<p class="private-role-label">Administración</p>':''}`;
+    const topbar=`<div class="private-topbar"><div class="topbar-start">${brand('#inicio','YouGarden, inicio','topbar-brand')}</div><div class="topbar-actions">${accountLink}${noticesLink}${menuButton}</div></div>`;
+    const sidebarTop=`<div class="sidebar-top">${brand('#inicio','YouGarden, inicio','sidebar-brand')}</div><a class="sidebar-home" href="#inicio">${icon('home')}<span>Ver página principal</span></a>${isAdmin?'<p class="private-role-label">Administración</p>':''}`;
     // Enlace externo: abre otra pestaña y el panel sigue abierto. Si no hay correo configurado, no se muestra.
     const mailLink=()=>{const url=AppModel.supportMailUrl();return url?`<a class="private-mail-link" href="${escaparHTML(url)}" target="_blank" rel="noopener noreferrer">${icon('mail')}<span>Abrir correo de soporte</span>${icon('external')}<span class="sr-only">(se abre en otra pestaña)</span></a>`:'';};
     // Administración: los grupos del menú llegan ya filtrados por capacidad; el correo de soporte va antes de Mi cuenta.
@@ -149,7 +180,7 @@ const AppViews = (() => {
     const navigation=isAdmin?groups.map(groupHtml).join('')+mailLink()+link(account):links.map(link).join('');
     // La página principal ya tiene acceso fijo bajo el logotipo, también en móvil.
     const menuFooter=`<div class="private-menu-footer"><button class="button private-menu-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></div>`;
-    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="deletion-banner" class="deletion-banner" data-deletion-banner hidden></div><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
+    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
   }
   const FILTERS = [['todos', 'Todos'], ['no_leidos', 'No leídos'], ['equipo', 'Mi equipo'], ['ia', 'IA'], ['soporte', 'Soporte'], ['legales', 'Legales']];
   const SEVERITIES = {critico:['Crítico', 'rojo'], advertencia:['Advertencia', 'ambar'], informacion:['Información', 'gris']};
@@ -199,9 +230,6 @@ const AppViews = (() => {
       bell(unread){const badge=root.querySelector('[data-bell-count]'),link=badge?.closest('a');if(!badge)return;
         badge.hidden=!unread;badge.textContent=unread>9?'9+':String(unread||'');
         link.setAttribute('aria-label',unread?`Avisos, ${unread} sin leer`:'Avisos');},
-      // Aviso fijo mientras haya una eliminación de cuenta pendiente (4.9).
-      deletion(deletionDate){const banner=root.querySelector('[data-deletion-banner]');banner.hidden=!deletionDate;
-        banner.innerHTML=deletionDate?`<p>Tu cuenta se eliminará el ${date(deletionDate)}.</p><button class="button btn-liquid-light compact" type="button" data-app-action="cancel-deletion">Cancelar eliminación</button>`:'';},
       pageBusy(on){page.inert=on;if(on)page.setAttribute('aria-busy','true');else page.removeAttribute('aria-busy');},
       // Devuelve el contenedor del perfil cuando la cuenta está lista; el controlador monta su formulario.
       draw(screen,data,filter,detail,alias){
@@ -237,8 +265,7 @@ const AppViews = (() => {
         if(focused.getBoundingClientRect().bottom>available-16)focused.scrollIntoView({block:'center'});
       }};
   }
-  const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},
-    cancelarEliminacion:{titulo:'¿Cancelar la eliminación de tu cuenta?',texto:'Tu cuenta y tus datos se conservarán.',accion:'Cancelar eliminación'}};
+  const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},};
   return {shell,frame,heading,state,empty,conFolio,kpi,date,notices,account,accountGreeting,accountTabs,confirmaciones
   };
 })();
@@ -405,6 +432,12 @@ const DateFilterViews = (() => {
 // Piezas que comparten las pantallas de administración: tabla, paginación visible, pestañas, calendario y diálogo.
 const AdminTableViews = (() => {
   const PAGE_SIZE = 25;
+  // Guarda un archivo descargado con fetch (exportaciones): enlace temporal a un objeto Blob, que se libera al terminar.
+  function saveFile(blob, name) {
+    const url = URL.createObjectURL(blob), link = Object.assign(document.createElement('a'), {href:url, download:name});
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
   const button = (action, label, kind = 'light', attrs = '') => `<button type="button" class="button btn-liquid-${kind}" data-admin-action="${action}" ${attrs}>${label}</button>`;
   // Cada celda lleva el nombre de su columna (la vista en tarjetas del móvil lo muestra) y la primera, su texto completo como título.
   function cells(row, heads) {
@@ -431,6 +464,14 @@ const AdminTableViews = (() => {
     <button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div></div>`;
   const day = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString('es-MX', {dateStyle:'medium'}) : '—';
   const merida = value => new Date(value).toLocaleString('es-MX', {timeZone:'America/Merida', dateStyle:'medium', timeStyle:'short'});
+  // Fecha y hora completas de Mérida, sin abreviar: «20/11/2026 00:15:32».
+  const EXACT = new Intl.DateTimeFormat('es-MX', {timeZone:'America/Merida', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'});
+  function exact(value) {
+    const date = new Date(value);
+    if(!value || Number.isNaN(date.getTime())) return '—';
+    const part = Object.fromEntries(EXACT.formatToParts(date).map(({type, value: text}) => [type, text]));
+    return `${part.day}/${part.month}/${part.year} ${part.hour}:${part.minute}:${part.second}`;
+  }
   const money = value => new Intl.NumberFormat('es-MX', {style:'currency', currency:'MXN'}).format(Number(value));
   function open(root, html) {
     const box = root.querySelector('.admin-dialog');
@@ -440,7 +481,7 @@ const AdminTableViews = (() => {
   }
   function dismiss(root) { const box = root.querySelector('.admin-dialog'); if(box?.open) box.close(); }
   const paint = (root, html) => { root.innerHTML = html; };
-  return Object.freeze({button, table, pager, tabs, status, dialog, dateField, day, merida, money, open, dismiss, paint});
+  return Object.freeze({button, table, pager, tabs, status, dialog, dateField, day, merida, exact, money, open, dismiss, paint, saveFile});
 })();
 
 // ── Campos ──

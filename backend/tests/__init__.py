@@ -2,6 +2,7 @@
 
 La base exige, al confirmar, que toda cuenta nueva haya aceptado los textos vigentes."""
 import secrets
+import time
 
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
@@ -42,3 +43,13 @@ def aceptar_vigentes(usuario):
     sujeto = Sujeto.objects.get(usuario=usuario, ambito='cuenta')
     for acto, tipo in (('aceptacion_terminos', 'terminos'), ('lectura_aviso', 'aviso_privacidad')):
         Decision.objects.create(sujeto=sujeto, acto=acto, decision=True, documento=documento_vigente(tipo), usuario=usuario)
+
+
+def reautenticado(cliente):
+    """Marca la sesión del cliente como recién reautenticada (lo que deja allauth al confirmar la contraseña).
+    Las acciones críticas del panel (M-2) lo exigen; las pruebas de esas funciones parten de una confirmación vigente."""
+    sesion = cliente.session
+    sesion['account_authentication_methods'] = [*sesion.get('account_authentication_methods', []),
+                                                {'method': 'password', 'at': time.time(), 'reauthenticated': True}]
+    sesion.save()
+    return cliente

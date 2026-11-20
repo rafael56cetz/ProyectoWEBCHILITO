@@ -113,6 +113,36 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   assert.ok(run('AdminTableViews.pager({page:2, total:60})').includes('Página 2 de 3'));
   context.bigConsent = {...context.consentState, list:{...context.consentState.list, total:50001}};
   assert.ok(run('ConsentViews.screen(bigConsent)').includes('disabled>Exportar CSV'), 'un filtro demasiado grande no ofrece una descarga que fallaría');
+  // Filtros rápidos de la bitácora: pestañas arriba, documento y fecha marcados, y las fechas del rango visibles en los campos.
+  assert.ok(consent.includes('data-tab="bitacora" aria-pressed="true"') && consent.includes('data-tab="cuentas" aria-pressed="false"') && consent.includes('data-admin-action="refresh"'));
+  context.cookieConsent = {...context.consentState, filters:{documento:'cookies', desde:'2026-11-14', hasta:'2026-11-20'}, range:'7'};
+  const quick = run('ConsentViews.screen(cookieConsent)');
+  assert.ok(/data-admin-action="quick-document"[^>]*data-value="cookies" aria-pressed="true">Política de cookies/.test(quick), 'el documento elegido queda marcado');
+  assert.ok(/data-admin-action="quick-range"[^>]*data-value="7" aria-pressed="true">Últimos 7 días/.test(quick) && quick.includes('value="2026-11-14"') && quick.includes('value="2026-11-20"'));
+  assert.ok(/data-value="" aria-pressed="false">Todos/.test(quick));
+  // Rangos rápidos: días de Mérida, incluido hoy; «todo» no manda fechas. El nombre del rango nunca viaja al servidor.
+  const dias = preset => { const {desde, hasta} = run(`ConsentService.range(${JSON.stringify(preset)})`); return [desde, hasta]; };
+  const tramo = ([desde, hasta]) => (Date.parse(hasta) - Date.parse(desde)) / 86400000;
+  assert.deepEqual(dias('todo'), ['', '']);
+  assert.deepEqual(dias('otro'), ['', '']);
+  for(const [preset, span] of [['hoy', 0], ['7', 6], ['30', 29]]) {
+    const range = dias(preset);
+    assert.ok(range.every(value => /^\d{4}-\d{2}-\d{2}$/.test(value)) && tramo(range) === span, preset);
+  }
+  assert.equal(dias('hoy')[0], new Intl.DateTimeFormat('en-CA', {timeZone:'America/Merida'}).format(new Date()));
+  // Padrón de cuentas: contadores, estado, fecha exacta y correo escapado.
+  assert.equal(run("AdminTableViews.exact('2026-11-20T06:15:32Z')"), '20/11/2026 00:15:32');
+  assert.equal(run("AdminTableViews.exact('')"), '—');
+  context.accountsState = {...context.consentState, tab:'cuentas', accounts:{status:'ready', range:'hoy', filters:{estado:'inactivas', busqueda:context.bad},
+    totals:{total:3, activas:2, inactivas:1}, list:{page:1, total:1, items:[{email:context.bad, status:'inactiva', emailVerified:false, createdAt:'2026-11-20T06:15:32Z', lastLogin:null}]}}};
+  const accounts = run('ConsentViews.screen(accountsState)');
+  assert.ok(!accounts.includes('<img src=x') && accounts.includes('&lt;img'), 'el correo va escapado en la tabla, el botón y el buscador');
+  assert.ok(accounts.includes('data-tab="cuentas" aria-pressed="true"') && !accounts.includes('Exportar CSV') && accounts.includes('data-admin-action="refresh"'));
+  for(const text of ['<h2>Total</h2><strong>3</strong>', '<h2>Activas</h2><strong>2</strong>', '<h2>Inactivas</h2><strong>1</strong>', 'Inactiva</span>', 'correo sin verificar', '20/11/2026 00:15:32', 'Correo electrónico', 'Fecha y hora de creación', 'data-admin-action="account-consents"', 'data-admin-form="accounts-filter"', 'maxlength="254"']) assert.ok(accounts.includes(text), text);
+  assert.ok(/data-admin-action="quick-status"[^>]*data-value="inactivas" aria-pressed="true"/.test(accounts) && /data-admin-action="quick-range"[^>]*data-value="hoy" aria-pressed="true"/.test(accounts));
+  context.noAccounts = {...context.accountsState, accounts:{...context.accountsState.accounts, list:{page:1, total:0, items:[]}}};
+  assert.ok(run('ConsentViews.screen(noAccounts)').includes('No hay cuentas con estos filtros'));
+  assert.ok(run("ConsentViews.screen({...accountsState, accounts:{status:'loading'}})").includes('Cuentas registradas'), 'mientras carga, las pestañas siguen a la vista');
   // Lo viejo ya no existe.
   const sources = ['modelos', 'vistas', 'controladores'].map(dir => ['administracion', 'equipos'].map(name => read(`${dir}/${name}.js`)).join('\n')).join('\n') + read('index.html');
   for(const gone of ['Commerce', 'BindingService', 'BindingViews', 'BindingAdminController', 'comercial.css', 'admin/comercial', 'admin/vinculacion']) assert.ok(!sources.includes(gone), gone);
@@ -429,16 +459,21 @@ suite('Mi huerto y retirada de despliegues', async () => {
   // Vistas: tres versiones, selector solo con 2 o más huertos, y texto del servidor siempre escapado.
   const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-08', today:() => 0},
     AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
-    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title}});
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
   vm.runInContext('const GardenModelAlias = GardenModel;', views);
   vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
   const V = vm.runInContext('GardenViews', views);
   const plants = [1, 2, 3].map(number => ({number, name:`Planta ${number}`, stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null}));
   const detail = (gardenDevice, extra = {}) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:null, lamp:null, summary:null, ...extra});
   const A = V.summary({status:'ready', gardens:[], detail:null}, 'Ana');
-  assert.ok(A.includes('Aún no tienes un huerto') && A.includes('Crear mi huerto') && !A.includes('disabled') && !A.includes('fieldset'));
+  // Sin huerto: aviso y «Crear mi huerto» operables; la vista previa (fichas y acciones rápidas) va en un <fieldset disabled>.
+  assert.ok(A.includes('Aún no tienes un huerto') && A.includes('Crear mi huerto') && A.includes('<fieldset class="garden-locked" disabled'));
+  assert.ok(A.indexOf('Crear mi huerto') < A.indexOf('<fieldset'), 'el botón para crear el huerto queda fuera del bloqueo');
+  assert.ok(!A.includes('Ver planta') && A.includes('Revisar mi equipo'), 'vista previa sin enlaces a fichas');
   const B = V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null)}, 'Ana');
-  assert.ok(B.includes('Conecta tu equipo') && B.includes('Vincular equipo') && B.includes('Ver planta') && !B.includes('Depósito de agua'));
+  // B (huerto sin vincular): se ven sus plantas, pero bloqueadas y sin «Ver planta» hasta conectar el equipo.
+  assert.ok(B.includes('Conecta tu equipo') && B.includes('Vincular equipo') && !B.includes('Ver planta') && !B.includes('Depósito de agua'));
+  assert.ok(B.includes('<fieldset class="garden-locked" disabled') && B.indexOf('Vincular equipo') < B.indexOf('<fieldset') && B.includes('Planta 1'), 'fichas visibles y bloqueadas');
   const equipo = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:null, linkedAt:null, firmware:null, lastReadingAt:null};
   const C = V.summary({status:'ready', gardens:[detail(equipo).garden], detail:detail(equipo)}, 'Ana');
   assert.ok(C.includes('Depósito de agua') && C.includes('Esperando la primera lectura de tu equipo') && C.includes('Revisar mi equipo') && C.includes('Generado con IA') === false);
@@ -515,8 +550,32 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(!technical.includes('Luz · BH1750'), 'sin lecturas de luz no se muestra la tarjeta');
   assert.ok(technical.includes('Sin lectura') && !technical.includes('<img src=x'), 'sin lectura es «Sin lectura» y el texto del servidor va escapado');
   assert.ok(T.screen({status:'ready', gardens:[garden], garden, data:{...data, hasLight:true, latest:{...data.latest, light:1200}}, range:'24h', log}).includes('Luz · BH1750'));
-  assert.ok(T.screen({status:'ready', gardens:[{...garden, device:null}], garden:{...garden, device:null}, data:null, range:'24h', log}).includes('Vincular equipo'));
-  assert.ok(T.screen({status:'ready', gardens:[], garden:null}).includes('Crear mi huerto'));
+  // Huerto sin vincular (aunque la cuenta tenga otro vinculado): fichas bloqueadas, selector y «Vincular equipo» fuera del bloqueo.
+  const sinVincular = {...garden, id:'2', device:null};
+  const tecnicoSinVincular = T.screen({status:'ready', gardens:[garden, sinVincular], garden:sinVincular, data:null, range:'24h', log});
+  assert.ok(tecnicoSinVincular.includes('Vincular equipo') && tecnicoSinVincular.includes('aún no está vinculado') && tecnicoSinVincular.includes('Regar una planta')
+    && tecnicoSinVincular.includes('<fieldset class="garden-locked" disabled') && tecnicoSinVincular.includes('garden-selector'), 'Panel técnico sin vincular: fichas bloqueadas');
+  const cuidadosSinVincular = Care.screen({status:'ready', gardens:[garden, sinVincular], garden:sinVincular, plants:data.plants, tank:null});
+  assert.ok(cuidadosSinVincular.includes('aún no está vinculado') && cuidadosSinVincular.includes('Registrar un cuidado') && cuidadosSinVincular.includes('data-care-list')
+    && cuidadosSinVincular.indexOf('<fieldset') < cuidadosSinVincular.indexOf('Registrar un cuidado') && cuidadosSinVincular.indexOf('data-care-guides') > cuidadosSinVincular.indexOf('</fieldset>'),
+    'Mantenimiento sin vincular: historial real visible, registro bloqueado, guías fuera');
+  assert.ok(!Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants, tank:null}).includes('garden-locked'), 'con equipo no se bloquea');
+  const soporteSinVincular = Sp.screen({status:'ready', gardens:[garden, sinVincular], garden:sinVincular, data:{hasDevice:false}, diagnostic:null});
+  assert.ok(soporteSinVincular.includes('aún no está vinculado') && soporteSinVincular.includes('Solicita una revisión técnica') && soporteSinVincular.includes('<fieldset class="garden-locked" disabled'),
+    'Soporte sin vincular: fichas bloqueadas');
+  // Controladores: la ficha de planta no se abre en un huerto sin vincular y ninguna escritura sale sin equipo.
+  const controles = read('controladores/huerto.js');
+  const fichaPlanta = controles.slice(controles.indexOf('const PlantController'), controles.indexOf('const GardenController'));
+  assert.ok(/if\(!GardenModel\.linked\(garden\)\)[^\n]*location\.hash = '#huerto'/.test(fichaPlanta), 'PlantController no abre la ficha sin vincular');
+  assert.ok((controles.match(/GardenModel\.linked\(state\.garden\)/g) || []).length >= 4, 'Panel técnico y Mantenimiento comprueban el vínculo');
+  // Sin huerto: cada sección se ve con su estructura, bloqueada en un <fieldset disabled>, con el aviso y «Crear mi huerto» fuera.
+  const locked = html => html.includes('<fieldset class="garden-locked" disabled') && html.includes('id="garden-lock-note"') && html.indexOf('Crear mi huerto') < html.indexOf('<fieldset');
+  const sinHuerto = {status:'ready', gardens:[], garden:null, plants:[], tank:null, data:null};
+  const tecnicoVacio = T.screen(sinHuerto), cuidadosVacio = Care.screen(sinHuerto), soporteVacio = Sp.screen(sinHuerto);
+  assert.ok(locked(tecnicoVacio) && tecnicoVacio.includes('Regar una planta') && tecnicoVacio.includes('Bitácora del equipo'), 'Panel técnico: estructura visible y bloqueada');
+  assert.ok(locked(cuidadosVacio) && cuidadosVacio.includes('Registrar un cuidado') && cuidadosVacio.includes('Historial de cuidados'), 'Mantenimiento: estructura visible y bloqueada');
+  assert.ok(cuidadosVacio.indexOf('data-care-guides') > cuidadosVacio.indexOf('</fieldset>'), 'las guías (lectura) quedan fuera del bloqueo');
+  assert.ok(locked(soporteVacio) && soporteVacio.includes('Revisa tu equipo') && soporteVacio.includes('Solicita una revisión técnica'), 'Soporte: estructura visible y bloqueada');
   const careList = Care.list({status:'ready', page:1, total:2, items:[
     {id:'a', type:'sustrato', plant:3, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:true, corrected:false, reason:dirty},
     {id:'b', type:'cosecha', plant:null, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:true, reason:'Se anotó mal'}]});
@@ -596,7 +655,10 @@ suite('Mi huerto y retirada de despliegues', async () => {
 // ── Depósito con flotador: textos, botones de recarga, insignia y historial del depósito ─────────
 suite('depósito con flotador', async () => {
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
-  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value)}, Date, Intl});
+  // Reloj fijo (12:00 de Mérida del 18-11-2026): «Hoy», «Mañana» y «vie 20 nov» no deben depender del día en que se corre.
+  const AHORA_FIJO = Date.parse('2026-11-18T18:00:00Z');
+  const RelojFijo = class extends Date { constructor(...valores) { super(...(valores.length ? valores : [AHORA_FIJO])); } static now() { return AHORA_FIJO; } };
+  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value)}, Date:RelojFijo, Intl});
   vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
   const M = vm.runInContext('GardenModel', context);
   // Hora de Mérida (UTC−6) y duraciones en días y horas.
@@ -633,7 +695,7 @@ suite('depósito con flotador', async () => {
   assert.deepEqual([noDevice.status, ...noDevice.lines], ['Sin lectura', 'Última recarga: hoy a las 08:00 (detectada por tu equipo)', 'Sueles rellenar cada 4 días.']);
   assert.ok(!M.tankSummary(tank({hasDevice:false, hasWater:null}), NOW).lines.some(text => text.startsWith('Sueles') || text.startsWith('Te diremos')));
   // Vistas: la ficha simple de Mi huerto (con y sin equipo) y la sección «Depósito de agua» de Mantenimiento.
-  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
+  const views = vm.createContext({Date:RelojFijo, escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
     AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
     AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
   vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
@@ -651,7 +713,7 @@ suite('depósito con flotador', async () => {
   const STATES = {
     con_agua:tank({state:'con_agua', lastRefill:mine, averageSeconds:3 * 86400, estimatedLowAt:'2026-11-20T16:00:00Z'}),
     rellenar:tank({state:'rellenar', hasWater:false, lowSince:lowAt, lastRefill:null, canRefill:true, refillBlock:null}),
-    detectada:tank({state:'detectada', hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new Date().toISOString()}}),
+    detectada:tank({state:'detectada', hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new RelojFijo().toISOString()}}),
     sigue_bajo:tank({state:'sigue_bajo', hasWater:false, lowSince:lowAt, lastRefill:mine, canRefill:false, refillBlock:'repetida'}),
     esperando_lectura:tank({state:'esperando_lectura', hasWater:false, lowSince:lowAt, lastRefill:mine, canRefill:false, refillBlock:'repetida'}),
     sin_lectura:tank({state:'sin_lectura', hasWater:null, lastRefill:null}),
@@ -805,7 +867,7 @@ suite('depósito con flotador', async () => {
   // Errores de la regla y versión de los estáticos.
   for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
   const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
-  assert.deepEqual([...versions], ['?v=mvc.46'], 'todos los estáticos en mvc.46');
+  assert.deepEqual([...versions], ['?v=mvc.48'], 'todos los estáticos en mvc.48');
   console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 
@@ -861,6 +923,72 @@ suite('guías de cuidado', async () => {
   assert.ok(!/fetch\(|ChilitoHTTP/.test(control));
   assert.ok(!/<img|data-image|placeholder/i.test(view));
   console.log('PASS guías de cuidado');
+});
+
+// ── Correcciones de la auditoría (REGISTRO_CORRECCIONES.md) ─────────────────────────────────────
+suite('correcciones de auditoría: reautenticación, CSP, cookies __Host-, registro sin textos y superadministración', async () => {
+  let respuestas = [], pedidas = [];
+  const json = (status, body) => ({status, json:async () => body, blob:async () => ({tamaño:3})});
+  const context = vm.createContext({console, crypto:webcrypto, structuredClone, DOMException, AbortController, AbortSignal, Date, Map, Set, Object, Array, JSON, Number, String, RegExp, Error, Intl, encodeURIComponent, decodeURIComponent,
+    URLSearchParams, document:{cookie:'otra=1; __Host-csrftoken=seguro'}, window:{dispatchEvent() {}}, Event,
+    fetch:async (url, opciones) => { pedidas.push([url, opciones]); return respuestas.shift(); }});
+  cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/administracion.js');
+  const run = code => vm.runInContext(code, context);
+  // M-2: una acción crítica que pide reautenticación se reintenta una sola vez tras confirmar la contraseña.
+  let preguntas = 0;
+  run('AdminHTTP').onReauthentication(async () => { preguntas += 1; return true; });
+  respuestas = [json(403, {code:'reauthentication-required'}), json(200, {status:'accepted', credential:'nueva'})];
+  const rotada = await run('AdminHTTP').call('/api/admin/equipos/1/rotar', {method:'POST', body:{}});
+  assert.equal(rotada.credential, 'nueva');
+  assert.equal(preguntas, 1);
+  assert.equal(pedidas.length, 2);
+  assert.notEqual(pedidas[0][1].headers['Idempotency-Key'], pedidas[1][1].headers['Idempotency-Key'], 'el reintento usa una clave de idempotencia nueva');
+  assert.equal(pedidas[0][1].headers['X-CSRFToken'], 'seguro', 'lee la cookie __Host-csrftoken del sitio publicado');
+  // Si el servidor vuelve a pedirla, no hay bucle: se devuelve el código.
+  respuestas = [json(403, {code:'reauthentication-required'}), json(403, {code:'reauthentication-required'})];
+  assert.equal((await run('AdminHTTP').call('/api/admin/equipos/1/rotar', {method:'POST', body:{}})).code, 'reauthentication-required');
+  assert.equal(preguntas, 2);
+  // Cancelar el diálogo: no se reintenta.
+  run('AdminHTTP').onReauthentication(async () => false);
+  pedidas = []; respuestas = [json(403, {code:'reauthentication-required'})];
+  assert.equal((await run('AdminHTTP').call('/api/admin/administradores/cuenta', {method:'POST', body:{}})).code, 'reauthentication-required');
+  assert.equal(pedidas.length, 1);
+  // La exportación CSV también: se descarga con fetch y vuelve como Blob.
+  run('AdminHTTP').onReauthentication(async () => true);
+  respuestas = [json(403, {code:'reauthentication-required'}), json(200, {})];
+  const csv = await run('ConsentService').download({documento:'terminos'});
+  assert.equal(csv.status, 'ready');
+  assert.ok(csv.blob);
+  assert.ok(String(pedidas.at(-1)[0]).startsWith('/api/admin/consentimientos/exportar?documento=terminos'));
+  // Padrón de cuentas: solo los parámetros de su lista blanca; los vacíos no viajan.
+  respuestas = [json(200, {status:'ready', items:[], page:1, total:0, totals:{total:0, activas:0, inactivas:0}})];
+  assert.equal((await run('ConsentService').accounts({estado:'activas', busqueda:'', desde:'', hasta:''}, 1)).status, 'ready');
+  assert.equal(String(pedidas.at(-1)[0]), '/api/admin/consentimientos/cuentas?estado=activas&page=1');
+  // Registro sin textos legales publicados: un mensaje claro en lugar del error genérico.
+  respuestas = [json(503, {status:503, code:'legal-no-publicado'})];
+  assert.equal((await run('AuthService').request('register', {email:'a@b.c', password:'x'.repeat(16), termsAccepted:true, privacyRead:true})).status, 'legal-not-published');
+  assert.ok(read('controladores/cuenta.js').includes("status === 'legal-not-published'"));
+  // Superadministración y textos legales: no quedan atrapados en «Aceptar textos».
+  const M = run('AppModel');
+  assert.equal(M.legalGateExempt({capabilities:['gestionar_administradores']}), true);
+  assert.equal(M.legalGateExempt({capabilities:['gestionar_legales']}), true);
+  assert.equal(M.legalGateExempt({capabilities:['gestionar_guias']}), false);
+  assert.equal(M.legalGateExempt({capabilities:[]}), false);
+  const enrutador = read('controladores/enrutador.js');
+  assert.ok(enrutador.includes('} else if(pendingLegal && !legalExempt) {'), 'las demás cuentas siguen pasando por «Aceptar textos»');
+  // B-6: la CSP ya no admite estilos en línea: ningún atributo style en las plantillas ni en index.html.
+  for(const nombre of [...fs.readdirSync(path.join(FRONT, 'vistas')).filter(f => f.endsWith('.js')).map(f => `vistas/${f}`), 'index.html'])
+    assert.ok(!/\sstyle\s*=\s*["'$]/.test(read(nombre)), `${nombre} no debe llevar atributos style`);
+  assert.ok(read('vistas/huerto.js').includes('data-width='), 'la barra de humedad usa data-width');
+  // El proyecto se llama YouGarden: ningún texto visible conserva el nombre anterior.
+  for(const nombre of ['index.html', ...['vistas', 'modelos', 'controladores'].flatMap(dir => fs.readdirSync(path.join(FRONT, dir)).filter(f => f.endsWith('.js')).map(f => `${dir}/${f}`))])
+    assert.ok(!/El Chilito|tu Chilito/.test(read(nombre)), `${nombre} aún dice «El Chilito»`);
+  assert.ok(read('vistas/publico.js').includes('<span class="brand-name">YouGarden</span>') && read('index.html').includes('<title>YouGarden'), 'marca y título');
+  // Acceso: el autocompletado del navegador (también al pegar, con el campo enfocado) no deja un fondo claro con texto blanco.
+  const apariencia = read('vistas/estilos/apariencia.css');
+  assert.ok(/\.auth-layout \.field input:is\(:-webkit-autofill,:autofill\):is\(:hover,:focus,:focus-visible,:active\)/.test(apariencia)
+    && /-webkit-text-fill-color:#fff!important/.test(apariencia) && /transition:background-color 600000s/.test(apariencia), 'autocompletado legible en todos los estados');
+  console.log('PASS correcciones de auditoría: reautenticación con reintento único, CSV con contraseña, __Host-csrftoken, registro sin textos y superadministración sin bloqueo');
 });
 
 // ── Guardián MVC: los controladores coordinan; escribir en el DOM es de las vistas ─
@@ -1191,6 +1319,48 @@ suite('ciclos de planta', async () => {
   assert.match(control, /else if\(action === 'end-cycle'\) GardenViews\.openDialog\(root, dialogs\.endCycle\);/);
   assert.match(control, /else if\(kind === 'end-cycle'\) endCycle\(event\.target\);/);
   console.log('PASS ciclos de planta: ciclo actual, «Terminar ciclo» con confirmación y «Ciclos anteriores» de solo lectura');
+});
+
+// ── Aviso de cookies: solo con política publicada ─────────────────────────────────────────────
+suite('aviso de cookies', async () => {
+  const visible = [], configurable = [];
+  let respuesta;
+  const context = vm.createContext({console, Set, Object, Promise, document:{addEventListener() {}}, window:{addEventListener() {}},
+    PrivacyData:{cookies:async () => respuesta}, PrivacyModel:{sectionOf:() => null},
+    CookieViews:{screen:() => ({form:{addEventListener() {}}, reserveSpace() {}, closePreferences() {}, banner:on => visible.push(on), settings:on => configurable.push(on)})}});
+  cargar(context, 'controladores/publico.js');
+  const run = code => vm.runInContext(code, context);
+  const pendiente = {status:'ready', decided:false, statistics:false, privacyVersion:'1.0', cookiesVersion:null};
+  respuesta = pendiente;
+  await run('CookieController.start()');
+  assert.equal(visible.at(-1), false, 'sin política de cookies publicada no hay aviso');
+  assert.equal(configurable.at(-1), false, 'ni «Configurar cookies»');
+  respuesta = {...pendiente, cookiesVersion:'1.0'};
+  await run('CookieController.refresh()');
+  assert.equal(visible.at(-1), true, 'en cuanto se publica, aparece');
+  assert.equal(configurable.at(-1), true, 'y vuelve «Configurar cookies»');
+  respuesta = {...pendiente, cookiesVersion:'1.0', decided:true};
+  await run('CookieController.refresh()');
+  assert.equal(visible.at(-1), false, 'con la elección vigente no se vuelve a pedir');
+  assert.equal(configurable.at(-1), true, 'pero se puede cambiar desde «Configurar cookies»');
+  const antes = configurable.length;
+  respuesta = {status:'unavailable'};
+  await run('CookieController.refresh()');
+  assert.equal(visible.at(-1), true, 'sin respuesta del servidor se pregunta, nunca se presume');
+  assert.equal(configurable.length, antes, 'sin respuesta no cambia la disponibilidad de «Configurar cookies»');
+  // La vista marca la raíz del documento y la hoja de estilos oculta los botones y su elemento de lista.
+  const raiz = {atributos:new Set(), toggleAttribute(nombre, on) { if(on) this.atributos.add(nombre); else this.atributos.delete(nombre); }};
+  const vista = vm.createContext({document:{documentElement:raiz, createElement:() => ({querySelector:() => ({}), set innerHTML(_) {}}), body:{append() {}}}});
+  cargar(vista, 'vistas/comun.js', 'vistas/publico.js');
+  vm.runInContext('CookieViews.screen().settings(false)', vista);
+  assert.ok(raiz.atributos.has('data-cookies-sin-politica'));
+  vm.runInContext('CookieViews.screen().settings(true)', vista);
+  assert.ok(!raiz.atributos.has('data-cookies-sin-politica'));
+  assert.match(read('vistas/estilos/cookies.css'), /\[data-cookies-sin-politica\] \[data-cookie-settings\],\n\[data-cookies-sin-politica\] li:has\(> \[data-cookie-settings\]\) \{ display:none; \}/);
+  // Quien publica la política de cookies ve el aviso sin recargar la página.
+  const legal = read('controladores/administracion.js');
+  assert.equal((legal.match(/mostrarAviso\('exito', `Versión \$\{version\} publicada[^\n]*\n\s+if\(type === 'politica_cookies'\) CookieController\.refresh\(\);/g) || []).length, 2);
+  console.log('PASS aviso de cookies: aviso y «Configurar cookies» ocultos sin política publicada, aparecen al publicarla y no se repite tras decidir');
 });
 
 // ── Ejecución: una suite tras otra ────────────────────────────────────────────────────────────

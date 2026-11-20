@@ -79,7 +79,16 @@ html body .auth-layout .password-input-group { background:rgba(255,255,255,.1);b
 html body .auth-layout .password-input-group input { background:transparent!important;border-color:transparent!important; }
 html body .auth-layout .password-eye-btn { color:#fff!important;background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.2)!important; }
 .auth-layout .field input::placeholder { color:rgba(255,255,255,.66);-webkit-text-fill-color:rgba(255,255,255,.66); }
-.auth-layout .field input:-webkit-autofill { -webkit-text-fill-color:#fff;box-shadow:inset 0 0 0 40px #26453a;caret-color:#fff; }
+/* Autocompletado de Chrome/Edge/Safari (también al pegar un correo, una contraseña o un código guardados): el navegador
+   pone su propio fondo claro y, con el texto blanco, no se veía nada. Se conserva el fondo del campo en todos los estados
+   (también con foco, que es cuando se pega) y el texto sigue blanco. La transición larga impide que el navegador
+   llegue a pintar su fondo; la sombra interior lo tapa en los navegadores que no respetan la transición. */
+html body .auth-layout .field input:is(:-webkit-autofill,:autofill),
+html body .auth-layout .field input:is(:-webkit-autofill,:autofill):is(:hover,:focus,:focus-visible,:active) {
+  -webkit-text-fill-color:#fff!important;color:#fff!important;caret-color:#fff!important;
+  box-shadow:inset 0 0 0 100px #26453a!important;
+  transition:background-color 600000s 0s,color 600000s 0s!important;
+}
 .auth-layout .field input:focus-visible { outline-color:#fff!important; }
 .auth-layout .password-input-group:focus-within { outline-color:#fff; }
 .auth-layout .auth-text-link,.auth-layout .auth-switch a,.auth-layout .terms-field a { color:#fff; }
@@ -784,6 +793,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .p
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading .button { color:#fff!important;background:var(--vidrio-sobre-verde)!important;border:1px solid var(--vidrio-sobre-verde-borde)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-5);margin-top:var(--esp-5); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns>.bento-panel { margin:0!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns>.bento-panel>.button { display:inline-flex;margin-top:var(--esp-5); }
 @media (max-width:900px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns { grid-template-columns:1fr; } }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating { color:#fff;background:var(--pieza-verde)!important;border-color:var(--pieza-verde-borde)!important;box-shadow:var(--pieza-verde-filo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating :is(h2,p,label) { color:#fff!important; }
@@ -1281,6 +1291,46 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 @media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-profile [data-profile] { grid-template-columns:minmax(0,1fr); } }
 /* La bienvenida usa los mismos campos: la ayuda del alias va debajo del campo, no a su lado. */
 html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] small { display:block;margin:var(--esp-2) 0 0;color:var(--claro-suave);font-size:var(--texto-meta);font-weight:400;line-height:1.4; }
+
+/* Ficha de bienvenida — Liquid Glass: etiquetas encima, 2 columnas, Alias ancho completo y pie de botones propio. */
+html body[data-private=true][data-role=user] dialog.app-dialog[data-welcome] {
+  box-sizing:border-box;width:min(480px,calc(100% - 32px));max-width:480px;padding:32px!important;border-radius:24px!important;
+  background:rgba(255,255,255,.62)!important;border:1px solid rgba(255,255,255,.72)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);
+  box-shadow:0 1px 0 rgba(255,255,255,.8) inset,0 28px 64px -24px rgba(24,40,28,.45)!important;
+}
+html body[data-private=true][data-role=user] dialog[data-welcome]::backdrop { background:rgba(24,30,22,.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px); }
+html body[data-private=true][data-role=user] dialog[data-welcome] h2 { margin:0 0 10px;font-size:24px;line-height:1.2; }
+html body[data-private=true][data-role=user] dialog[data-welcome] > p { margin:0 0 22px;line-height:1.5; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px;align-items:start;margin:0; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] label { display:flex;flex-direction:column;gap:6px;flex:none;min-width:0;margin:0;font-size:14px;font-weight:600; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] label:has([name=alias]),
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > p,
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions { grid-column:1/-1; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > p { margin:0; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] small { margin:0; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] input {
+  width:100%;box-sizing:border-box;min-height:44px;padding:10px 14px;border-radius:13px;
+  background:rgba(255,255,255,.72);border:1px solid rgba(31,25,21,.14);font:500 15px/1.3 var(--body);
+}
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] input:focus-visible {
+  outline:0;border-color:var(--claro-verde);box-shadow:0 0 0 3px rgba(47,106,72,.22);
+}
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-top:6px; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions .button { flex:0 0 auto;width:auto;min-width:120px;border-radius:999px!important; }
+@media (prefers-reduced-motion:no-preference) {
+  html body[data-private=true][data-role=user] dialog[data-welcome] .btn-liquid-brand:hover:not(:disabled) { transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(31,90,56,.6),var(--lg-solid)!important; }
+}
+@media (max-width:520px) {
+  html body[data-private=true][data-role=user] dialog.app-dialog[data-welcome] { padding:28px 22px!important; }
+  html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] { grid-template-columns:1fr; }
+  html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions { flex-direction:column-reverse; }
+  html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions .button { width:100%; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true][data-role=user] dialog.app-dialog[data-welcome] { background:#fffdf9!important;-webkit-backdrop-filter:none;backdrop-filter:none; }
+  html body[data-private=true][data-role=user] dialog[data-welcome]::backdrop { -webkit-backdrop-filter:none;backdrop-filter:none; }
+}
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card { display:flex;flex-direction:column;gap:var(--esp-2); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card>.app-actions:last-child { margin-top:auto; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .my-garden>h2 { font-size:22px!important;font-weight:650;letter-spacing:-.02em; }
@@ -2208,3 +2258,8 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .p
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-4); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns h3 { margin:0 0 var(--esp-2);font-size:14px; }
 @media (max-width:700px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns { grid-template-columns:1fr; } }
+
+/* Sin huerto activo: cada sección se ve con su estructura, pero de solo lectura (<fieldset disabled>). */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page fieldset.garden-locked { border:0;padding:0;margin:0;min-width:0;display:grid;gap:var(--esp-5);opacity:.6;filter:saturate(.6); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page fieldset.garden-locked :is(button,input,select,textarea,label) { cursor:not-allowed; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-lock-note { margin-bottom:var(--esp-5); }

@@ -60,6 +60,24 @@ class AyudasHuerto:
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
         return respuesta.json()['garden']['id']
 
+    def huerto_vinculado(self, nombre=None):
+        """Huerto con su equipo vinculado por el flujo real (código + canje), con identificador y MAC únicos por prueba.
+        Desde la corrección «huerto no vinculado», editar plantas, registrar cuidados u ordenar exige un equipo vinculado."""
+        self._vinculados = getattr(self, '_vinculados', 0) + 1
+        numero = self._vinculados
+        huerto_id = self.crear_huerto(nombre)
+        identificador = f'CHI-V{numero:03d}'
+        equipo(identificador, f'02:00:00:01:00:{numero:02x}')
+        self.assertEqual(self.vincular(identificador, codigo=self.codigo(huerto_id)).json()['result'], 'vinculado')
+        return huerto_id
+
+    def con_huerto(self, usuario):
+        """Cliente de una cuenta con su propio huerto: así una prueba de acceso ajeno prueba la propiedad (404) y no la
+        falta de huerto, que desde la corrección «sin huerto» responde antes con 403 «huerto-requerido»."""
+        cliente = self.cliente(usuario)
+        self.crear_huerto(cliente=cliente)
+        return cliente
+
     def codigo(self, huerto_id):
         respuesta = self.post(f'/api/huertos/{huerto_id}/codigo')
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
@@ -128,6 +146,7 @@ class Huertos(BaseHuerto):
     def test_otra_cuenta_recibe_404_en_cada_endpoint(self):
         huerto_id = self.huerto_con_equipo()
         ajena = self.cliente(self.otra)
+        suyo = self.crear_huerto(cliente=ajena)     # con huerto propio: así se prueba la propiedad, no la falta de huerto
         for ruta in ('', '/ia', '/vinculacion', '/plantas/1'):
             with self.subTest(ruta=ruta):
                 self.assertEqual(ajena.get(f'/api/huertos/{huerto_id}{ruta}').status_code, 404)
@@ -136,7 +155,7 @@ class Huertos(BaseHuerto):
         for ruta, datos in pruebas:
             with self.subTest(ruta=ruta):
                 self.assertEqual(self.post(f'/api/huertos/{huerto_id}{ruta}', datos, ajena).status_code, 404)
-        self.assertEqual(ajena.get('/api/huertos').json()['items'], [])
+        self.assertEqual([item['id'] for item in ajena.get('/api/huertos').json()['items']], [suyo])
         self.assertEqual(Huerto.objects.get(pk=huerto_id).nombre, 'Mi huerto')
 
     def test_inexistente_y_ajeno_responden_igual(self):
@@ -165,7 +184,7 @@ class Huertos(BaseHuerto):
 
 class Plantas(BaseHuerto):
     def test_editar_nombre_fecha_y_etapa(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         hoy = timezone.localdate().isoformat()
         respuesta = self.post(f'/api/huertos/{huerto_id}/plantas/2', {'name': 'Chilito', 'sowingDate': hoy, 'stage': 'germinacion'})
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
@@ -184,7 +203,7 @@ class Plantas(BaseHuerto):
         self.assertEqual(etapas, [{'stage': 'sin_sembrar', 'since': hoy.isoformat()}])
 
     def test_cambiar_etapa_agrega_en_orden(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         respuesta = self.post(f'/api/huertos/{huerto_id}/plantas/1', {'stage': 'germinacion'})
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
         etapas = self.client.get(f'/api/huertos/{huerto_id}/plantas/1').json()['stages']
@@ -193,7 +212,7 @@ class Plantas(BaseHuerto):
 
     def test_relleno_no_duplica(self):
         relleno = importlib.import_module('web.migrations.0003_linea_de_vida').RELLENO
-        primero = self.crear_huerto()
+        primero = self.huerto_vinculado()
         self.post(f'/api/huertos/{primero}/plantas/1', {'stage': 'germinacion'})
         with connection.cursor() as cursor:
             cursor.execute(relleno)
@@ -214,7 +233,7 @@ class Plantas(BaseHuerto):
         self.assertEqual(PlantaEtapa.objects.filter(planta__huerto_id=primero).count(), 4)
 
     def test_validacion(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         futuro = (timezone.localdate() + timedelta(days=2)).isoformat()
         casos = ({'name': ''}, {'name': 'x' * 41}, {'sowingDate': futuro}, {'sowingDate': 'ayer'}, {'stage': 'madura'}, {}, {'otro': 1})
         for datos in casos:
@@ -356,7 +375,8 @@ class Ordenes(BaseHuerto):
 
     def test_sin_equipo_no_hay_ordenes(self):
         huerto_id = self.crear_huerto()
-        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'}).status_code, 400)
+        respuesta = self.post(f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'})
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (403, 'huerto-sin-vincular'))
 
     def test_registrar_recarga(self):
         huerto_id = self.huerto_con_equipo()
@@ -551,7 +571,7 @@ class Cuidados(BaseHuerto):
         self.assertNotIn('latest', self.listar('?tipo=cosecha').json())
 
     def test_otra_cuenta(self):
-        ajena = self.cliente(self.otra)
+        ajena = self.con_huerto(self.otra)
         self.assertEqual(ajena.get(f'/api/huertos/{self.huerto_id}/cuidados').status_code, 404)
         self.assertEqual(self.post(f'/api/huertos/{self.huerto_id}/cuidados', {'type': 'rellenar_deposito'}, ajena).status_code, 404)
 
@@ -704,10 +724,10 @@ class Deposito(BaseHuerto):
     def test_solo_el_dueno_confirma_o_descarta(self):
         self.flotador((3, True), (2, False), (1, True))
         deteccion = self.pendiente()
-        otra = self.cliente(self.otra)
+        otra = self.con_huerto(self.otra)
         self.assertEqual(self.confirmar(deteccion, otra).status_code, 404)
         self.assertEqual(self.descartar(deteccion, otra).status_code, 404)
-        self.assertEqual(self.confirmar(deteccion, self.cliente(self.editor)).status_code, 404)
+        self.assertEqual(self.confirmar(deteccion, self.con_huerto(self.editor)).status_code, 404)
         self.assertEqual(self.client.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/confirmar').status_code, 400)  # sin recibo
         ajena = self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{uuid.uuid4()}/confirmar')
         self.assertEqual(ajena.status_code, 404)
@@ -877,26 +897,27 @@ class Deposito(BaseHuerto):
         self.assertEqual(self.deposito()['tank']['lastRefill']['byOwner'], False)
 
     # ── Huerto sin equipo ──
-    def test_sin_equipo_una_recarga_cada_12_horas(self):
+    def test_sin_equipo_no_registra_recargas(self):
+        """Huerto no vinculado: el depósito se ve, pero «Ya lo rellené» responde 403 «huerto-sin-vincular»."""
         huerto = self.crear_huerto('Sin equipo')
-        self.assertEqual(self.registrar(huerto, doneAt=self.hace(13)).status_code, 200)
-        self.assertEqual(self.registrar(huerto).status_code, 200)
-        respuesta = self.registrar(huerto, doneAt=self.hace(1))
-        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (409, 'deposito-espera'))
-        self.assertIn('Podrás', respuesta.json()['message'].replace('podrás', 'Podrás'))
-        tanque = self.deposito(huerto)['tank']
-        ultima = Cuidado.objects.filter(huerto_id=huerto).order_by('-realizado_en').first().realizado_en
-        self.assertEqual((tanque['hasDevice'], tanque['canRefill'], tanque['refillBlock']), (False, False, 'espera'))
-        self.assertEqual(tanque['nextRefillAt'], (ultima + timedelta(hours=12)).isoformat())
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Cuidado.objects.create(huerto_id=huerto, tipo='rellenar_deposito', registrado_por=self.dueña)
+        respuesta = self.registrar(huerto)
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (403, 'huerto-sin-vincular'))
+        self.assertIn('Vincula', respuesta.json()['message'])
+        self.assertFalse(Cuidado.objects.filter(huerto_id=huerto).exists())
+        self.assertFalse(self.deposito(huerto)['tank']['hasDevice'])
 
     def test_sin_equipo_muestra_la_frecuencia(self):
+        """Un huerto que tuvo equipo y se desvinculó conserva su historial: se lee, aunque ya no se puede registrar."""
         huerto = self.crear_huerto('Sin equipo')
-        self.registrar(huerto, doneAt=self.hace(24 * 6))
+        equipo('CHI-0002', '02:00:00:00:00:02')
+        self.assertEqual(self.vincular('CHI-0002', codigo=self.codigo(huerto)).json()['result'], 'vinculado')
+        self.assertEqual(self.registrar(huerto, doneAt=self.hace(24 * 6)).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto}/desvincular').status_code, 200)
         self.assertIsNone(self.deposito(huerto)['tank']['refillEverySeconds'])
+        self.assertEqual(self.vincular('CHI-0002', codigo=self.codigo(huerto)).json()['result'], 'vinculado')
         for horas in (24 * 4, 24 * 2):
             self.assertEqual(self.registrar(huerto, doneAt=self.hace(horas)).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto}/desvincular').status_code, 200)
         tanque = self.deposito(huerto)['tank']
         self.assertHoras(tanque['refillEverySeconds'], 48)
         self.assertEqual((tanque['averageSeconds'], tanque['estimatedLowAt'], self.deposito(huerto)['loads']), (None, None, []))
@@ -1029,7 +1050,7 @@ class Soporte(BaseHuerto):
 
     def test_otra_cuenta_recibe_404(self):
         caso = self.abrir().json()['case']
-        ajena = self.cliente(self.otra)
+        ajena = self.con_huerto(self.otra)
         self.assertEqual(ajena.get(self.ruta).status_code, 404)
         self.assertEqual(self.post(self.ruta, {'incident': 'bomba', 'consent': True}, ajena).status_code, 404)
         for accion in ('revocar', 'cancelar'):
@@ -1041,7 +1062,7 @@ class Soporte(BaseHuerto):
         sin_equipo = self.cliente(self.otra)
         huerto_id = self.crear_huerto(cliente=sin_equipo)
         respuesta = self.post(f'/api/huertos/{huerto_id}/soporte', {'incident': 'bomba', 'consent': True}, sin_equipo)
-        self.assertEqual(respuesta.status_code, 400)
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (403, 'huerto-sin-vincular'))
 
     def test_autodiagnostico_propio_y_ajeno(self):
         orden = self.post(f'/api/huertos/{self.huerto_id}/comandos', {'type': 'autodiagnostico'}).json()['command']
@@ -1127,10 +1148,18 @@ class SimuladorDeEquipoEntorno(SimpleTestCase):
 
     def test_se_niega_fuera_de_desarrollo(self):
         cambios = ({'CHILITO_DEBUG': '0'}, {'CHILITO_DEBUG': ''}, {'CHILITO_ENV': 'deployment'}, {'CHILITO_ENV': ''},
-                   {'CHILITO_SIM_DB': 'chilito_produccion'}, {'CHILITO_SIM_DB': ''}, {'CHILITO_SIM_CLAVE_IOT': ''})
+                   {'CHILITO_SIM_DB': 'chilito_produccion'}, {'CHILITO_SIM_DB': ''}, {'CHILITO_SIM_CLAVE_IOT': ''},
+                   # B-5: antes pasaban porque el nombre contenía «test» o «prueba».
+                   {'CHILITO_SIM_DB': 'chilito_prod_attest'}, {'CHILITO_SIM_DB': 'produccion_pruebas'}, {'CHILITO_SIM_DB': 'test_otra_app'},
+                   {'CHILITO_SIM_DB': 'test_chilito_x; DROP'})
         for cambio in cambios:
             with self.subTest(cambio=cambio), self.assertRaises(SystemExit):
                 simular_equipo.exigir_entorno({**self.BASE, **cambio})
+
+    def test_acepta_solo_bases_de_desarrollo_exactas(self):
+        for base in ('chilito_integracion_sinteticos', 'test_chilito_integracion_sinteticos', 'test_chilito_x'):
+            with self.subTest(base=base):
+                self.assertEqual(simular_equipo.exigir_entorno({**self.BASE, 'CHILITO_SIM_DB': base})['dbname'], base)
 
     def test_argumentos_del_deposito(self):
         argumentos = simular_equipo.leer_argumentos(['CHI-1', 'medir', '--sin-agua', '--hace', '48'])
@@ -1320,3 +1349,118 @@ class SimuladorDeEquipo(AyudasHuerto, TransactionTestCase):
         with self.conexion_iot() as con, self.assertRaises(SystemExit):
             simular_equipo.equipo(con, 'CHI-0009')
 
+
+
+class SinHuerto(BaseHuerto):
+    """Doble capa (bug funcional 1): sin huerto activo, la cuenta ve las secciones y usa su cuenta, pero el servidor
+    rechaza cualquier escritura del huerto con 403 «huerto-requerido» y un mensaje claro."""
+    AJENO = '00000000-0000-4000-8000-000000000001'
+    ESCRITURAS = (
+        '/api/huertos/1/renombrar', '/api/huertos/1/archivar', '/api/huertos/1/codigo', '/api/huertos/1/desvincular',
+        '/api/huertos/1/plantas/1', '/api/huertos/1/plantas/1/terminar-ciclo', '/api/huertos/1/comandos', '/api/huertos/1/cuidados',
+        f'/api/huertos/1/deposito/detecciones/{AJENO}/confirmar', f'/api/huertos/1/deposito/detecciones/{AJENO}/descartar',
+        '/api/huertos/1/soporte', f'/api/soporte/{AJENO}/revocar', f'/api/soporte/{AJENO}/cancelar')
+
+    def test_toda_escritura_del_huerto_responde_403_con_mensaje(self):
+        from web.models import Idempotencia
+        for ruta in self.ESCRITURAS:
+            with self.subTest(ruta=ruta):
+                respuesta = self.post(ruta, {'name': 'X', 'type': 'sustrato', 'plant': 1})
+                self.assertEqual(respuesta.status_code, 403, respuesta.content)
+                cuerpo = respuesta.json()
+                self.assertEqual(cuerpo['code'], 'huerto-requerido')
+                self.assertIn('huerto', cuerpo['message'])
+        self.assertFalse(Idempotencia.objects.filter(actor=self.dueña).exists(), 'un rechazo no deja recibo')
+
+    def test_puede_ver_las_secciones(self):
+        self.assertEqual(self.client.get('/api/huertos').json()['items'], [])
+        self.assertEqual(self.client.get('/api/guias').status_code, 200)
+        perfil = self.client.get('/api/cuenta').json()
+        self.assertFalse(perfil['gardenAssigned'])
+
+    def test_la_cuenta_y_crear_el_huerto_siguen_permitidos(self):
+        self.assertEqual(self.post('/api/cuenta/perfil', {'firstName': 'Ana'}).status_code, 200)
+        self.assertEqual(self.post('/api/avisos/leer-todos').status_code, 200)
+        huerto_id = self.crear_huerto()
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/renombrar', {'name': 'Balcón'}).status_code, 200, 'con huerto ya escribe')
+
+    def test_archivar_el_ultimo_huerto_vuelve_a_bloquear(self):
+        huerto_id = self.crear_huerto()
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/archivar').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/cuidados', {'type': 'sustrato', 'plant': 1}).json()['code'], 'huerto-requerido')
+
+    def test_huerto_ajeno_sigue_siendo_404(self):
+        ajeno = self.crear_huerto(cliente=self.cliente(self.otra))
+        self.crear_huerto()
+        self.assertEqual(self.post(f'/api/huertos/{ajeno}/renombrar', {'name': 'Mío'}).status_code, 404)
+
+    def test_estado_de_orden_de_un_huerto_archivado_es_404(self):
+        """B-10: el estado de una orden solo se ve mientras su huerto siga activo y sea de la cuenta."""
+        huerto_id = self.huerto_con_equipo()
+        orden = self.post(f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'}).json()['command']['id']
+        self.assertEqual(self.client.get(f'/api/comandos/{orden}').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/desvincular').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/archivar').status_code, 200)
+        self.assertEqual(self.client.get(f'/api/comandos/{orden}').status_code, 404)
+
+
+class HuertoSinVincular(BaseHuerto):
+    """Corrección BUG-1b: cada huerto es independiente. Uno creado pero sin equipo vinculado se ve completo, pero no
+    admite registros, ediciones ni órdenes (403 «huerto-sin-vincular»), aunque la cuenta tenga otro huerto vinculado."""
+    AJENO = '00000000-0000-4000-8000-000000000001'
+
+    def escrituras(self, huerto_id):
+        return ((f'/api/huertos/{huerto_id}/plantas/1', {'name': 'Chile'}),
+                (f'/api/huertos/{huerto_id}/plantas/1/terminar-ciclo', {'reason': 'otro'}),
+                (f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'}),
+                (f'/api/huertos/{huerto_id}/cuidados', {'type': 'sustrato', 'plant': 1}),
+                (f'/api/huertos/{huerto_id}/cuidados', {'type': 'rellenar_deposito'}),
+                (f'/api/huertos/{huerto_id}/deposito/detecciones/{self.AJENO}/confirmar', {}),
+                (f'/api/huertos/{huerto_id}/deposito/detecciones/{self.AJENO}/descartar', {}),
+                (f'/api/huertos/{huerto_id}/soporte', {'incident': 'bomba', 'consent': True}))
+
+    def setUp(self):
+        super().setUp()
+        self.vinculado = self.huerto_con_equipo()      # la cuenta ya tiene un huerto conectado…
+        self.sin_vincular = self.crear_huerto('Patio')  # …y crea otro que aún no vincula
+
+    def test_toda_escritura_del_huerto_sin_vincular_responde_403_con_mensaje(self):
+        from web.models import Idempotencia
+        for ruta, datos in self.escrituras(self.sin_vincular):
+            with self.subTest(ruta=ruta, datos=datos):
+                respuesta = self.post(ruta, datos)
+                self.assertEqual(respuesta.status_code, 403, respuesta.content)
+                self.assertEqual(respuesta.json()['code'], 'huerto-sin-vincular')
+                self.assertIn('Vincula', respuesta.json()['message'])
+        self.assertFalse(Cuidado.objects.filter(huerto_id=self.sin_vincular).exists())
+        self.assertFalse(Idempotencia.objects.filter(actor=self.dueña, ruta__contains=f'/huertos/{self.sin_vincular}/').exists())
+
+    def test_el_otro_huerto_vinculado_sigue_operando(self):
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/plantas/1', {'name': 'Chile'}).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/cuidados', {'type': 'sustrato', 'plant': 1}).status_code, 200)
+
+    def test_se_ve_todo(self):
+        for ruta in ('', '/plantas/1', '/cuidados', '/deposito', '/bitacora', '/telemetria', '/soporte'):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.client.get(f'/api/huertos/{self.sin_vincular}{ruta}').status_code, 200)
+
+    def test_gestion_del_huerto_permitida(self):
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/renombrar', {'name': 'Terraza'}).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/codigo').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/archivar').status_code, 200)
+
+    def test_al_vincular_se_habilita(self):
+        equipo('CHI-0002', '02:00:00:00:00:02')
+        self.assertEqual(self.vincular('CHI-0002', codigo=self.codigo(self.sin_vincular)).json()['result'], 'vinculado')
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/plantas/1', {'name': 'Chile'}).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/cuidados', {'type': 'sustrato', 'plant': 1}).status_code, 200)
+
+    def test_al_desvincular_se_vuelve_a_bloquear(self):
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/desvincular').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/plantas/1', {'name': 'Chile'}).json()['code'], 'huerto-sin-vincular')
+
+    def test_huerto_ajeno_sigue_siendo_404(self):
+        ajena = self.con_huerto(self.otra)
+        for ruta, datos in self.escrituras(self.sin_vincular)[:4]:
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.post(ruta, datos, ajena).status_code, 404)

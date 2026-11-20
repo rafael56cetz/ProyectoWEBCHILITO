@@ -147,8 +147,9 @@ def _resumen_ia_dto(resumen):
 
 
 def detalle(actor, huerto_id):
+    # B-1: un GET no escribe. Las recomendaciones salen con cada lectura del equipo (trigger de web.0007) y con la
+    # tarea periódica (`manage.py tareas_periodicas` o `revisar_recomendaciones`).
     huerto = s.huerto_propio(actor, huerto_id)
-    _revisar_recomendaciones(huerto)
     equipo = _equipo_de(huerto)
     plantas = Planta.objects.filter(huerto_id=huerto.pk).order_by('numero')
     resumen = IaResumen.objects.filter(huerto_id=huerto.pk).order_by('-generado_en').first()
@@ -282,13 +283,6 @@ def terminar_ciclo(actor, huerto_id, numero, motivo, nota):
             'cycle': _ciclo_dto(ciclos[-1]), 'ended': _ciclo_dto(ciclos[-2])}
 
 
-def _revisar_recomendaciones(huerto):
-    """Al abrir Mi huerto: la base avisa al dueño de lo que encuentre (una vez por ciclo y situación)."""
-    with connection.cursor() as cursor:
-        for planta_id in Planta.objects.filter(huerto_id=huerto.pk).exclude(etapa='sin_sembrar').values_list('pk', flat=True):
-            cursor.execute('SELECT chilito_recomendaciones_planta(%s)', [planta_id])
-
-
 def _nombre_planta(nombre):
     """Nombre de cosa (1 a 40): «Planta 1», el de fábrica, sigue siendo válido."""
     return v.nombre_cosa(nombre, 'name', maximo=40)
@@ -359,7 +353,9 @@ def crear_comando(actor, huerto_id, tipo, planta, duracion):
 
 
 def estado_comando(actor, comando_id):
-    comando = Comando.objects.filter(pk=comando_id, solicitado_por_id=actor.pk, origen='usuario').first()
+    # B-10: como `huerto_propio`, solo de un huerto activo de la cuenta; uno archivado responde lo mismo que uno inexistente.
+    comando = Comando.objects.filter(pk=comando_id, solicitado_por_id=actor.pk, origen='usuario',
+                                     huerto__propietario_id=actor.pk, huerto__estado='activo').first()
     if comando is None:
         raise Http404
     return {'status': 'ready', 'command': _comando_dto(comando, con_diagnostico=True)}

@@ -17,7 +17,7 @@ from datos import ventas
 from datos.models import (Auditoria, Comando, Cuidado, Dispositivo, DispositivoEvento, ResumenHoraHuerto, ResumenHoraPlanta,
                           SoporteCaso, SoporteSesion, Venta)
 from huerto.services import ZONA_MERIDA
-from tests import cuenta, publicar_textos
+from tests import cuenta, publicar_textos, reautenticado
 from web import sesion
 from web.models import Idempotencia
 
@@ -41,6 +41,7 @@ class BaseAdmin(TestCase):
         cliente = Client(HTTP_HOST='127.0.0.1')
         if usuario is not None:
             cliente.force_login(usuario, backend='django.contrib.auth.backends.ModelBackend')
+            reautenticado(cliente)     # M-2: estas pruebas parten de una contraseña confirmada (tests/test_correcciones_auditoria.py prueba lo contrario)
         return cliente
 
     def post(self, cliente, ruta, datos=None):
@@ -74,7 +75,7 @@ class Capacidades(BaseAdmin):
         ('post', '/api/admin/ventas/1/cancelar', 'gestionar_ventas'),
         ('get', '/api/admin/legales?tipo=terminos', 'gestionar_legales'), ('post', '/api/admin/legales/vista-previa', 'gestionar_legales'),
         ('get', '/api/admin/consentimientos', 'ver_consentimientos'), ('get', '/api/admin/consentimientos/resumen', 'ver_consentimientos'),
-        ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos'),
+        ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos'), ('get', '/api/admin/consentimientos/cuentas', 'ver_consentimientos'),
         ('get', '/api/admin/flota', 'ver_flota'), ('get', '/api/admin/soporte', 'atender_soporte'),
         ('get', f'/api/admin/soporte/{FOLIO_AJENO}', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender', 'atender_soporte'),
         ('post', f'/api/admin/soporte/{UUID_AJENO}/conectar', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/resolver', 'atender_soporte'),

@@ -40,8 +40,6 @@ ACCIONES_SOPORTE = ('lectura_inmediata', 'autodiagnostico', 'probar_bomba', 'lam
 SEGUNDOS_PRUEBA_BOMBA = (1, 5)
 EVENTOS_DE_SESION = timedelta(hours=24)
 MAXIMO_LISTA_SESION = 50
-# La base anonimiza a los 15 días de la solicitud; aquí solo se usa para mostrar la fecha.
-DIAS_PARA_ELIMINAR = 15
 # Orden de las revisiones del autodiagnóstico en pantalla (3.7).
 COMPONENTES = ('conexion', 'sensor_ambiente', 'sensor_luz', 'sensor_sustrato_1', 'sensor_sustrato_2', 'sensor_sustrato_3',
                'flotador', 'bomba_1', 'bomba_2', 'bomba_3', 'lampara', 'ventilador')
@@ -51,6 +49,22 @@ FILTROS_AVISOS = {'todos': None, 'no_leidos': None, 'equipo': ('dispositivo', 'v
 
 class FactorRequerido(PermissionDenied):
     """Administrador sin TOTP ni WebAuthn: puede entrar a su cuenta, no al panel."""
+
+
+class HuertoRequerido(PermissionDenied):
+    """Cuenta sin huerto activo: puede ver las secciones y usar su cuenta, pero no escribir en el huerto."""
+
+    code = 'huerto-requerido'
+    message = 'Primero crea tu huerto y vincula tu equipo. Mientras tanto, puedes recorrer las secciones.'
+
+
+class HuertoSinVincular(PermissionDenied):
+    """El huerto elegido existe pero no tiene equipo vinculado: se ve todo, pero no se registra ni se ordena nada.
+    Cada huerto es independiente: tener otro huerto vinculado no habilita este."""
+
+    code = 'huerto-sin-vincular'
+    message = ('Vincula el equipo de este huerto para registrar cuidados, editar plantas o dar órdenes. '
+               'Mientras tanto puedes ver toda su información.')
 
 
 class RegistroDesactualizado(Exception):
@@ -91,8 +105,6 @@ def session_contract(actor):
     caps = sorted(capabilities(user))
     return {'status': 'authenticated', 'sessionConfirmed': True, 'role': 'admin' if caps else 'user',
             'capabilities': caps, 'mfaRequired': bool(caps) and not strong_factor(user),
-            'deletionRequestedAt': user.anonimizacion_solicitada_en.isoformat() if user.anonimizacion_solicitada_en else None,
-            'deletionDate': (user.anonimizacion_solicitada_en + timedelta(days=DIAS_PARA_ELIMINAR)).isoformat() if user.anonimizacion_solicitada_en else None,
             'profile': {'id': str(user.pk), 'email': user.email, 'verified': True, 'status': 'ready',
                         'firstName': user.first_name, 'lastName': user.last_name, 'alias': user.alias,
                         'greeting': user.nombre_presentacion, 'welcomePending': user.bienvenida_atendida_en is None}}
@@ -108,6 +120,15 @@ def aceptaciones_pendientes(actor):
 
 def has_garden(actor):
     return Huerto.objects.filter(propietario=identity(actor), estado='activo').exists()
+
+
+def huerto_vinculado(actor, huerto_id):
+    """True si el huerto activo de la cuenta tiene equipo; False si no lo tiene; None si no es un huerto activo propio
+    (así la ruta sigue respondiendo 404, igual que un huerto ajeno o inexistente)."""
+    huerto = Huerto.objects.filter(pk=huerto_id, propietario_id=actor.pk, estado='activo').first()
+    if huerto is None:
+        return None
+    return Dispositivo.objects.filter(huerto_id=huerto.pk).exists()
 
 
 def huerto_propio(actor, huerto_id, *, bloquear=False):

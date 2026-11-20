@@ -1,12 +1,13 @@
 """Despliegue: cualquier valor inseguro detiene el arranque."""
 import os
+import warnings
 
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
 from cryptography.fernet import Fernet
 
-from .base import CHILITO_MFA_KEY, DATABASES, ELCHILITO_SMTP_ENABLED, ORIGIN
+from .base import BASES_SINTETICAS, CHILITO_BYPASS_LEGAL_CHECK, CHILITO_MFA_KEY, DATABASES, ELCHILITO_SMTP_ENABLED, ORIGIN
 
 if os.environ.get('CHILITO_DEBUG', '0') != '0':
     raise ImproperlyConfigured('DEBUG no se permite en despliegue')
@@ -16,6 +17,11 @@ if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
     raise ImproperlyConfigured('Hosts explícitos requeridos')
 if not ORIGIN.startswith('https://'):
     raise ImproperlyConfigured('Origen HTTPS requerido')
+# B-4: sin nombre explícito no se cae a la base sintética; tampoco se acepta una base sintética o de pruebas.
+if not os.environ.get('CHILITO_DB_NAME', '').strip():
+    raise ImproperlyConfigured('Despliegue requiere CHILITO_DB_NAME explícito')
+if DATABASES['default']['NAME'] in BASES_SINTETICAS or DATABASES['default']['NAME'].startswith('test_'):
+    raise ImproperlyConfigured('Despliegue no puede usar una base sintética o de pruebas')
 if DATABASES['default']['USER'] != 'chilito_pkg_runtime':
     raise ImproperlyConfigured('La aplicación requiere rol limitado')
 if DATABASES['default']['OPTIONS']['sslmode'] != 'verify-full':
@@ -36,3 +42,11 @@ if os.environ.get('CHILITO_BEHIND_PROXY') == '1':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     ALLAUTH_TRUSTED_PROXY_COUNT = int(os.environ.get('CHILITO_TRUSTED_PROXY_COUNT', '1'))
 ELCHILITO_REGISTRATION_ENABLED = os.environ.get('CHILITO_REGISTRATION_ENABLED', '0') == '1'
+# B-6: prefijo __Host- (solo HTTPS, ruta /, sin dominio): un subdominio no puede fijar estas cookies.
+SESSION_COOKIE_NAME = '__Host-sessionid'
+CSRF_COOKIE_NAME = '__Host-csrftoken'
+# B-8: en despliegue se comprueban las contraseñas filtradas salvo que se apague explícitamente.
+CHILITO_VERIFICAR_FILTRADAS = os.environ.get('CHILITO_VERIFICAR_FILTRADAS', '1') == '1'
+if CHILITO_BYPASS_LEGAL_CHECK:
+    warnings.warn('CHILITO_BYPASS_LEGAL_CHECK activo: solo para crear la primera cuenta. Quítalo al publicar los textos legales.',
+                  RuntimeWarning, stacklevel=1)

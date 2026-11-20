@@ -21,12 +21,15 @@ destino_temporal.exigir()
 
 from allauth.account.models import EmailAddress
 from django.core.cache import cache
-from django.db import connection, transaction
+from django.contrib.auth.hashers import make_password
+from django.db import DatabaseError, connection, transaction
+from django.test import RequestFactory
 from django.test import Client, override_settings
 
 from cuentas.models import Usuario
 from privacidad import services
 from datos.models import Auditoria
+from huerto.models import Huerto
 from privacidad.models import ConteoNavegacion, Decision, Sujeto
 from web.models import Idempotencia
 
@@ -173,12 +176,55 @@ def recorrer():
     ok('sin capacidad no publica', post(c, f'/api/admin/guias/{uuid.uuid4()}/publicar', {'version': 1}).status_code == 403)
 
 
+def rechaza(sql, parametros, antes=None):
+    """True si la base rechaza la sentencia (se revierte solo su punto de guardado). `antes`: (sql, parámetros) previo."""
+    try:
+        with transaction.atomic(), connection.cursor() as k:
+            if antes:
+                k.execute(*antes)
+            k.execute(sql, parametros)
+    except DatabaseError:
+        return True
+    return False
+
+
+def eliminacion():
+    """Borrado físico con el rol de la aplicación: solo la propia cuenta y solo por chilito_eliminar_cuenta."""
+    clave = 'Clave-flujo-eliminar-1'
+    u = Usuario.objects.create(email='eliminar-flujo@example.test', password=make_password(clave))
+    services.registrar_actos_de_registro(u, RequestFactory().get('/'))
+    EmailAddress.objects.create(user=u, email=u.email, verified=True, primary=True)
+    otra, _ = cuenta('eliminar-flujo-otra@example.test')
+    c = Client(SERVER_NAME='localhost')
+    c.force_login(u, backend='django.contrib.auth.backends.ModelBackend')
+    ok('crea su huerto', post(c, '/api/huertos', {}).status_code == 200)
+    post(c, '/api/privacidad/cookies', {'statistics': True})
+    ok('runtime no borra la bitácora directamente', rechaza('DELETE FROM privacidad_decision WHERE usuario_id=%s', [u.pk]))
+    ok('runtime no borra cuentas directamente', rechaza('DELETE FROM cuentas_usuario WHERE id=%s', [u.pk]))
+    ok('runtime no escribe la marca de borrado', rechaza('INSERT INTO cuenta_en_borrado(usuario_id) VALUES (%s)', [u.pk]))
+    ok('una bandera de sesión no abre la excepción',
+       rechaza('DELETE FROM privacidad_decision WHERE usuario_id=%s', [u.pk], ("SELECT set_config('chilito.borrar_cuenta', %s, true)", [str(u.pk)])))
+    ok('no borra otra cuenta', rechaza('SELECT chilito_eliminar_cuenta(%s)', [otra.pk], ("SELECT set_config('chilito.actor_id', %s, true)", [str(u.pk)])))
+    r = post(c, '/api/cuenta/eliminar', {'password': 'otra'})
+    ok('contraseña incorrecta: 400', r.status_code == 400, r.status_code)
+    r = post(c, '/api/cuenta/eliminar', {'password': clave})
+    ok('elimina: 200', r.status_code == 200 and r.json().get('status') == 'deleted', r.status_code)
+    ok('la cuenta ya no existe', not Usuario.objects.filter(pk=u.pk).exists())
+    ok('sin huertos, sujetos ni decisiones', not Huerto.objects.filter(propietario_id=u.pk).exists()
+       and not Sujeto.objects.filter(usuario_id=u.pk).exists() and not Decision.objects.filter(usuario_id=u.pk).exists())
+    ok('sin auditoría ni recibos de la cuenta', not Auditoria.objects.filter(actor_id=u.pk).exists()
+       and not Idempotencia.objects.filter(actor_id=u.pk).exists())
+    ok('la sesión quedó cerrada', c.get('/api/cuenta').status_code == 401)
+    ok('la otra cuenta sigue', Usuario.objects.filter(pk=otra.pk).exists())
+
+
 def main():
     # Como en los otros flujos: ningún correo sale del proceso, aunque estas rutas no envían.
     with override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'), transaction.atomic():
         try:
             cache.clear()
             recorrer()
+            eliminacion()
         finally:
             transaction.set_rollback(True)
     with connection.cursor() as k:

@@ -59,12 +59,18 @@ def exigir_desarrollo(entorno):
         sys.exit('El simulador solo corre con CHILITO_ENV=local o testing y CHILITO_DEBUG=1.')
 
 
+def base_permitida(base):
+    return base in BASES_DE_DESARROLLO or (base.startswith('test_chilito_') and base.isascii() and base.replace('_', '').isalnum())
+
+
 def exigir_entorno(entorno=None):
     """Devuelve los datos de conexión o termina el programa si el entorno no es de desarrollo."""
     entorno = os.environ if entorno is None else entorno
     exigir_desarrollo(entorno)
     base = entorno.get('CHILITO_SIM_DB', '')
-    if base not in BASES_DE_DESARROLLO and 'prueba' not in base and 'test' not in base:
+    # B-5: coincidencia exacta o prefijo de prueba de este proyecto; antes bastaba con que el nombre contuviera «test».
+    # No se usa destino_temporal.exigir(): el simulador debe poder usar también la base de desarrollo sintética.
+    if not base_permitida(base):
         sys.exit(f'El simulador no escribe en «{base}»: solo en bases de desarrollo o de pruebas.')
     if not entorno.get('CHILITO_SIM_CLAVE_IOT'):
         sys.exit('Falta CHILITO_SIM_CLAVE_IOT (la contraseña de chilito_pkg_iot).')
@@ -196,7 +202,7 @@ def correr(con, dispositivo, cada=10.0, ciclos=None, **opciones):
 
 
 def leer_argumentos(argv=None):
-    analizador = argparse.ArgumentParser(description='Simula un equipo El Chilito (solo desarrollo).')
+    analizador = argparse.ArgumentParser(description='Simula un equipo YouGarden (solo desarrollo).')
     analizador.add_argument('identificador')
     analizador.add_argument('accion', choices=('vincular', 'conectar', 'desconectar', 'medir', 'atender', 'correr'))
     analizador.add_argument('--n', type=int, default=1, help='mediciones a insertar (medir)')

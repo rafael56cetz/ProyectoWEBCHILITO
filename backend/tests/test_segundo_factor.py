@@ -67,10 +67,10 @@ class SoporteTests(TestCase):
 
     def setUp(self):
         self.cuenta = cuenta('ana@example.test', factor=True)
-        self.operador = cuenta('soporte@example.test')
+        self.operador = cuenta('soporte@example.test', 'gestionar_administradores')
 
-    def retirar(self, *extra):
-        call_command('retirar_factores', 'ana@example.test', '--operador', 'soporte@example.test', *extra, stdout=StringIO())
+    def retirar(self, *extra, correo='ana@example.test', operador='soporte@example.test', caso=('--caso', 'CS-0001A2B3')):
+        call_command('retirar_factores', correo, '--operador', operador, *caso, *extra, stdout=StringIO())
 
     def test_exige_declarar_la_verificacion(self):
         with self.assertRaises(CommandError):
@@ -82,10 +82,41 @@ class SoporteTests(TestCase):
         self.assertFalse(Authenticator.objects.filter(user=self.cuenta).exists())
         registro = Auditoria.objects.get(accion='retirar_segundo_factor')
         self.assertEqual((registro.actor, registro.entidad_id), (self.operador, str(self.cuenta.pk)))
+        self.assertEqual(registro.detalle, {'caso': 'CS-0001A2B3'}, 'el folio del caso queda en la auditoría')
 
     def test_nadie_atiende_su_propia_cuenta(self):
         with self.assertRaises(CommandError):
-            call_command('retirar_factores', 'ana@example.test', '--operador', 'ana@example.test', '--identidad-verificada')
+            self.retirar('--identidad-verificada', operador='ana@example.test')
+
+    # B-9: el operador debe poder responder por el retiro, con caso y doble confirmación si la cuenta administra.
+    def test_operador_sin_capacidad_o_sin_factor_no_puede(self):
+        cuenta('cualquiera@example.test')
+        cuenta('sin-factor@example.test', 'gestionar_administradores', factor=False)
+        for operador in ('cualquiera@example.test', 'sin-factor@example.test'):
+            with self.subTest(operador=operador), self.assertRaises(CommandError):
+                self.retirar('--identidad-verificada', operador=operador)
+        self.assertTrue(Authenticator.objects.filter(user=self.cuenta).exists())
+        self.assertFalse(Auditoria.objects.filter(accion='retirar_segundo_factor').exists())
+
+    def test_exige_folio_del_caso(self):
+        for caso in ((), ('--caso', ''), ('--caso', 'x')):
+            with self.subTest(caso=caso), self.assertRaises(CommandError):
+                self.retirar('--identidad-verificada', caso=caso)
+        self.assertTrue(Authenticator.objects.filter(user=self.cuenta).exists())
+
+    def test_cuenta_con_capacidades_pide_confirmar_el_correo(self):
+        jefa = cuenta('jefa@example.test', 'gestionar_guias')
+        with self.assertRaises(CommandError):
+            self.retirar('--identidad-verificada', correo='jefa@example.test')
+        self.assertTrue(Authenticator.objects.filter(user=jefa).exists())
+        self.retirar('--identidad-verificada', '--confirmar', 'jefa@example.test', correo='jefa@example.test')
+        self.assertFalse(Authenticator.objects.filter(user=jefa).exists())
+
+    def test_sin_metodos_no_audita(self):
+        self.retirar('--identidad-verificada')
+        with self.assertRaises(CommandError):
+            self.retirar('--identidad-verificada')
+        self.assertEqual(Auditoria.objects.filter(accion='retirar_segundo_factor').count(), 1)
 
 
 class CifradoTests(SimpleTestCase):

@@ -16,7 +16,7 @@ from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 
 from datos.models import Auditoria, Notificacion
 from huerto.models import Huerto
-from tests import aceptar_vigentes, cuenta, publicar_textos
+from tests import aceptar_vigentes, cuenta, publicar_textos, reautenticado
 
 from . import consentimientos, politicas, services
 from .models import ConteoNavegacion, Decision, DocumentoLegal, Finalidad, Sujeto
@@ -194,6 +194,46 @@ class DocumentosHTML(SimpleTestCase):
                 html, _ = sanear_html(f'<a href="{enlace}">Texto</a>')
                 self.assertIn('href=', html)
 
+    # B-7: corpus de evasión (OWASP XSS Filter Evasion Cheat Sheet y mXSS). La salida nunca debe contener una etiqueta
+    # activa, un manejador de eventos, un atributo de estilo ni un esquema de enlace distinto de los permitidos.
+    CORPUS_XSS = (
+        '<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>', '<IMG SRC="javascript:alert(\'XSS\');">', '<IMG SRC=JaVaScRiPt:alert(1)>',
+        '<IMG SRC=`javascript:alert("x")`>', '<a onmouseover="alert(document.cookie)">x</a>', '<IMG """><SCRIPT>alert("XSS")</SCRIPT>">',
+        '<IMG SRC=/ onerror="alert(1)"></img>', '<img src=x onerror=&#0000106&#0000097&#0000118&#0000097alert(1)>',
+        '<a href="&#x6A;&#x61;&#x76;&#x61;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3A;alert(1)">x</a>', '<a href="jav&#x09;ascript:alert(1)">x</a>',
+        '<a href=" &#14;  javascript:alert(1)">x</a>', '<SCRIPT/XSS SRC="http://xss.rocks/xss.js"></SCRIPT>', '<BODY onload!#$%&()*~+-_.,:;?@[/|\\]^`=alert(1)>',
+        '<<SCRIPT>alert("XSS");//\\<</SCRIPT>', '<SCRIPT SRC=//xss.rocks/.j>', '<iframe src=http://xss.rocks/scriptlet.html <',
+        '\\";alert(\'XSS\');//', '</TITLE><SCRIPT>alert("XSS");</SCRIPT>', '<INPUT TYPE="IMAGE" SRC="javascript:alert(1);">',
+        '<BODY BACKGROUND="javascript:alert(1)">', '<svg/onload=alert(1)>', '<svg><script>alert(1)</script></svg>',
+        '<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>', '<noscript><p title="</noscript><img src=x onerror=alert(1)>">',
+        '<form><math><mtext></form><form><mglyph><style></math><img src onerror=alert(1)>', '<template><img src=x onerror=alert(1)></template>',
+        '<STYLE>li {list-style-image: url("javascript:alert(1)");}</STYLE><UL><LI>XSS</br>', '<p style="background:url(javascript:alert(1))">x</p>',
+        '<META HTTP-EQUIV="refresh" CONTENT="0;url=javascript:alert(1);">', '<TABLE BACKGROUND="javascript:alert(1)">', '<DIV STYLE="width: expression(alert(1));">',
+        '<!--[if gte IE 4]><SCRIPT>alert(1);</SCRIPT><![endif]-->', '<BASE HREF="javascript:alert(1);//">', '<OBJECT TYPE="text/x-scriptlet" DATA="http://x/x.html"></OBJECT>',
+        '<EMBED SRC="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=">', '<a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">x</a>',
+        '<a href="vbscript:msgbox(1)">x</a>', '<a href="  JAVASCRIPT:alert(1)">x</a>', '<a href="java\u0000script:alert(1)">x</a>',
+        '<a href="\\\\evil.example/x">x</a>', '<a href="/\\evil.example">x</a>', '<a href="https://ok.example" onclick="alert(1)" style="x">ok</a>',
+        '<p>texto<img src=x:alert(alt) onerror=eval(src) alt=0></p>', '<details open ontoggle=alert(1)>', '<video><source onerror="alert(1)">',
+        '<a href="#" xlink:href="javascript:alert(1)">x</a>', '<isindex type=image src=1 onerror=alert(1)>', '<keygen autofocus onfocus=alert(1)>',
+    )
+    ETIQUETAS_ACTIVAS = ('<script', '<img', '<svg', '<math', '<iframe', '<object', '<embed', '<style', '<meta', '<base', '<form', '<input',
+                         '<body', '<template', '<video', '<source', '<details', '<isindex', '<keygen', '<link', '<noscript')
+
+    def test_corpus_de_evasion_xss(self):
+        import re
+        from .documentos_html import sanear_html
+        for carga in self.CORPUS_XSS:
+            with self.subTest(carga=carga):
+                html, _ = sanear_html(carga)
+                bajo = html.lower()
+                self.assertFalse(any(etiqueta in bajo for etiqueta in self.ETIQUETAS_ACTIVAS), html)
+                self.assertNotRegex(bajo, r'<[^>]*\son[a-z]+\s*=', 'sin manejadores de eventos')
+                self.assertNotIn('style=', bajo)
+                for enlace in re.findall(r'href="([^"]*)"', html):
+                    self.assertRegex(enlace, r'^(https?:|mailto:|#|/(?![/\\]))', enlace)
+                # La salida ya saneada es estable: volver a sanearla no cambia nada (sin mutaciones tipo mXSS).
+                self.assertEqual(sanear_html(html)[0], html)
+
     def test_titulos_tablas_y_citas_sin_atributos(self):
         from .documentos_html import sanear_html
         html, texto = sanear_html('<h1>A</h1><h2>B</h2><h3>C</h3><h4>D</h4><h6>E</h6><blockquote style="x"><p>Cita</p></blockquote>'
@@ -249,34 +289,7 @@ class EliminarCuenta(TestCase):
         otra.force_login(cuenta('eliminar-otra@example.test'), backend='django.contrib.auth.backends.ModelBackend')
         self.assertEqual(len(otra.get('/api/cuenta/aceptaciones').json()['items']), 2)
 
-    def test_exige_la_contrasena(self):
-        for clave in ('otra-clave', '', None, 5):
-            with self.subTest(clave=clave):
-                self.assertEqual(self.post('/api/cuenta/eliminar', {'password': clave}).status_code, 400)
-        self.usuaria.refresh_from_db()
-        self.assertIsNone(self.usuaria.anonimizacion_solicitada_en)
-        self.assertEqual(self.post('/api/cuenta/eliminar', {}).status_code, 400)
-
-    def test_solicitar_y_cancelar(self):
-        respuesta = self.post('/api/cuenta/eliminar', {'password': self.CLAVE})
-        self.assertEqual(respuesta.status_code, 200, respuesta.content)
-        cuerpo = respuesta.json()
-        self.assertTrue(cuerpo['deletionRequestedAt'] and cuerpo['deletionDate'])
-        perfil = self.client.get('/api/cuenta').json()
-        self.assertEqual((perfil['deletionRequestedAt'], perfil['deletionDate']), (cuerpo['deletionRequestedAt'], cuerpo['deletionDate']))
-        self.assertEqual(self.post('/api/cuenta/eliminar/cancelar').status_code, 200)
-        despues = self.client.get('/api/cuenta').json()
-        self.assertEqual((despues['deletionRequestedAt'], despues['deletionDate']), (None, None))
-        self.assertEqual(self.post('/api/cuenta/eliminar/cancelar').status_code, 400)
-        acciones = list(Auditoria.objects.filter(actor=self.usuaria).values_list('accion', flat=True))
-        self.assertIn('solicitar_eliminacion', acciones)
-        self.assertIn('cancelar_eliminacion', acciones)
-        self.assertFalse(Auditoria.objects.filter(detalle__icontains=self.CLAVE).exists())
-
-    def test_cuota_de_intentos(self):
-        estados = [self.post('/api/cuenta/eliminar', {'password': 'mala-%d' % n}).status_code for n in range(7)]
-        self.assertEqual(estados[:5], [400] * 5)
-        self.assertEqual(estados[5:], [429, 429])
+    # El borrado físico, la contraseña, la cuota y el padrón de cuentas se prueban en tests/test_eliminacion_cuenta.py.
 
 
 class AdminBase(TestCase):
@@ -290,7 +303,7 @@ class AdminBase(TestCase):
     def cliente(self, usuario):
         cliente = Client(HTTP_HOST='127.0.0.1')
         cliente.force_login(usuario, backend='django.contrib.auth.backends.ModelBackend')
-        return cliente
+        return reautenticado(cliente)     # M-2: la exportación exige contraseña confirmada
 
     def post(self, cliente, ruta, datos=None):
         return cliente.post(ruta, json.dumps(datos or {}), content_type='application/json', HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
@@ -554,9 +567,32 @@ class BitacoraDeConsentimientos(AdminBase):
         self.assertEqual([(f['account'], f['what'], f['purpose'], f['ip']) for f in anonimo], [('Visitante anónimo', 'Cookies', politicas.FINALIDAD_ESTADISTICAS, '189.203.45.0')])
         self.assertEqual(self.sesion.get('/api/admin/consentimientos?page=2').json()['items'], [])
         self.assertEqual(self.sesion.get('/api/admin/consentimientos').json()['exportLimit'], consentimientos.MAXIMO_FILAS_CSV)
-        for consulta in ('?documento=otro', '?decision=quiza', '?version=x', '?desde=ayer', '?desde=2026-02-01&hasta=2026-01-01', '?x=1', '?page=0', '?cuenta=' + 'a' * 61):
+        for consulta in ('?documento=otro', '?decision=quiza', '?version=x', '?desde=ayer', '?desde=2026-02-01&hasta=2026-01-01', '?x=1', '?page=0', '?cuenta=' + 'a' * 61,
+                         '?desde=2026-W47-1', '?hasta=2026-02-30', '?desde=20261120'):
             with self.subTest(consulta=consulta):
                 self.assertEqual(self.sesion.get(f'/api/admin/consentimientos{consulta}').status_code, 400)
+                self.assertEqual(self.sesion.get(f'/api/admin/consentimientos/exportar{consulta}').status_code, 400)
+
+    def test_filtros_rapidos_con_paginacion_y_exportacion(self):
+        """Documento + rango de fechas (lo que mandan los botones rápidos) paginan y exportan exactamente lo mismo."""
+        for _ in range(26):
+            self.navegador(True)
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT max(registrada_en_merida)::date FROM v_bitacora_consentimientos')
+            hoy = cursor.fetchone()[0].isoformat()
+        rapido = f'?documento=cookies&desde={hoy}&hasta={hoy}'
+        primera = self.sesion.get(f'/api/admin/consentimientos{rapido}').json()
+        segunda = self.sesion.get(f'/api/admin/consentimientos{rapido}&page=2').json()
+        self.assertEqual((primera['total'], len(primera['items']), len(segunda['items'])), (26, 25, 1))
+        self.assertTrue(all(f['what'] == 'Cookies' for f in primera['items'] + segunda['items']))
+        self.assertFalse({f['id'] for f in primera['items']} & {f['id'] for f in segunda['items']})
+        self.assertEqual(self.sesion.get(f'/api/admin/consentimientos?documento=terminos&desde={hoy}&hasta={hoy}').json()['total'], 2)
+        self.assertEqual(self.sesion.get(f'/api/admin/consentimientos?documento=cookies&desde=2000-01-01&hasta=2000-01-02').json()['total'], 0)
+        respuesta = self.sesion.get(f'/api/admin/consentimientos/exportar{rapido}')
+        self.assertEqual(respuesta.status_code, 200)
+        filas = list(csv.reader(io.StringIO(respuesta.content.decode('utf-8').lstrip('﻿'))))[1:]
+        self.assertEqual(len(filas), 26)
+        self.assertTrue(all(fila[3] == 'Cookies' and fila[0].startswith(hoy) for fila in filas))
 
     def test_resumen(self):
         resumen = self.sesion.get('/api/admin/consentimientos/resumen').json()

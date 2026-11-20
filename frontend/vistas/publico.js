@@ -4,7 +4,7 @@
 // ── Pagina publica ──
 const badge=(text,type='neutral',name)=>`<span class="badge ${type}">${name?icon(name):''}${text}</span>`;
 const brandLogoBadge = `<span class="brand-logo-badge" aria-hidden="true"><svg viewBox="0 0 64 64" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="leafGlass" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#9BE3B1" stop-opacity="0.92" /><stop offset="100%" stop-color="#3E7B52" stop-opacity="0.78" /></linearGradient><linearGradient id="habaneroGrad" x1="32" y1="22" x2="32" y2="45" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FF9436" /><stop offset="55%" stop-color="#F25C19" /><stop offset="100%" stop-color="#C83506" /></linearGradient><filter id="habaneroGlow" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#F25C19" flood-opacity="0.45" /></filter></defs><path d="M31 9C23 14 17 23 17 31C23 28 28 21 31 9Z" fill="url(#leafGlass)" stroke="rgba(255,255,255,0.55)" stroke-width="1.1" stroke-linejoin="round" /><path d="M33 9C41 14 47 23 47 31C41 28 36 21 33 9Z" fill="url(#leafGlass)" stroke="rgba(255,255,255,0.55)" stroke-width="1.1" stroke-linejoin="round" /><path d="M12 49C13 39 18 33 25 32C24 40 19 46 12 49Z" fill="url(#leafGlass)" stroke="rgba(255,255,255,0.5)" stroke-width="1.1" stroke-linejoin="round" /><path d="M52 49C51 39 46 33 39 32C40 40 45 46 52 49Z" fill="url(#leafGlass)" stroke="rgba(255,255,255,0.5)" stroke-width="1.1" stroke-linejoin="round" /><path d="M14 51C21 47 27 47 31 51C25 53 19 53 14 51Z" fill="url(#leafGlass)" stroke="rgba(255,255,255,0.45)" stroke-width="1" stroke-linejoin="round" /><path d="M50 51C43 47 37 47 33 51C39 53 45 53 50 51Z" fill="url(#leafGlass)" stroke="rgba(255,255,255,0.45)" stroke-width="1" stroke-linejoin="round" /><path d="M32 25C32 21.5 33.8 19.2 35.5 18.5" stroke="#B6E8A7" stroke-width="2" stroke-linecap="round" /><path filter="url(#habaneroGlow)" d="M32 25.2C27.2 24.6 24.5 27.8 25 32.8C25.4 37.2 28.5 41.8 32 43.8C35.5 41.8 38.6 37.2 39 32.8C39.5 27.8 36.8 24.6 32 25.2Z" fill="url(#habaneroGrad)" stroke="rgba(255,220,180,0.55)" stroke-width="0.9" /><path d="M32 25.8C29.8 29.5 29.8 37.5 32 43.2" stroke="rgba(255,255,255,0.28)" stroke-width="1" stroke-linecap="round" /><path d="M32 25.8C34.2 29.5 34.2 37.5 32 43.2" stroke="rgba(140,30,0,0.28)" stroke-width="1" stroke-linecap="round" /><circle cx="32" cy="25.2" r="1.6" fill="#FFF3B0" /></svg></span>`;
-const brand=(href='#inicio', label='El Chilito, inicio', extra='')=>`<a class="brand brand-mark ${extra}" href="${href}" aria-label="${label}">${brandLogoBadge}<span class="brand-name">El Chilito</span></a>`;
+const brand=(href='#inicio', label='YouGarden, inicio', extra='')=>`<a class="brand brand-mark ${extra}" href="${href}" aria-label="${label}">${brandLogoBadge}<span class="brand-name">YouGarden</span></a>`;
 // Con sesión completa, «Iniciar sesión» se convierte en el acceso al panel de esa sesión.
 const showAccountAccess = (root, panel) => root.querySelectorAll('a[href="#acceso"]').forEach(link => {
   link.setAttribute('href',panel);
@@ -49,7 +49,7 @@ const publicFooter = () => `<footer class="site-footer">
     <div class="site-footer__grid">
       <!-- Columna 1: Marca y Propósito -->
       <div class="site-footer__col">
-        <a href="#inicio" class="site-footer__brand brand-mark" aria-label="El Chilito, inicio">${brandLogoBadge}<span class="brand-name">El Chilito</span></a>
+        <a href="#inicio" class="site-footer__brand brand-mark" aria-label="YouGarden, inicio">${brandLogoBadge}<span class="brand-name">YouGarden</span></a>
         <p class="site-footer__desc">
           Estación doméstica inteligente para el cultivo interior de chile habanero (Capsicum chinense), con riego automatizado por tiempos, iluminación LED programada y monitoreo IoT.
         </p>
@@ -84,7 +84,7 @@ const publicFooter = () => `<footer class="site-footer">
 
     <!-- Barra Inferior de Cierre -->
     <div class="site-footer__bottom">
-      <span>© 2026 El Chilito. Todos los derechos reservados.</span>
+      <span>© 2026 YouGarden. Todos los derechos reservados.</span>
       <div class="site-footer__legal-links">
         <span>Yucatán, México</span>
         <a href="#terminos" class="site-footer__link">Términos y condiciones</a>
@@ -94,7 +94,7 @@ const publicFooter = () => `<footer class="site-footer">
   </div>
 </footer>`;
 const menuToggle = id => `<button class="button compact btn-liquid-nav nav-toggle public-menu-toggle" type="button" data-nav-toggle aria-controls="${id}" aria-expanded="false" aria-label="Abrir menú de navegación"><span class="public-menu-open-icon">${icon('menu')}</span><span class="public-menu-close-icon">${icon('close')}</span><span>Menú</span></button>`;
-function siteHeader({ navigation = '', action = '', brandHref = '#inicio', brandLabel = 'El Chilito, inicio', panelId = '', extra = '' }) {
+function siteHeader({ navigation = '', action = '', brandHref = '#inicio', brandLabel = 'YouGarden, inicio', panelId = '', extra = '' }) {
   return `<header class="site-header ${extra}"><div class="header-inner container">${brand(brandHref, brandLabel)}${navigation}<div class="header-actions">${action}${panelId ? menuToggle(panelId) : ''}</div></div></header>`;
 }
 // Encabezado de la portada. Las páginas legales usan el mismo para no cambiar de navegación.
@@ -115,7 +115,7 @@ function landing(assets = ''){return `
         </div>
         <div class="project-header-right">
           <h3>Cultivar habanero en casa, sin depender de un patio ni de tu agenda.</h3>
-          <p>Falta de espacio exterior, lluvias intensas o poco tiempo libre suelen impedir tener un cultivo propio. El Chilito reúne tres plantas de chile habanero (<em>Capsicum chinense</em>) en una estación interior de madera con drenaje seguro y bandeja recolectora que protege la oxigenación de las raíces.</p>
+          <p>Falta de espacio exterior, lluvias intensas o poco tiempo libre suelen impedir tener un cultivo propio. YouGarden reúne tres plantas de chile habanero (<em>Capsicum chinense</em>) en una estación interior de madera con drenaje seguro y bandeja recolectora que protege la oxigenación de las raíces.</p>
           <p>El sistema automatiza el riego por tiempos programados y los ciclos de iluminación LED, mientras sus sensores monitorean el cultivo y te informan desde tu celular o computadora.</p>
         </div>
       </div>
@@ -150,7 +150,7 @@ function landing(assets = ''){return `
       </div>
       <div class="prototype-bento-showcase">
         <div class="prototype-visual-wrap">
-          <img src="${assets}vistas/imagenes/prototipo-estacion.jpg" width="1024" height="1024" loading="lazy" alt="Prototipo del huerto urbano inteligente El Chilito en el hogar">
+          <img src="${assets}vistas/imagenes/prototipo-estacion.jpg" width="1024" height="1024" loading="lazy" alt="Prototipo del huerto urbano inteligente YouGarden en el hogar">
         </div>
         <div class="anatomy-cards-column">
           <article class="anatomy-glass-card">
@@ -190,7 +190,7 @@ function landing(assets = ''){return `
   <section class="get-section" id="consiguelo" aria-labelledby="get-title">
     <div class="container">
       <div class="get-panel">
-        <h2 id="get-title">Sé de los primeros en tener tu Chilito.</h2>
+        <h2 id="get-title">Sé de los primeros en tener tu YouGarden.</h2>
         <p>Será un equipo completo, sin planes ni suscripciones. Pregúntanos por el precio y la disponibilidad, o pide que te avisemos cuando salga la primera versión.</p>
         <button class="button btn-liquid-primary get-open" type="button" data-contact-open>Quiero más información</button>
       </div>
@@ -208,7 +208,7 @@ function landing(assets = ''){return `
           <a class="button btn-liquid-primary" href="#acceso">Iniciar sesión en el panel</a>
         </div>
         <div class="lifestyle-image-wrap">
-          <img src="${assets}vistas/imagenes/el-chilito-convivir.jpg" alt="Huerto urbano inteligente El Chilito conviviendo en el hogar" loading="lazy">
+          <img src="${assets}vistas/imagenes/el-chilito-convivir.jpg" alt="Huerto urbano inteligente YouGarden conviviendo en el hogar" loading="lazy">
         </div>
       </div>
       <div class="dark-glass-features-grid">
@@ -243,7 +243,7 @@ function plantDrawing(n){return `<svg class="plant-drawing plant-${n}" viewBox="
 const SiteViews = Object.freeze({
   busy(app, on) { if(on) app.setAttribute('aria-busy','true'); else app.removeAttribute('aria-busy'); },
   checking(app) { app.innerHTML = AuthViews.sessionChecking(); },
-  title(text) { document.title = text + ' · El Chilito'; },
+  title(text) { document.title = text + ' · YouGarden'; },
   screen(app, {screen, isPrivate, admin}) {
     document.body.dataset.screen = screen;
     document.body.dataset.private = String(isPrivate);
@@ -275,7 +275,7 @@ const ContactViews = Object.freeze({
       <div class="contact-layout">
         <div class="contact-copy">
           <h2 id="contact-title">Cuéntanos qué quieres saber</h2>
-          <p>Escríbenos sobre El Chilito y te responderemos a tu correo.</p>
+          <p>Escríbenos sobre YouGarden y te responderemos a tu correo.</p>
           <ul><li>${icon('check')}<span>Pregunta por el precio y la disponibilidad.</span></li>
           <li>${icon('check')}<span>Pide que te avisemos cuando salga la primera versión.</span></li></ul>
           <p class="contact-direct" data-contact-direct hidden></p>
@@ -374,14 +374,14 @@ const LegalViews = Object.freeze({
   render(document, route) {
     const title = document.title;
     const leads = {privacidad:'Qué datos personales tratamos, para qué los usamos y cómo puedes ejercer tus derechos.',
-      terminos:'Condiciones de uso de la plataforma El Chilito y de sus servicios.',
+      terminos:'Condiciones de uso de la plataforma YouGarden y de sus servicios.',
       cookies:'Qué cookies usamos, para qué sirven y cómo cambiar tu elección.'};
     const related = Object.entries(PrivacyModel.documents).filter(([id]) => id !== route)
       .map(([id,item]) => `<li><a href="#${id}">${escaparHTML(item.title)}</a></li>`).join('');
     return `${publicHeader()}
       <main class="legal-page" id="contenido" tabindex="-1">
         <div class="legal-hero"><div class="legal-wrap">
-          <p class="legal-eyebrow">Documentos legales · El Chilito</p>
+          <p class="legal-eyebrow">Documentos legales · YouGarden</p>
           <h1>${escaparHTML(title)}</h1>
           <p class="legal-lead">${escaparHTML(leads[route] || '')}</p>
         </div></div>
@@ -422,8 +422,8 @@ const CookieViews = (() => {
             <span class="cookies-fijo">Siempre activas</span>
           </div>
           <details class="cookies-detalle"><summary>Ver detalles</summary><ul>
-            <li><code>sessionid</code>: mantiene la sesión iniciada.</li>
-            <li><code>csrftoken</code>: ayuda a proteger tus acciones frente a solicitudes enviadas desde otros sitios.</li>
+            <li><code>sessionid</code> (<code>__Host-sessionid</code> en el sitio publicado): mantiene la sesión iniciada.</li>
+            <li><code>csrftoken</code> (<code>__Host-csrftoken</code> en el sitio publicado): ayuda a proteger tus acciones frente a solicitudes enviadas desde otros sitios.</li>
             <li><code>chilito_preferencia</code>: recuerda tu elección de cookies durante un máximo de 180 días.</li>
           </ul></details>
         </section>
@@ -470,6 +470,8 @@ const CookieViews = (() => {
       return {form, reserveSpace, showError,
         busy: on => CookieViews.busy(root,on),
         banner(visible) { banner.hidden = !visible; reserveSpace(); },
+        // En la raíz del documento: vale también para los «Configurar cookies» que se dibujen después.
+        settings(available) { document.documentElement.toggleAttribute('data-cookies-sin-politica', !available); },
         statisticsChoice: () => form.elements.statistics.checked,
         openPreferences(statistics) {
           form.elements.statistics.checked = statistics;
