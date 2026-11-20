@@ -12,17 +12,18 @@ from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
-from django.db.models import Case, CharField, F, OuterRef, Q, SmallIntegerField, Subquery, When
+from django.db.models import BooleanField, Case, CharField, F, OuterRef, Q, SmallIntegerField, Subquery, Value, When
 from django.http import Http404
 from django.utils import timezone
 
 from datos import services as s
-from datos.models import (Actuacion, Autodiagnostico, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, Dispositivo,
-                          DispositivoEvento, IaResumen, Medicion, MedicionPlanta, ResumenHoraHuerto, ResumenHoraPlanta)
+from datos.models import (Actuacion, Autodiagnostico, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, DepositoDeteccion,
+                          Dispositivo, DispositivoEvento, IaResumen, Medicion, MedicionPlanta, ResumenHoraHuerto, ResumenHoraPlanta)
 from datos.paginacion import paginar
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
-from .models import Huerto, Planta, PlantaEtapa
+from .models import Huerto, Planta, PlantaCiclo, PlantaEtapa
 
 ALFABETO_CODIGO = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 LARGO_CODIGO = 8
@@ -52,12 +53,6 @@ def _fecha(valor):
     return valor.isoformat() if valor else None
 
 
-def _entero(valor, minimo, maximo):
-    if type(valor) is not int or not minimo <= valor <= maximo:
-        raise ValidationError('Número no válido')
-    return valor
-
-
 def _equipo_de(huerto):
     return Dispositivo.objects.filter(huerto_id=huerto.pk).first()
 
@@ -76,11 +71,9 @@ def _huerto_dto(huerto, equipo):
 
 
 def _nombre_huerto(nombre):
-    if nombre is None:
-        return None
-    if not isinstance(nombre, str) or not nombre.isprintable() or not 1 <= len(nombre.strip()) <= 60:
-        raise ValidationError('Nombre no válido')
-    return nombre.strip()
+    """Nombre de cosa: letras, números, espacios y guion (1 a 60). Al crear se puede omitir (la base pone «Mi huerto»),
+    pero si llega, no puede estar vacío."""
+    return None if nombre is None else v.nombre_cosa(nombre, 'name', maximo=60)
 
 
 def listar(actor):
@@ -100,9 +93,7 @@ def crear(actor, nombre):
 @transaction.atomic
 def renombrar(actor, huerto_id, nombre):
     huerto = s.huerto_propio(actor, huerto_id, bloquear=True)
-    huerto.nombre = _nombre_huerto(nombre)
-    if huerto.nombre is None:
-        raise ValidationError('Nombre no válido')
+    huerto.nombre = v.nombre_cosa(nombre, 'name', maximo=60)
     huerto.save(update_fields=['nombre'])
     s.auditar(actor, 'renombrar_huerto', entidad='huerto', entidad_id=huerto.pk)
     return {'status': 'accepted', 'garden': _huerto_dto(huerto, _equipo_de(huerto))}
@@ -156,6 +147,8 @@ def _resumen_ia_dto(resumen):
 
 
 def detalle(actor, huerto_id):
+    # B-1: un GET no escribe. Las recomendaciones salen con cada lectura del equipo (trigger de web.0007) y con la
+    # tarea periódica (`manage.py tareas_periodicas` o `revisar_recomendaciones`).
     huerto = s.huerto_propio(actor, huerto_id)
     equipo = _equipo_de(huerto)
     plantas = Planta.objects.filter(huerto_id=huerto.pk).order_by('numero')
@@ -163,7 +156,7 @@ def detalle(actor, huerto_id):
     return {'status': 'ready', 'garden': _huerto_dto(huerto, equipo),
             'plants': [_planta_dto(planta, _ultima_lectura_planta(huerto, planta.numero)) for planta in plantas],
             'metrics': _metricas(huerto) if equipo else None, 'lamp': _lampara(huerto) if equipo else None,
-            'summary': _resumen_ia_dto(resumen) if resumen else None}
+            'summary': _resumen_ia_dto(resumen) if resumen else None, 'tank': _deposito(huerto, equipo)[0]}
 
 
 def resumenes_ia(actor, huerto_id, pagina):
@@ -204,11 +197,15 @@ def _cuidados_vigentes():
                       rev_planta=Subquery(ultima.values('planta_corregida')[:1]), rev_chiles=Subquery(ultima.values('chiles_corregidos')[:1]),
                       rev_motivo=Subquery(ultima.values('motivo')[:1]), rev_numero=Subquery(ultima.values('numero')[:1]))
             .annotate(tipo_vigente=vigente('tipo', 'rev_tipo_c', CharField()), planta_vigente=vigente('planta_numero', 'rev_planta', SmallIntegerField()),
-                      chiles_vigentes=vigente('chiles_cosechados', 'rev_chiles', SmallIntegerField())))
+                      chiles_vigentes=vigente('chiles_cosechados', 'rev_chiles', SmallIntegerField()),
+                      por_dueno=Case(When(registrado_por_id=F('huerto__propietario_id'), then=Value(True)), default=Value(False),
+                                     output_field=BooleanField())))
 
 
 def _cuidado_dto(cuidado):
-    return {'id': str(cuidado.pk), 'type': cuidado.tipo_vigente, 'plant': cuidado.planta_vigente, 'chiles': cuidado.chiles_vigentes,
+    # Recarga del equipo: «confirmed» si alguien la confirmó (las de la 0004 no tienen autor); «byOwner», si fue el dueño.
+    return {'id': str(cuidado.pk), 'type': cuidado.tipo_vigente, 'plant': cuidado.planta_vigente, 'chiles': cuidado.chiles_vigentes, 'origin': cuidado.origen,
+            'confirmed': cuidado.origen == 'equipo' and cuidado.registrado_por_id is not None, 'byOwner': cuidado.por_dueno,
             'doneAt': _fecha(cuidado.realizado_en), 'voided': cuidado.rev_tipo == 'anulacion', 'corrected': cuidado.rev_tipo == 'correccion',
             'reason': cuidado.rev_motivo if cuidado.rev_tipo else None}
 
@@ -219,23 +216,76 @@ def _ultimo_riego(huerto, numero):
     return {'at': _fecha(riego.ocurrido_en), 'origin': riego.origen, 'duration': riego.duracion_s} if riego else None
 
 
+# ── Ciclos de la planta ──
+# Siempre hay un ciclo abierto (web.0007). La línea de vida y los cuidados no se borran al terminar un ciclo: cada etapa
+# guarda su ciclo (lo fija la base) y los cuidados se reparten por fecha: lo anterior al fin de un ciclo es de ese ciclo.
+MOTIVOS_FIN_CICLO = ('cosecha_terminada', 'planta_murio', 'no_germino', 'pudricion_plaga', 'otro')
+MAXIMO_NOTA_CICLO = 500
+CUIDADOS_POR_CICLO = 50
+
+
+def _ciclos(planta):
+    return list(PlantaCiclo.objects.filter(planta_id=planta.pk).order_by('numero'))
+
+
+def _del_ciclo(filas, campo, ciclos, indice):
+    """Las filas (ya ordenadas) cuyo `campo` cae en el ciclo `indice`: desde el fin del anterior y antes de su propio fin."""
+    desde = ciclos[indice - 1].fin if indice else None
+    hasta = ciclos[indice].fin
+    return [fila for fila in filas if (desde is None or getattr(fila, campo) >= desde) and (hasta is None or getattr(fila, campo) < hasta)]
+
+
+def _etapa_dto(fila):
+    return {'stage': fila.etapa, 'since': _fecha(fila.desde)}
+
+
+def _ciclo_dto(ciclo):
+    return {'number': ciclo.numero, 'startedAt': _fecha(ciclo.inicio), 'endedAt': _fecha(ciclo.fin), 'reason': ciclo.motivo,
+            'note': ciclo.nota or None}
+
+
 def detalle_planta(actor, huerto_id, numero, rango):
     if rango not in RANGOS:
         raise ValidationError('Rango no válido')
     huerto = s.huerto_propio(actor, huerto_id)
     planta = _planta(huerto, numero)
-    historial = PlantaEtapa.objects.filter(planta_id=planta.pk).order_by('desde', 'id')
-    cuidados = _cuidados_vigentes().filter(huerto_id=huerto.pk, planta_vigente=numero).order_by('-realizado_en')[:10]
+    ciclos = _ciclos(planta)
+    etapas = list(PlantaEtapa.objects.filter(planta_id=planta.pk).order_by('desde', 'id'))
+    cuidados = list(_cuidados_vigentes().filter(huerto_id=huerto.pk, planta_vigente=numero).order_by('-realizado_en'))
+    actual = len(ciclos) - 1
+    etapas_de = lambda i: [_etapa_dto(f) for f in etapas if f.ciclo_id == ciclos[i].pk]   # noqa: E731
+    anteriores = [{**_ciclo_dto(ciclos[i]), 'stages': etapas_de(i),
+                   'care': [_cuidado_dto(c) for c in _del_ciclo(cuidados, 'realizado_en', ciclos, i)[:CUIDADOS_POR_CICLO]]}
+                  for i in range(actual - 1, -1, -1)]
     return {'status': 'ready', 'plant': _planta_dto(planta, _ultima_lectura_planta(huerto, numero)),
-            'stages': [{'stage': fila.etapa, 'since': _fecha(fila.desde)} for fila in historial],
-            'series': _serie(huerto, numero, rango), 'range': rango, 'care': [_cuidado_dto(c) for c in cuidados],
+            'cycle': _ciclo_dto(ciclos[actual]), 'pastCycles': anteriores,
+            'stages': etapas_de(actual),
+            'series': _serie(huerto, numero, rango), 'range': rango,
+            'care': [_cuidado_dto(c) for c in _del_ciclo(cuidados, 'realizado_en', ciclos, actual)[:10]],
             'lastWatering': _ultimo_riego(huerto, numero), 'hasDevice': _equipo_de(huerto) is not None}
 
 
+@transaction.atomic
+def terminar_ciclo(actor, huerto_id, numero, motivo, nota):
+    """Solo el dueño: cierra el ciclo con su motivo y abre el siguiente (la base lo hace en chilito_terminar_ciclo).
+    La planta vuelve a «sin_sembrar» sin fecha de siembra y conserva su nombre; no se borra nada."""
+    huerto = s.huerto_propio(actor, huerto_id)
+    planta = _planta(huerto, numero, bloquear=True)
+    if motivo not in MOTIVOS_FIN_CICLO:
+        raise v.CampoInvalido('reason', 'motivo-no-valido', 'Elige por qué termina el ciclo.')
+    nota = v.texto_libre(nota, 'note', maximo=MAXIMO_NOTA_CICLO, multilinea=True)
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT chilito_terminar_ciclo(%s, %s, %s)', [planta.pk, motivo, nota])
+    ciclos = _ciclos(planta)
+    s.auditar(actor, 'terminar_ciclo', entidad='planta', entidad_id=planta.pk, detalle={'ciclo': ciclos[-2].numero, 'motivo': motivo})
+    planta.refresh_from_db()
+    return {'status': 'accepted', 'plant': _planta_dto(planta, _ultima_lectura_planta(huerto, numero)),
+            'cycle': _ciclo_dto(ciclos[-1]), 'ended': _ciclo_dto(ciclos[-2])}
+
+
 def _nombre_planta(nombre):
-    if not isinstance(nombre, str) or not nombre.isprintable() or not 1 <= len(nombre.strip()) <= 40:
-        raise ValidationError('Nombre no válido')
-    return nombre.strip()
+    """Nombre de cosa (1 a 40): «Planta 1», el de fábrica, sigue siendo válido."""
+    return v.nombre_cosa(nombre, 'name', maximo=40)
 
 
 def _fecha_siembra(valor):
@@ -287,7 +337,7 @@ def crear_comando(actor, huerto_id, tipo, planta, duracion):
     if tipo not in TIPOS_COMANDO:
         raise ValidationError('Orden no válida')
     if tipo == 'regar':
-        _entero(planta, 1, 3)
+        v.entero(planta, 'plant', 1, 3)
         if duracion not in DURACIONES_RIEGO or type(duracion) is not int:
             raise ValidationError('Duración no válida')
     elif planta is not None or duracion is not None:
@@ -303,7 +353,9 @@ def crear_comando(actor, huerto_id, tipo, planta, duracion):
 
 
 def estado_comando(actor, comando_id):
-    comando = Comando.objects.filter(pk=comando_id, solicitado_por_id=actor.pk, origen='usuario').first()
+    # B-10: como `huerto_propio`, solo de un huerto activo de la cuenta; uno archivado responde lo mismo que uno inexistente.
+    comando = Comando.objects.filter(pk=comando_id, solicitado_por_id=actor.pk, origen='usuario',
+                                     huerto__propietario_id=actor.pk, huerto__estado='activo').first()
     if comando is None:
         raise Http404
     return {'status': 'ready', 'command': _comando_dto(comando, con_diagnostico=True)}
@@ -328,14 +380,18 @@ def _validar_cuidado(tipo, planta, chiles):
     if tipo == 'rellenar_deposito' and planta is not None:
         raise ValidationError('Datos que sobran')
     if tipo in TIPOS_CUIDADO_DE_PLANTA or (tipo == 'inspeccion' and planta is not None):
-        _entero(planta, 1, 3)
-    if chiles is not None and (tipo != 'cosecha' or type(chiles) is not int or not 0 <= chiles <= 999):
-        raise ValidationError('Cantidad no válida')
+        v.entero(planta, 'plant', 1, 3)
+    if chiles is not None:
+        if tipo != 'cosecha':
+            raise ValidationError('Datos que sobran')
+        v.entero(chiles, 'chiles', 0, 999)
 
 
 def _crear_cuidado(actor, huerto, tipo, planta, chiles, realizado_en):
     _validar_cuidado(tipo, planta, chiles)
     momento = _momento_cuidado(realizado_en)
+    if tipo == 'rellenar_deposito':
+        _exigir_recarga_permitida(huerto, momento or timezone.now())
     cuidado = Cuidado.objects.create(huerto=huerto, tipo=tipo, planta_numero=planta, chiles_cosechados=chiles,
                                      registrado_por_id=actor.pk, **({'realizado_en': momento} if momento else {}))
     s.auditar(actor, 'registrar_cuidado', entidad='cuidado', entidad_id=cuidado.pk, detalle={'tipo': tipo})
@@ -374,10 +430,224 @@ def _filtrar_cuidados(consulta, planta, tipo, desde, hasta):
     return consulta
 
 
+# Tipos de las fichas «Último…» de Mantenimiento.
+TIPOS_RESUMEN = ('rellenar_deposito', 'cosecha', 'sustrato', 'inspeccion')
+
+
+def _ultimos_cuidados(vigentes):
+    """El último cuidado no anulado de cada tipo de las fichas, sin depender de la página del historial."""
+    validos = vigentes.filter(Q(rev_tipo__isnull=True) | ~Q(rev_tipo='anulacion')).order_by('-realizado_en', '-registrado_en')
+    ultimos = {}
+    for tipo in TIPOS_RESUMEN:
+        cuidado = validos.filter(tipo_vigente=tipo).first()
+        ultimos[tipo] = _cuidado_dto(cuidado) if cuidado else None
+    return ultimos
+
+
 def cuidados(actor, huerto_id, planta, tipo, desde, hasta, pagina):
     huerto = s.huerto_propio(actor, huerto_id)
-    consulta = _filtrar_cuidados(_cuidados_vigentes().filter(huerto_id=huerto.pk), planta, tipo, desde, hasta)
-    return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en'), pagina, _cuidado_dto)}
+    vigentes = _cuidados_vigentes().filter(huerto_id=huerto.pk)
+    consulta = _filtrar_cuidados(vigentes, planta, tipo, desde, hasta)
+    respuesta = {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en'), pagina, _cuidado_dto)}
+    # El resumen solo acompaña al historial sin filtros, página 1: es lo que pinta las fichas «Último…».
+    if pagina == 1 and not any((planta, tipo, desde, hasta)):
+        respuesta['latest'] = _ultimos_cuidados(vigentes)
+    return respuesta
+
+
+# ── Depósito: estado del flotador, reglas de la recarga manual y duración de cada carga ──
+# Las mismas reglas las impone la base (web.0004, web.0005 y web.0006): aquí se calculan para mostrarlas y dar un mensaje claro
+# antes de escribir. Una recarga que detecta el flotador queda pendiente (deposito_deteccion) hasta que el dueño la confirma:
+# solo entonces hay cuidado. Con una pendiente, registrar la recarga a mano es confirmarla, así que no se aplican las reglas
+# manuales. Con equipo, la recarga manual exige nivel bajo y cuenta una sola vez por cada nivel bajo (web.0006).
+ESPERA_SIN_EQUIPO = timedelta(hours=12)
+CARGA_MINIMA = timedelta(hours=1)        # menos que esto es rebote del flotador
+CARGAS_PARA_PROMEDIO = 5
+CARGAS_EN_HISTORIAL = 10
+
+
+def _hora_merida(momento):
+    return momento.astimezone(ZONA_MERIDA).strftime('%d/%m/%Y a las %H:%M')
+
+
+def _recargas(huerto):
+    """Recargas vigentes (no anuladas y con tipo vigente rellenar_deposito), de la más antigua a la más reciente."""
+    return list(_cuidados_vigentes().filter(huerto_id=huerto.pk, tipo_vigente='rellenar_deposito')
+                .filter(Q(rev_tipo__isnull=True) | Q(rev_tipo='correccion'))
+                .order_by('realizado_en', 'registrado_en').values('realizado_en', 'registrado_en', 'origen', 'registrado_por_id'))
+
+
+def _deteccion_pendiente(huerto):
+    return DepositoDeteccion.objects.filter(huerto_id=huerto.pk, estado='pendiente').first()
+
+
+def _lecturas_flotador(huerto):
+    return Medicion.objects.filter(huerto_id=huerto.pk, deposito_con_agua__isnull=False)
+
+
+def _bajo_desde(huerto):
+    """Inicio del nivel bajo en curso: la primera lectura baja después de la última con agua (None si la última tiene agua)."""
+    lecturas = _lecturas_flotador(huerto)
+    con_agua = lecturas.filter(deposito_con_agua=True).order_by('-medida_en').values_list('medida_en', flat=True).first()
+    bajas = lecturas.filter(deposito_con_agua=False)
+    if con_agua is not None:
+        bajas = bajas.filter(medida_en__gt=con_agua)
+    return bajas.order_by('medida_en').values_list('medida_en', flat=True).first()
+
+
+def _recarga_desde(recargas, desde):
+    """La recarga vigente más reciente hecha desde `desde`; la de una persona también si la registró desde entonces
+    (como chilito_recarga_desde)."""
+    if desde is None:
+        return None
+    dentro = [r for r in recargas if r['realizado_en'] >= desde or (r['origen'] == 'persona' and r['registrado_en'] >= desde)]
+    return max(dentro, key=lambda r: r['realizado_en']) if dentro else None
+
+
+def _bloqueo_recarga(huerto, equipo, recargas, momento, pendiente=None):
+    """None si se permite una recarga manual en `momento`; si no, (código, mensaje, próxima fecha permitida o None)."""
+    if pendiente is not None:
+        return None
+    ultima = recargas[-1]['realizado_en'] if recargas else None
+    if equipo is not None and _lecturas_flotador(huerto).exists():
+        bajo_desde = _bajo_desde(huerto)
+        if bajo_desde is None:
+            if ultima is None:
+                return ('deposito-con-agua', 'Tu depósito tiene agua: podrás registrar una recarga cuando el flotador marque nivel bajo.', None)
+            return ('deposito-con-agua', f'Tu depósito tiene agua desde tu última recarga ({_hora_merida(ultima)}). '
+                    'Podrás registrar otra cuando el flotador marque nivel bajo.', None)
+        registrada = _recarga_desde(recargas, bajo_desde)
+        if registrada is not None:
+            return ('deposito-repetida', f'Ya registraste esta recarga ({_hora_merida(registrada["realizado_en"])}): no hace falta registrar otra.', None)
+        return None
+    cercanas = [r['realizado_en'] for r in recargas if abs(r['realizado_en'] - momento) < ESPERA_SIN_EQUIPO]
+    if not cercanas:
+        return None
+    proxima = max(cercanas) + ESPERA_SIN_EQUIPO
+    return ('deposito-espera', f'Ya registraste una recarga hace menos de 12 horas: podrás registrar otra a partir del {_hora_merida(proxima)}.', proxima)
+
+
+def _exigir_recarga_permitida(huerto, momento):
+    bloqueo = _bloqueo_recarga(huerto, _equipo_de(huerto), _recargas(huerto), momento, _deteccion_pendiente(huerto))
+    if bloqueo:
+        raise ReglaDeNegocio(bloqueo[0], bloqueo[1])
+
+
+def _cargas(recargas, bajos):
+    """Una carga va de la última recarga vigente antes de un «deposito_bajo» (y después del anterior) a ese evento.
+
+    Devuelve (completas de la más antigua a la más reciente, sin las de menos de 1 hora; recarga de la carga abierta o None)."""
+    completas, anterior = [], None
+    for bajo in bajos:
+        candidatas = [r for r in recargas if r['realizado_en'] < bajo and (anterior is None or r['realizado_en'] > anterior)]
+        if candidatas and bajo - candidatas[-1]['realizado_en'] >= CARGA_MINIMA:
+            completas.append({**candidatas[-1], 'bajo': bajo})
+        anterior = bajo
+    abiertas = [r for r in recargas if anterior is None or r['realizado_en'] > anterior]
+    return completas, (abiertas[-1] if abiertas else None)
+
+
+def _carga_dto(carga, dueno_id):
+    duracion = carga['bajo'] - carga['realizado_en'] if carga.get('bajo') else None
+    return {'refilledAt': _fecha(carga['realizado_en']), 'origin': carga['origen'], 'confirmed': carga['origen'] == 'equipo' and carga['registrado_por_id'] is not None,
+            'byOwner': carga['registrado_por_id'] == dueno_id, 'lowAt': _fecha(carga.get('bajo')),
+            'seconds': int(duracion.total_seconds()) if duracion else None}
+
+
+def _fase_deposito(huerto, equipo, lectura, recargas, pendiente):
+    """Qué muestra la tarjeta Depósito: con_agua | rellenar | detectada | esperando_lectura | sigue_bajo | sin_lectura | sin_equipo."""
+    if equipo is None:
+        return 'sin_equipo'
+    if lectura is None:
+        return 'sin_lectura'
+    if lectura.deposito_con_agua:
+        return 'detectada' if pendiente is not None and pendiente.detectada_en <= lectura.medida_en else 'con_agua'
+    registrada = _recarga_desde(recargas, _bajo_desde(huerto))
+    if registrada is None:
+        return 'rellenar'
+    # Registró la recarga en este nivel bajo: ¿llegó otra lectura (baja) después de registrarla?
+    despues = max(registrada['realizado_en'], registrada['registrado_en']) if registrada['origen'] == 'persona' else registrada['realizado_en']
+    return 'sigue_bajo' if lectura.medida_en > despues else 'esperando_lectura'
+
+
+def _deposito(huerto, equipo):
+    """(estado del depósito para la interfaz, cargas para el historial: la abierta primero y luego las completas, recientes primero)."""
+    ahora = timezone.now()
+    recargas = _recargas(huerto)
+    ultima = recargas[-1] if recargas else None
+    lectura = _lecturas_flotador(huerto).order_by('-medida_en').first() if equipo else None
+    bajo_desde = None
+    if lectura is not None and lectura.deposito_con_agua is False:
+        evento = (DispositivoEvento.objects.filter(huerto_id=huerto.pk, tipo='deposito_bajo').order_by('-ocurrido_en')
+                  .values_list('ocurrido_en', flat=True).first())
+        bajo_desde = evento or lectura.medida_en
+    pendiente = _deteccion_pendiente(huerto)
+    bloqueo = _bloqueo_recarga(huerto, equipo, recargas, ahora, pendiente)
+    fase = _fase_deposito(huerto, equipo, lectura, recargas, pendiente)
+    estado = {'hasDevice': equipo is not None, 'hasWater': lectura.deposito_con_agua if lectura else None, 'lowSince': _fecha(bajo_desde),
+              'state': fase,
+              # La pregunta «¿Ya lo rellenaste?» solo con una detección real: pendiente y la última lectura con agua.
+              'pendingRefill': {'id': str(pendiente.pk), 'detectedAt': _fecha(pendiente.detectada_en)} if fase == 'detectada' else None,
+              'lastRefill': {'at': _fecha(ultima['realizado_en']), 'origin': ultima['origen'],
+                             'confirmed': ultima['origen'] == 'equipo' and ultima['registrado_por_id'] is not None,
+                             'byOwner': ultima['registrado_por_id'] == huerto.propietario_id} if ultima else None,
+              'canRefill': bloqueo is None, 'refillBlock': bloqueo[0].removeprefix('deposito-') if bloqueo else None,
+              'nextRefillAt': _fecha(bloqueo[2]) if bloqueo else None,
+              'averageSeconds': None, 'averageLoads': 0, 'estimatedLowAt': None, 'completedLoads': 0, 'refillEverySeconds': None}
+    if equipo is None:
+        ultimas = [r['realizado_en'] for r in recargas[-CARGAS_PARA_PROMEDIO:]]
+        if len(ultimas) >= 2:
+            estado['refillEverySeconds'] = int((ultimas[-1] - ultimas[0]).total_seconds() / (len(ultimas) - 1))
+        return estado, []
+    bajos = list(DispositivoEvento.objects.filter(huerto_id=huerto.pk, tipo='deposito_bajo').order_by('ocurrido_en')
+                 .values_list('ocurrido_en', flat=True))
+    completas, abierta = _cargas(recargas, bajos)
+    estado['completedLoads'] = len(completas)
+    if completas:
+        recientes = completas[-CARGAS_PARA_PROMEDIO:]
+        promedio = sum(((c['bajo'] - c['realizado_en']) for c in recientes), timedelta()) / len(recientes)
+        estado['averageSeconds'] = int(promedio.total_seconds())
+        estado['averageLoads'] = len(recientes)
+        if abierta is not None and lectura is not None and lectura.deposito_con_agua:
+            estado['estimatedLowAt'] = _fecha(ultima['realizado_en'] + promedio)
+    historial = ([abierta] if abierta else []) + completas[::-1]
+    return estado, historial[:CARGAS_EN_HISTORIAL]
+
+
+def deposito(actor, huerto_id):
+    huerto = s.huerto_propio(actor, huerto_id)
+    estado, cargas = _deposito(huerto, _equipo_de(huerto))
+    return {'status': 'ready', 'tank': estado, 'loads': [_carga_dto(carga, huerto.propietario_id) for carga in cargas]}
+
+
+def _deteccion_a_decidir(actor, huerto_id, deteccion_id):
+    """La detección pendiente del huerto propio, con el huerto y la detección bloqueados (en ese orden, como la base)."""
+    huerto = s.huerto_propio(actor, huerto_id, bloquear=True)
+    deteccion = DepositoDeteccion.objects.select_for_update().filter(pk=deteccion_id, huerto_id=huerto.pk).first()
+    if deteccion is None:
+        raise Http404
+    if deteccion.estado != 'pendiente':
+        raise ReglaDeNegocio('deposito-resuelta', 'Esta recarga detectada ya se confirmó, se descartó o quedó sin confirmar.')
+    return huerto, deteccion
+
+
+@transaction.atomic
+def confirmar_recarga(actor, huerto_id, deteccion_id):
+    """Solo el dueño: registra la recarga, que la base convierte en la detectada (su hora, origen «equipo»)."""
+    huerto, deteccion = _deteccion_a_decidir(actor, huerto_id, deteccion_id)
+    cuidado = Cuidado.objects.create(huerto=huerto, tipo='rellenar_deposito', registrado_por_id=actor.pk)
+    s.auditar(actor, 'confirmar_recarga', entidad='deposito_deteccion', entidad_id=deteccion.pk, detalle={'cuidado': str(cuidado.pk)})
+    return {'status': 'accepted', 'care': _cuidado_dto(_cuidados_vigentes().get(pk=cuidado.pk)), 'tank': _deposito(huerto, _equipo_de(huerto))[0]}
+
+
+@transaction.atomic
+def descartar_recarga(actor, huerto_id, deteccion_id):
+    """Solo el dueño: «No fue una recarga». No crea cuidado."""
+    huerto, deteccion = _deteccion_a_decidir(actor, huerto_id, deteccion_id)
+    DepositoDeteccion.objects.filter(pk=deteccion.pk, estado='pendiente').update(estado='descartada', decidida_por_id=actor.pk,
+                                                                               decidida_en=timezone.now())
+    s.auditar(actor, 'descartar_recarga', entidad='deposito_deteccion', entidad_id=deteccion.pk)
+    return {'status': 'accepted', 'tank': _deposito(huerto, _equipo_de(huerto))[0]}
 
 
 # ── Mantenimientos de todos los huertos (`gestionar_mantenimientos`) ──
@@ -396,18 +666,15 @@ def _mantenimiento_dto(cuidado):
             'owner': cuidado.huerto.propietario.email, 'revision': cuidado.rev_numero or 0, 'registeredAt': _fecha(cuidado.registrado_en)}
 
 
-def _id_numerico(valor):
+def _id_numerico(valor, campo='garden'):
+    """N.º de huerto: entero positivo o solo dígitos (hasta 18)."""
     if type(valor) is int and valor > 0:
         return valor
-    if isinstance(valor, str) and valor.isascii() and valor.isdecimal() and len(valor) <= 18:
-        return int(valor)
-    raise ValidationError('Identificador no válido')
+    return int(v.entero_texto(valor, campo, maximo_digitos=18))
 
 
 def _busqueda(texto):
-    if texto is not None and (not isinstance(texto, str) or len(texto) > MAXIMO_BUSQUEDA or not texto.isprintable()):
-        raise ValidationError('Búsqueda no válida')
-    return texto.strip() if texto else None
+    return v.texto_libre(texto, 'busqueda', maximo=MAXIMO_BUSQUEDA) or None
 
 
 def mantenimientos(actor, busqueda, huerto, planta, tipo, estado, desde, hasta, pagina):
@@ -418,7 +685,7 @@ def mantenimientos(actor, busqueda, huerto, planta, tipo, estado, desde, hasta, 
     if busqueda := _busqueda(busqueda):
         consulta = consulta.filter(Q(huerto__nombre__icontains=busqueda) | Q(huerto__propietario__email__icontains=busqueda))
     if huerto:
-        consulta = consulta.filter(huerto_id=_id_numerico(huerto))
+        consulta = consulta.filter(huerto_id=_id_numerico(huerto, 'huerto'))
     if estado:
         consulta = consulta.filter(rev_tipo=ESTADOS_CUIDADO[estado]) if ESTADOS_CUIDADO[estado] else consulta.filter(rev_tipo__isnull=True)
     return {'status': 'ready', **paginar(consulta.order_by('-realizado_en', '-registrado_en', 'id'), pagina, _mantenimiento_dto)}
@@ -454,9 +721,7 @@ def registrar_mantenimiento(actor, huerto_id, tipo, planta, chiles, realizado_en
 
 
 def _motivo_de_revision(motivo):
-    if not isinstance(motivo, str) or not motivo.replace('\n', ' ').isprintable() or not 1 <= len(motivo.strip()) <= MAXIMO_MOTIVO:
-        raise ValidationError('Motivo no válido')
-    return motivo.strip()
+    return v.texto_libre(motivo, 'reason', maximo=MAXIMO_MOTIVO, multilinea=True, requerido=True)
 
 
 def _revisar(editor, cuidado_id, revision, motivo, accion, **campos):

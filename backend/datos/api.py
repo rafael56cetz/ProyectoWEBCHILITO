@@ -29,7 +29,7 @@ def command_state(request, data, comando_id):
     return huerto.estado_comando(request.user, comando_id)
 
 
-@endpoint(('GET', 'POST'), ('incident', 'note', 'diagnostic', 'consent'))
+@endpoint(('GET', 'POST'), ('incident', 'note', 'diagnostic', 'consent'), vinculado=True)
 def support(request, data, huerto_id):
     if request.method == 'POST':
         return datos.abrir_caso(request.user, huerto_id, data.get('incident'), data.get('note'), data.get('diagnostic'), data.get('consent'))
@@ -37,12 +37,12 @@ def support(request, data, huerto_id):
     return datos.soporte(request.user, huerto_id)
 
 
-@endpoint(('POST',))
+@endpoint(('POST',), huerto=True)
 def support_revoke(request, data, caso_id):
     return datos.revocar_caso(request.user, caso_id)
 
 
-@endpoint(('POST',))
+@endpoint(('POST',), huerto=True)
 def support_cancel(request, data, caso_id):
     return datos.cancelar_caso(request.user, caso_id)
 
@@ -100,6 +100,9 @@ def link_device(request):
             raise EntradaInvalida
         if not ratelimit.consume(request, action='vincular_dispositivo', key=identificador):
             return error(429, 'rate-limited')
+        # B-3: tope global antes de PBKDF2 (check_password), para que muchas IP no agoten la CPU.
+        if not ratelimit.consume(request, action='vincular_dispositivo_global', key='global'):
+            return error(429, 'rate-limited')
         return JsonResponse({'status': 'ready', 'result': huerto.vincular_dispositivo(identificador, credencial, codigo)})
     except (EntradaInvalida, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
         return error(400, 'invalid-input')
@@ -126,12 +129,12 @@ def admin_device(request, data, equipo_id):
     return equipos_admin.detalle(request.user, equipo_id, bounds(request))
 
 
-@endpoint(('POST',), cap='gestionar_dispositivos')
+@endpoint(('POST',), cap='gestionar_dispositivos', reciente=True)
 def admin_device_unlink(request, data, equipo_id):
     return equipos_admin.desvincular(request.user, equipo_id)
 
 
-@endpoint(('POST',), cap='gestionar_dispositivos')
+@endpoint(('POST',), cap='gestionar_dispositivos', reciente=True)
 def admin_device_rotate(request, data, equipo_id):
     return equipos_admin.rotar_credencial(request.user, equipo_id)
 
@@ -180,7 +183,7 @@ def admin_session(request, data, sesion_id):
     return datos.estado_sesion(request.user, sesion_id)
 
 
-@endpoint(('POST',), ('type', 'plant', 'duration'), cap='atender_soporte')
+@endpoint(('POST',), ('type', 'plant', 'duration'), cap='atender_soporte', reciente=True)
 def admin_session_order(request, data, sesion_id):
     return datos.dar_orden(request.user, sesion_id, data.get('type'), data.get('plant'), data.get('duration'))
 
@@ -207,7 +210,7 @@ def admin_admins_activity(request, data):
     return administradores_admin.actividad(request.user, _filtro(request, 'cuenta'), pagina)
 
 
-@endpoint(('POST',), ('email', 'capabilities', 'reason'), cap='gestionar_administradores')
+@endpoint(('POST',), ('email', 'capabilities', 'reason'), cap='gestionar_administradores', reciente=True)
 def admin_admins_change(request, data):
     return administradores_admin.cambiar_capacidades(request.user, data.get('email'), data.get('capabilities'), data.get('reason'))
 

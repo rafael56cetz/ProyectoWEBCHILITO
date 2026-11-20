@@ -1,23 +1,25 @@
 """Sobre PostgreSQL: huertos, plantas, órdenes, vinculación del equipo y aceptación de textos."""
+import importlib
 import io
 import json
 import os
 import unittest
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest.mock import patch
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 import psycopg
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
 from django.utils import timezone
 
-from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, Dispositivo, Medicion, MedicionPlanta,
-                          Notificacion)
-from huerto.models import Huerto, Planta
+from datos.models import (Auditoria, CodigoVinculacion, Comando, Cuidado, CuidadoRevision, DepositoDeteccion, Dispositivo,
+                          DispositivoEvento, Medicion, MedicionPlanta, Notificacion)
+from huerto.models import Huerto, Planta, PlantaEtapa
 from privacidad.models import Decision
 from tests import aceptar_vigentes, cuenta, publicar_textos
 try:
@@ -57,6 +59,24 @@ class AyudasHuerto:
         respuesta = self.post('/api/huertos', {'name': nombre} if nombre else {}, cliente)
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
         return respuesta.json()['garden']['id']
+
+    def huerto_vinculado(self, nombre=None):
+        """Huerto con su equipo vinculado por el flujo real (código + canje), con identificador y MAC únicos por prueba.
+        Desde la corrección «huerto no vinculado», editar plantas, registrar cuidados u ordenar exige un equipo vinculado."""
+        self._vinculados = getattr(self, '_vinculados', 0) + 1
+        numero = self._vinculados
+        huerto_id = self.crear_huerto(nombre)
+        identificador = f'CHI-V{numero:03d}'
+        equipo(identificador, f'02:00:00:01:00:{numero:02x}')
+        self.assertEqual(self.vincular(identificador, codigo=self.codigo(huerto_id)).json()['result'], 'vinculado')
+        return huerto_id
+
+    def con_huerto(self, usuario):
+        """Cliente de una cuenta con su propio huerto: así una prueba de acceso ajeno prueba la propiedad (404) y no la
+        falta de huerto, que desde la corrección «sin huerto» responde antes con 403 «huerto-requerido»."""
+        cliente = self.cliente(usuario)
+        self.crear_huerto(cliente=cliente)
+        return cliente
 
     def codigo(self, huerto_id):
         respuesta = self.post(f'/api/huertos/{huerto_id}/codigo')
@@ -126,6 +146,7 @@ class Huertos(BaseHuerto):
     def test_otra_cuenta_recibe_404_en_cada_endpoint(self):
         huerto_id = self.huerto_con_equipo()
         ajena = self.cliente(self.otra)
+        suyo = self.crear_huerto(cliente=ajena)     # con huerto propio: así se prueba la propiedad, no la falta de huerto
         for ruta in ('', '/ia', '/vinculacion', '/plantas/1'):
             with self.subTest(ruta=ruta):
                 self.assertEqual(ajena.get(f'/api/huertos/{huerto_id}{ruta}').status_code, 404)
@@ -134,7 +155,7 @@ class Huertos(BaseHuerto):
         for ruta, datos in pruebas:
             with self.subTest(ruta=ruta):
                 self.assertEqual(self.post(f'/api/huertos/{huerto_id}{ruta}', datos, ajena).status_code, 404)
-        self.assertEqual(ajena.get('/api/huertos').json()['items'], [])
+        self.assertEqual([item['id'] for item in ajena.get('/api/huertos').json()['items']], [suyo])
         self.assertEqual(Huerto.objects.get(pk=huerto_id).nombre, 'Mi huerto')
 
     def test_inexistente_y_ajeno_responden_igual(self):
@@ -163,7 +184,7 @@ class Huertos(BaseHuerto):
 
 class Plantas(BaseHuerto):
     def test_editar_nombre_fecha_y_etapa(self):
-        huerto_id = self.crear_huerto()
+        huerto_id = self.huerto_vinculado()
         hoy = timezone.localdate().isoformat()
         respuesta = self.post(f'/api/huertos/{huerto_id}/plantas/2', {'name': 'Chilito', 'sowingDate': hoy, 'stage': 'germinacion'})
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
@@ -172,8 +193,47 @@ class Plantas(BaseHuerto):
         self.assertIsNotNone(planta['plant']['stageSince'])
         self.assertEqual([e['stage'] for e in planta['stages']][-1], 'germinacion')
 
-    def test_validacion(self):
+    def test_huerto_nuevo_nace_con_su_etapa_inicial(self):
         huerto_id = self.crear_huerto()
+        filas = list(PlantaEtapa.objects.filter(planta__huerto_id=huerto_id).order_by('planta__numero')
+                     .values_list('planta__numero', 'etapa', 'desde', 'registrada_por_id'))
+        hoy = timezone.localdate()
+        self.assertEqual(filas, [(n, 'sin_sembrar', hoy, self.dueña.pk) for n in (1, 2, 3)])
+        etapas = self.client.get(f'/api/huertos/{huerto_id}/plantas/1').json()['stages']
+        self.assertEqual(etapas, [{'stage': 'sin_sembrar', 'since': hoy.isoformat()}])
+
+    def test_cambiar_etapa_agrega_en_orden(self):
+        huerto_id = self.huerto_vinculado()
+        respuesta = self.post(f'/api/huertos/{huerto_id}/plantas/1', {'stage': 'germinacion'})
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        etapas = self.client.get(f'/api/huertos/{huerto_id}/plantas/1').json()['stages']
+        self.assertEqual([e['stage'] for e in etapas], ['sin_sembrar', 'germinacion'])
+        self.assertEqual(PlantaEtapa.objects.filter(planta__huerto_id=huerto_id, planta__numero=1).count(), 2)
+
+    def test_relleno_no_duplica(self):
+        relleno = importlib.import_module('web.migrations.0003_linea_de_vida').RELLENO
+        primero = self.huerto_vinculado()
+        self.post(f'/api/huertos/{primero}/plantas/1', {'stage': 'germinacion'})
+        with connection.cursor() as cursor:
+            cursor.execute(relleno)
+            self.assertEqual(cursor.rowcount, 0, 'las plantas con historial no reciben otra fila')
+            # Un huerto como los de antes de la migración: sus plantas nacen sin fila de historial.
+            cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')   # ALTER TABLE no admite comprobaciones pendientes
+            cursor.execute('ALTER TABLE huerto_planta DISABLE TRIGGER planta_etapa_inicial')
+            segundo = Huerto.objects.create(propietario=self.otra).pk
+            cursor.execute('ALTER TABLE huerto_planta ENABLE TRIGGER planta_etapa_inicial')
+            self.assertFalse(PlantaEtapa.objects.filter(planta__huerto_id=segundo).exists())
+            cursor.execute(relleno)
+            self.assertEqual(cursor.rowcount, 3)
+            cursor.execute(relleno)
+            self.assertEqual(cursor.rowcount, 0)
+        creado = timezone.localtime(Huerto.objects.get(pk=segundo).creado_en, ZoneInfo('America/Merida')).date()
+        self.assertEqual(sorted(PlantaEtapa.objects.filter(planta__huerto_id=segundo).values_list('planta__numero', 'etapa', 'desde')),
+                         [(n, 'sin_sembrar', creado) for n in (1, 2, 3)])
+        self.assertEqual(PlantaEtapa.objects.filter(planta__huerto_id=primero).count(), 4)
+
+    def test_validacion(self):
+        huerto_id = self.huerto_vinculado()
         futuro = (timezone.localdate() + timedelta(days=2)).isoformat()
         casos = ({'name': ''}, {'name': 'x' * 41}, {'sowingDate': futuro}, {'sowingDate': 'ayer'}, {'stage': 'madura'}, {}, {'otro': 1})
         for datos in casos:
@@ -315,7 +375,8 @@ class Ordenes(BaseHuerto):
 
     def test_sin_equipo_no_hay_ordenes(self):
         huerto_id = self.crear_huerto()
-        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'}).status_code, 400)
+        respuesta = self.post(f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'})
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (403, 'huerto-sin-vincular'))
 
     def test_registrar_recarga(self):
         huerto_id = self.huerto_con_equipo()
@@ -492,10 +553,437 @@ class Cuidados(BaseHuerto):
             with self.subTest(consulta=consulta):
                 self.assertEqual(self.listar(consulta).status_code, 400)
 
+    def test_ultimos_por_tipo_no_dependen_de_la_pagina(self):
+        hace = lambda horas: timezone.now() - timedelta(hours=horas)
+        Cuidado.objects.create(huerto_id=self.huerto_id, tipo='cosecha', planta_numero=2, chiles_cosechados=4, realizado_en=hace(100), registrado_por=self.dueña)
+        anulada = Cuidado.objects.create(huerto_id=self.huerto_id, tipo='cosecha', planta_numero=1, realizado_en=hace(90), registrado_por=self.dueña)
+        CuidadoRevision.objects.create(cuidado=anulada, numero=1, tipo='anulacion', motivo='Duplicado', editor=self.editor)
+        for numero in range(30):      # más de una página de inspecciones, todas más recientes que la cosecha
+            Cuidado.objects.create(huerto_id=self.huerto_id, tipo='inspeccion', realizado_en=hace(80 - numero), registrado_por=self.dueña)
+        datos = self.listar().json()
+        self.assertTrue(all(fila['type'] == 'inspeccion' for fila in datos['items']), 'la cosecha no está en la página 1')
+        ultimos = datos['latest']
+        self.assertEqual((ultimos['cosecha']['plant'], ultimos['cosecha']['chiles']), (2, 4), 'la anulada no cuenta')
+        self.assertEqual(ultimos['inspeccion']['doneAt'], datos['items'][0]['doneAt'])
+        self.assertIsNone(ultimos['sustrato'])
+        self.assertIsNone(ultimos['rellenar_deposito'])
+        self.assertNotIn('latest', self.listar('?page=2').json())
+        self.assertNotIn('latest', self.listar('?tipo=cosecha').json())
+
     def test_otra_cuenta(self):
-        ajena = self.cliente(self.otra)
+        ajena = self.con_huerto(self.otra)
         self.assertEqual(ajena.get(f'/api/huertos/{self.huerto_id}/cuidados').status_code, 404)
         self.assertEqual(self.post(f'/api/huertos/{self.huerto_id}/cuidados', {'type': 'rellenar_deposito'}, ajena).status_code, 404)
+
+
+class Deposito(BaseHuerto):
+    """El flotador: nivel bajo y recargas detectadas (por confirmar) en la base, límites de la recarga manual y duración de cada carga."""
+    HORA = 60
+
+    def setUp(self):
+        super().setUp()
+        self.editor = cuenta('deposito-editor@example.test', 'gestionar_mantenimientos')
+        self.huerto_id = self.huerto_con_equipo()
+
+    def flotador(self, *lecturas, huerto_id=None, confirmar=False):
+        """Mediciones en orden: (horas atrás, con agua). Con `confirmar`, el dueño confirma cada recarga detectada."""
+        for horas, con_agua in lecturas:
+            medir(huerto_id or self.huerto_id, horas * self.HORA, deposito_con_agua=con_agua)
+            if confirmar and (pendiente := self.pendiente()):
+                self.assertEqual(self.confirmar(pendiente).status_code, 200)
+
+    def pendiente(self):
+        return DepositoDeteccion.objects.filter(huerto_id=self.huerto_id, estado='pendiente').first()
+
+    def confirmar(self, deteccion, cliente=None):
+        return self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/confirmar', cliente=cliente)
+
+    def descartar(self, deteccion, cliente=None):
+        return self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/descartar', cliente=cliente)
+
+    def recargas(self, origen=None):
+        filas = Cuidado.objects.filter(huerto_id=self.huerto_id, tipo='rellenar_deposito')
+        return filas.filter(origen=origen) if origen else filas
+
+    def registrar(self, huerto_id=None, **datos):
+        return self.post(f"/api/huertos/{huerto_id or self.huerto_id}/cuidados", {'type': 'rellenar_deposito', **datos})
+
+    def deposito(self, huerto_id=None):
+        respuesta = self.client.get(f"/api/huertos/{huerto_id or self.huerto_id}/deposito")
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        return respuesta.json()
+
+    def hace(self, horas):
+        return (timezone.now() - timedelta(hours=horas)).isoformat()
+
+    def anular(self, cuidado, motivo='Prueba'):
+        CuidadoRevision.objects.create(cuidado=cuidado, numero=1, tipo='anulacion', motivo=motivo, editor=self.editor)
+
+    def assertHoras(self, segundos, horas):
+        self.assertAlmostEqual(segundos, horas * 3600, delta=5)
+
+    def assertRechazoBase(self, **campos):
+        with self.assertRaises(IntegrityError) as fallo, transaction.atomic():
+            Cuidado.objects.create(huerto_id=self.huerto_id, tipo='rellenar_deposito', registrado_por=self.dueña, **campos)
+        self.assertEqual(fallo.exception.__cause__.sqlstate, '23514')
+        return str(fallo.exception)
+
+    # ── Detección automática ──
+    def test_bajar_crea_evento_y_aviso_una_vez(self):
+        self.flotador((3, True), (2, False), (1, False))
+        self.assertEqual(DispositivoEvento.objects.filter(huerto_id=self.huerto_id, tipo='deposito_bajo').count(), 1)
+        avisos = Notificacion.objects.filter(destinatario=self.dueña, titulo='Tu depósito necesita agua')
+        self.assertEqual((avisos.count(), avisos.first().severidad, avisos.first().enlace), (1, 'advertencia', '#huerto'))
+        self.assertEqual(avisos.first().texto, 'Tu depósito se quedó sin agua. Rellénalo y avísanos.')
+        tanque = self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']
+        self.assertEqual((tanque['hasWater'], tanque['canRefill']), (False, True))
+        bajo = DispositivoEvento.objects.get(huerto_id=self.huerto_id, tipo='deposito_bajo').ocurrido_en
+        self.assertEqual(tanque['lowSince'], bajo.isoformat())
+
+    def test_deteccion_queda_pendiente_sin_cuidado(self):
+        self.flotador((4, True), (3, False), (2, True), (1, True))
+        self.assertFalse(self.recargas().exists())
+        deteccion = DepositoDeteccion.objects.get(huerto_id=self.huerto_id)
+        medida = Medicion.objects.filter(huerto_id=self.huerto_id).order_by('medida_en')[2].medida_en
+        self.assertEqual((deteccion.estado, deteccion.detectada_en, deteccion.cuidado_id, deteccion.decidida_por_id), ('pendiente', medida, None, None))
+        self.assertEqual(DispositivoEvento.objects.filter(huerto_id=self.huerto_id, tipo='deposito_recargado').count(), 1)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Tu depósito necesita agua').resuelta_en)
+        aviso = Notificacion.objects.get(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito')
+        hora = medida.astimezone(ZoneInfo('America/Merida')).strftime('%d/%m/%Y a las %H:%M')
+        self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), (f'Tu equipo detectó agua en el depósito el {hora}. ¿Ya lo rellenaste?', '#huerto', None))
+        tanque = self.deposito()['tank']
+        self.assertEqual(tanque['state'], 'detectada')
+        self.assertEqual(tanque['pendingRefill'], {'id': str(deteccion.pk), 'detectedAt': medida.isoformat()})
+        self.assertEqual((tanque['lastRefill'], tanque['canRefill'], tanque['completedLoads']), (None, True, 0))
+        self.assertEqual(self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']['pendingRefill']['id'], str(deteccion.pk))
+        self.assertEqual(self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'], [])
+
+    def test_confirmar_crea_un_solo_cuidado_con_la_hora_detectada(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.confirmar(deteccion)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        recarga = self.recargas().get()
+        self.assertEqual((recarga.origen, recarga.registrado_por_id, recarga.realizado_en), ('equipo', self.dueña.pk, deteccion.detectada_en))
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.cuidado_id, deteccion.decidida_por_id), ('confirmada', recarga.pk, self.dueña.pk))
+        self.assertIsNotNone(deteccion.decidida_en)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Confirma la recarga de tu depósito').resuelta_en)
+        cuerpo = respuesta.json()
+        self.assertEqual((cuerpo['care']['origin'], cuerpo['care']['confirmed'], cuerpo['care']['byOwner']), ('equipo', True, True))
+        self.assertIsNone(cuerpo['tank']['pendingRefill'])
+        ultima = self.deposito()['tank']['lastRefill']
+        self.assertEqual((ultima['origin'], ultima['confirmed'], ultima['byOwner'], ultima['at']), ('equipo', True, True, deteccion.detectada_en.isoformat()))
+        fila = self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'][0]
+        self.assertEqual((fila['origin'], fila['confirmed'], fila['byOwner']), ('equipo', True, True))
+        otra = self.confirmar(deteccion)                     # repetir el clic no duplica
+        self.assertEqual((otra.status_code, otra.json()['code']), (409, 'deposito-resuelta'))
+        self.assertEqual(self.registrar().json()['code'], 'deposito-con-agua')
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_descartar_no_crea_nada(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.descartar(deteccion)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.cuidado_id, deteccion.decidida_por_id), ('descartada', None, self.dueña.pk))
+        self.assertFalse(self.recargas().exists())
+        self.assertIsNone(respuesta.json()['tank']['pendingRefill'])
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Confirma la recarga de tu depósito').resuelta_en)
+        self.assertEqual(self.confirmar(deteccion).json()['code'], 'deposito-resuelta')
+        self.assertFalse(self.recargas().exists())
+
+    def test_nivel_bajo_con_pendiente_la_deja_sin_confirmar(self):
+        self.flotador((4, True), (3, False), (2, True))
+        deteccion = self.pendiente()
+        self.flotador((1, False))
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.decidida_por_id, deteccion.cuidado_id), ('sin_confirmar', None, None))
+        self.assertIsNotNone(deteccion.decidida_en)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Confirma la recarga de tu depósito').resuelta_en)
+        self.assertEqual(self.confirmar(deteccion).json()['code'], 'deposito-resuelta')
+        self.assertFalse(self.recargas().exists())
+        self.assertIsNone(self.deposito()['tank']['pendingRefill'])
+        self.flotador((0.5, True))                           # la siguiente recarga se detecta de nuevo
+        self.assertEqual(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id, estado='pendiente').count(), 1)
+
+    def test_manual_con_pendiente_confirma_sin_duplicar(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.registrar(doneAt=self.hace(0.1))
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        recarga = self.recargas().get()
+        self.assertEqual((recarga.origen, recarga.registrado_por_id, recarga.realizado_en), ('equipo', self.dueña.pk, deteccion.detectada_en))
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.cuidado_id), ('confirmada', recarga.pk))
+        self.assertEqual(respuesta.json()['care']['confirmed'], True)
+        self.assertEqual(self.registrar().json()['code'], 'deposito-con-agua')
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_solo_el_dueno_confirma_o_descarta(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        otra = self.con_huerto(self.otra)
+        self.assertEqual(self.confirmar(deteccion, otra).status_code, 404)
+        self.assertEqual(self.descartar(deteccion, otra).status_code, 404)
+        self.assertEqual(self.confirmar(deteccion, self.con_huerto(self.editor)).status_code, 404)
+        self.assertEqual(self.client.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{deteccion.pk}/confirmar').status_code, 400)  # sin recibo
+        ajena = self.post(f'/api/huertos/{self.huerto_id}/deposito/detecciones/{uuid.uuid4()}/confirmar')
+        self.assertEqual(ajena.status_code, 404)
+        # La base lo exige también: nadie más descarta, nadie la cierra a mano ni la crea.
+        for cambios in ({'estado': 'descartada', 'decidida_por': self.otra, 'decidida_en': timezone.now()},
+                        {'estado': 'sin_confirmar', 'decidida_en': timezone.now()}):
+            with self.subTest(cambios=cambios), self.assertRaises(IntegrityError), transaction.atomic():
+                DepositoDeteccion.objects.filter(pk=deteccion.pk).update(**cambios)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            DepositoDeteccion.objects.create(huerto_id=self.huerto_id, detectada_en=timezone.now())
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            DepositoDeteccion.objects.filter(pk=deteccion.pk).delete()
+        self.assertEqual((self.pendiente(), self.recargas().count()), (deteccion, 0))
+
+    def test_recarga_manual_reciente_no_pide_confirmacion(self):
+        self.flotador((2, True), (1, False))
+        self.assertEqual(self.registrar(doneAt=self.hace(0.5)).status_code, 200)
+        self.flotador((0.2, True))
+        self.assertEqual([(r.origen, r.registrado_por_id) for r in self.recargas()], [('persona', self.dueña.pk)])
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).exists())
+        self.assertTrue(self.deposito()['tank']['lastRefill']['byOwner'])
+
+    def test_recarga_registrada_en_el_nivel_bajo_no_pide_confirmacion(self):
+        """Más allá de los 30 minutos: si la persona ya avisó en este nivel bajo, el agua detectada es esa recarga."""
+        self.flotador((5, True), (4, False))
+        self.assertEqual(self.registrar(doneAt=self.hace(3)).status_code, 200)
+        self.flotador((1, True))
+        self.assertEqual(list(self.recargas().values_list('origen', flat=True)), ['persona'])
+        self.assertIsNone(self.pendiente())
+        self.assertEqual(self.deposito()['tank']['state'], 'con_agua')
+
+    def test_recargas_automaticas_anteriores_siguen_contando(self):
+        """Las que creó la 0004 (origen equipo, sin autor) se quedan: cuentan como recargas y no como confirmadas."""
+        self.flotador((50, True), (49, False))
+        with connection.cursor() as cursor:
+            cursor.execute('SET CONSTRAINTS ALL IMMEDIATE')     # sin eventos pendientes no se puede alterar la tabla
+            cursor.execute('ALTER TABLE cuidado DISABLE TRIGGER cuidado_reglas')
+            cursor.execute("INSERT INTO cuidado(huerto_id, tipo, origen, realizado_en) VALUES (%s, 'rellenar_deposito', 'equipo', %s)",
+                           [self.huerto_id, timezone.now() - timedelta(hours=40)])
+            cursor.execute('ALTER TABLE cuidado ENABLE TRIGGER cuidado_reglas')
+        self.flotador((30, True), (20, False))      # esta detección queda sin confirmar
+        tanque = self.deposito()['tank']
+        self.assertHoras(tanque['averageSeconds'], 20)
+        self.assertEqual((tanque['lastRefill']['origin'], tanque['lastRefill']['confirmed']), ('equipo', False))
+        fila = self.client.get(f'/api/huertos/{self.huerto_id}/cuidados').json()['items'][0]
+        self.assertEqual((fila['origin'], fila['confirmed']), ('equipo', False))
+
+    def test_origen_equipo_no_se_registra_a_mano(self):
+        self.flotador((1, False))
+        for campos in ({'origen': 'equipo', 'registrado_por': None}, {'origen': 'equipo'}):
+            with self.subTest(campos=campos), self.assertRaises(IntegrityError), transaction.atomic():
+                Cuidado.objects.create(huerto_id=self.huerto_id, tipo='rellenar_deposito', **{'registrado_por': self.dueña, **campos})
+
+    # ── Estados de la tarjeta Depósito (1 a 6) ──
+    def estado(self):
+        return self.deposito()['tank']
+
+    def test_estado_1_con_agua_tras_registrar_o_confirmar(self):
+        self.flotador((5, True), (4, False))
+        self.assertEqual(self.registrar().status_code, 200)
+        self.flotador((0, True))
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill'], tanque['canRefill'], tanque['lastRefill']['byOwner'], tanque['lastRefill']['origin']),
+                         ('con_agua', None, False, True, 'persona'))
+
+    def test_estado_2_nivel_bajo_pide_rellenar_con_un_solo_aviso(self):
+        self.flotador((3, True), (2, False), (1, False))
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill'], tanque['canRefill']), ('rellenar', None, True))
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).exists())
+        aviso = Notificacion.objects.get(destinatario=self.dueña, origen='dispositivo', titulo='Tu depósito necesita agua')
+        self.assertEqual((aviso.texto, aviso.enlace, aviso.resuelta_en), ('Tu depósito se quedó sin agua. Rellénalo y avísanos.', '#huerto', None))
+        self.assertFalse(Notificacion.objects.filter(titulo='Confirma la recarga de tu depósito').exists())
+
+    def test_avisos_del_deposito_enlazan_a_mantenimiento(self):
+        """La base guarda #huerto; la API lleva los dos avisos del depósito a Mantenimiento, donde se rellena o se confirma."""
+        self.flotador((3, True), (2, False), (1, True))
+        enlaces = {aviso['title']: aviso['link'] for aviso in self.client.get('/api/avisos').json()['items']}
+        self.assertEqual(enlaces['Tu depósito necesita agua'], '#mantenimiento')
+        self.assertEqual(enlaces['Confirma la recarga de tu depósito'], '#mantenimiento')
+        aviso = Notificacion.objects.get(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito')
+        self.assertEqual(aviso.enlace, '#huerto')                                         # la base no cambia
+        self.assertEqual(self.client.get(f'/api/avisos/{aviso.pk}').json()['notice']['link'], '#mantenimiento')
+
+    def test_estado_3_ya_lo_rellene_registra_con_la_hora_de_confirmacion(self):
+        self.flotador((2, True), (1, False))
+        respuesta = self.registrar()                          # «Sí, ya lo rellené»: sin fecha, la hora de confirmación
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        recarga = self.recargas().get()
+        self.assertEqual((recarga.origen, recarga.registrado_por_id), ('persona', self.dueña.pk))
+        self.assertAlmostEqual((timezone.now() - recarga.realizado_en).total_seconds(), 0, delta=60)
+        self.assertIsNotNone(Notificacion.objects.get(titulo='Tu depósito necesita agua').resuelta_en)
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['canRefill'], tanque['refillBlock']), ('esperando_lectura', False, 'repetida'))
+        self.assertEqual(self.registrar().json()['code'], 'deposito-repetida')
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_estado_4_agua_sin_aviso_pregunta_y_registra_con_la_hora_detectada(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill']['id']), ('detectada', str(deteccion.pk)))
+        self.assertEqual(self.confirmar(deteccion).status_code, 200)
+        self.assertEqual(self.recargas().get().realizado_en, deteccion.detectada_en)
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['pendingRefill'], tanque['lastRefill']['origin'], tanque['lastRefill']['confirmed']),
+                         ('con_agua', None, 'equipo', True))
+
+    def test_estado_5_registrada_pero_sigue_en_nivel_bajo(self):
+        self.flotador((2, True), (1, False))
+        self.assertEqual(self.registrar().status_code, 200)
+        medir(self.huerto_id, 0, deposito_con_agua=False)      # la siguiente lectura sigue baja
+        tanque = self.estado()
+        self.assertEqual((tanque['state'], tanque['canRefill'], tanque['refillBlock'], tanque['lastRefill']['byOwner']), ('sigue_bajo', False, 'repetida', True))
+        self.assertEqual(self.recargas().count(), 1)              # el registro no se borra
+        self.assertEqual(Notificacion.objects.filter(titulo='Tu depósito necesita agua').count(), 1)
+        self.assertEqual(self.registrar().json()['code'], 'deposito-repetida')
+        self.assertIn('Ya registraste esta recarga', self.assertRechazoBase())
+        medir(self.huerto_id, -1, deposito_con_agua=True)      # cuando por fin detecta agua, es esa recarga
+        self.assertIsNone(self.pendiente())
+        self.assertEqual((self.estado()['state'], self.recargas().count()), ('con_agua', 1))
+
+    def test_estado_6_sin_deteccion_real_no_hay_pregunta(self):
+        self.flotador((1, False))                               # solo «medir --sin-agua»
+        tanque = self.client.get(f'/api/huertos/{self.huerto_id}').json()['tank']
+        self.assertEqual((tanque['state'], tanque['pendingRefill']), ('rellenar', None))
+        self.flotador((0.5, True), (0.2, False))                # la detección quedó sin confirmar
+        self.assertEqual(DepositoDeteccion.objects.get(huerto_id=self.huerto_id).estado, 'sin_confirmar')
+        self.assertEqual((self.estado()['state'], self.estado()['pendingRefill']), ('rellenar', None))
+
+    # ── Recarga manual con equipo ──
+    def test_manual_rechazado_con_agua_y_sin_nivel_bajo_previo(self):
+        self.flotador((1, True))
+        respuesta = self.registrar()
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (409, 'deposito-con-agua'))
+        self.assertIn('Tu depósito tiene agua: podrás registrar una recarga', self.assertRechazoBase())
+        tanque = self.deposito()['tank']
+        self.assertEqual((tanque['canRefill'], tanque['refillBlock']), (False, 'con-agua'))
+        self.flotador((0.5, False), (0.2, True), confirmar=True)   # la recarga confirmada tampoco deja registrar otra
+        self.assertEqual(self.registrar().json()['code'], 'deposito-con-agua')
+        self.assertIn('Tu depósito tiene agua desde tu última recarga', self.assertRechazoBase())
+        self.assertEqual(self.recargas().count(), 1)
+
+    def test_manual_permitido_tras_nivel_bajo_y_una_sola_vez(self):
+        self.flotador((2, True), (1, False))
+        self.assertEqual(self.registrar().status_code, 200)
+        segunda = self.registrar()
+        self.assertEqual((segunda.status_code, segunda.json()['code']), (409, 'deposito-repetida'))
+        self.assertIn('Ya registraste esta recarga', self.assertRechazoBase())
+
+    def test_admin_tambien_respeta_la_regla_y_anula_la_del_equipo(self):
+        admin = self.cliente(self.editor)
+        self.flotador((3, True), (2, False), (1, True), confirmar=True)
+        respuesta = self.post('/api/admin/mantenimientos', {'garden': self.huerto_id, 'type': 'rellenar_deposito'}, admin)
+        self.assertEqual(respuesta.json().get('code'), 'deposito-con-agua')
+        self.anular(self.recargas('equipo').get(), 'El flotador rebotó')
+        tanque = self.deposito()['tank']
+        self.assertEqual((tanque['lastRefill'], tanque['canRefill'], tanque['refillBlock']), (None, False, 'con-agua'))  # hay agua
+
+    def test_registro_del_admin_con_pendiente_tambien_la_confirma(self):
+        self.flotador((3, True), (2, False), (1, True))
+        deteccion = self.pendiente()
+        respuesta = self.post('/api/admin/mantenimientos', {'garden': self.huerto_id, 'type': 'rellenar_deposito'}, self.cliente(self.editor))
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        deteccion.refresh_from_db()
+        self.assertEqual((deteccion.estado, deteccion.decidida_por_id), ('confirmada', self.editor.pk))
+        self.assertEqual(self.deposito()['tank']['lastRefill']['byOwner'], False)
+
+    # ── Huerto sin equipo ──
+    def test_sin_equipo_no_registra_recargas(self):
+        """Huerto no vinculado: el depósito se ve, pero «Ya lo rellené» responde 403 «huerto-sin-vincular»."""
+        huerto = self.crear_huerto('Sin equipo')
+        respuesta = self.registrar(huerto)
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (403, 'huerto-sin-vincular'))
+        self.assertIn('Vincula', respuesta.json()['message'])
+        self.assertFalse(Cuidado.objects.filter(huerto_id=huerto).exists())
+        self.assertFalse(self.deposito(huerto)['tank']['hasDevice'])
+
+    def test_sin_equipo_muestra_la_frecuencia(self):
+        """Un huerto que tuvo equipo y se desvinculó conserva su historial: se lee, aunque ya no se puede registrar."""
+        huerto = self.crear_huerto('Sin equipo')
+        equipo('CHI-0002', '02:00:00:00:00:02')
+        self.assertEqual(self.vincular('CHI-0002', codigo=self.codigo(huerto)).json()['result'], 'vinculado')
+        self.assertEqual(self.registrar(huerto, doneAt=self.hace(24 * 6)).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto}/desvincular').status_code, 200)
+        self.assertIsNone(self.deposito(huerto)['tank']['refillEverySeconds'])
+        self.assertEqual(self.vincular('CHI-0002', codigo=self.codigo(huerto)).json()['result'], 'vinculado')
+        for horas in (24 * 4, 24 * 2):
+            self.assertEqual(self.registrar(huerto, doneAt=self.hace(horas)).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto}/desvincular').status_code, 200)
+        tanque = self.deposito(huerto)['tank']
+        self.assertHoras(tanque['refillEverySeconds'], 48)
+        self.assertEqual((tanque['averageSeconds'], tanque['estimatedLowAt'], self.deposito(huerto)['loads']), (None, None, []))
+
+    # ── Duración del depósito ──
+    def test_duracion_promedio_y_descarte_de_rebotes(self):
+        self.flotador((150, True), (149, False), (140, True), (100, False), (99, True), (79, False),
+                      (78, True), (77.5, False), (70, True), (40, False), (10, True), confirmar=True)
+        datos = self.deposito()
+        tanque, cargas = datos['tank'], datos['loads']
+        self.assertEqual(tanque['completedLoads'], 3)                        # la de media hora es rebote
+        self.assertHoras(tanque['averageSeconds'], 30)                       # (40 + 20 + 30) / 3
+        estimada = datetime.fromisoformat(tanque['estimatedLowAt'])
+        self.assertAlmostEqual((estimada - timezone.now()).total_seconds(), 20 * 3600, delta=5)
+        self.assertEqual([c['lowAt'] is None for c in cargas], [True, False, False, False])
+        for carga, horas in zip(cargas[1:], (30, 20, 40)):
+            self.assertHoras(carga['seconds'], horas)
+        self.assertEqual({c['origin'] for c in cargas}, {'equipo'})
+
+    def test_promedio_de_las_ultimas_cinco(self):
+        lecturas, hora = [(160, True), (159, False)], 150
+        for duracion in (2, 10, 10, 10, 10, 10):
+            lecturas += [(hora, True), (hora - duracion, False)]
+            hora -= duracion + 1
+        self.flotador(*lecturas, confirmar=True)
+        tanque = self.deposito()['tank']
+        self.assertEqual(tanque['completedLoads'], 6)
+        self.assertHoras(tanque['averageSeconds'], 10)
+        self.assertEqual(tanque['averageLoads'], 5)                          # el promedio usa las últimas 5
+
+    def test_anuladas_no_cuentan(self):
+        self.flotador((50, True), (49, False), (40, True), (20, False), (10, True), confirmar=True)
+        self.assertHoras(self.deposito()['tank']['averageSeconds'], 20)
+        primera = self.recargas().order_by('realizado_en').first()
+        self.anular(primera)
+        tanque = self.deposito()['tank']
+        self.assertEqual((tanque['completedLoads'], tanque['averageSeconds'], tanque['estimatedLowAt']), (0, None, None))
+
+    def test_sin_cargas_completas(self):
+        self.flotador((3, True), (2, False), (1, True), confirmar=True)
+        datos = self.deposito()
+        self.assertEqual((datos['tank']['completedLoads'], datos['tank']['averageSeconds'], datos['tank']['estimatedLowAt']), (0, None, None))
+        self.assertEqual([(c['origin'], c['lowAt'], c['seconds']) for c in datos['loads']], [('equipo', None, None)])
+
+    def test_estimacion_solo_con_la_carga_abierta(self):
+        self.flotador((50, True), (49, False), (40, True), (20, False), confirmar=True)
+        tanque = self.deposito()['tank']
+        self.assertHoras(tanque['averageSeconds'], 20)
+        self.assertIsNone(tanque['estimatedLowAt'])
+        self.flotador((1, True), confirmar=True)
+        self.assertIsNotNone(self.deposito()['tank']['estimatedLowAt'])
+
+    def test_promedio_ignora_las_no_confirmadas(self):
+        self.flotador((60, True), (59, False), (50, True), confirmar=True)
+        self.flotador((30, False), (20, True), (15, False), (10, True))     # una queda sin confirmar
+        self.assertEqual(self.descartar(self.pendiente()).status_code, 200)  # y otra no fue una recarga
+        datos = self.deposito()
+        tanque = datos['tank']
+        self.assertEqual((tanque['completedLoads'], tanque['estimatedLowAt'], tanque['lastRefill']['confirmed']), (1, None, True))
+        self.assertHoras(tanque['averageSeconds'], 20)
+        self.assertEqual([(c['origin'], c['confirmed']) for c in datos['loads']], [('equipo', True)])
+        self.assertEqual(sorted(DepositoDeteccion.objects.filter(huerto_id=self.huerto_id).values_list('estado', flat=True)),
+                         ['confirmada', 'descartada', 'sin_confirmar'])
+
+    def test_otra_cuenta(self):
+        self.assertEqual(self.cliente(self.otra).get(f'/api/huertos/{self.huerto_id}/deposito').status_code, 404)
 
 
 class Soporte(BaseHuerto):
@@ -562,7 +1050,7 @@ class Soporte(BaseHuerto):
 
     def test_otra_cuenta_recibe_404(self):
         caso = self.abrir().json()['case']
-        ajena = self.cliente(self.otra)
+        ajena = self.con_huerto(self.otra)
         self.assertEqual(ajena.get(self.ruta).status_code, 404)
         self.assertEqual(self.post(self.ruta, {'incident': 'bomba', 'consent': True}, ajena).status_code, 404)
         for accion in ('revocar', 'cancelar'):
@@ -574,7 +1062,7 @@ class Soporte(BaseHuerto):
         sin_equipo = self.cliente(self.otra)
         huerto_id = self.crear_huerto(cliente=sin_equipo)
         respuesta = self.post(f'/api/huertos/{huerto_id}/soporte', {'incident': 'bomba', 'consent': True}, sin_equipo)
-        self.assertEqual(respuesta.status_code, 400)
+        self.assertEqual((respuesta.status_code, respuesta.json()['code']), (403, 'huerto-sin-vincular'))
 
     def test_autodiagnostico_propio_y_ajeno(self):
         orden = self.post(f'/api/huertos/{self.huerto_id}/comandos', {'type': 'autodiagnostico'}).json()['command']
@@ -637,6 +1125,14 @@ class Avisos(BaseHuerto):
                 self.assertEqual(self.post(f'/api/avisos/{mio.pk}/{accion}', cliente=ajena).status_code, 404)
         self.assertEqual(ajena.get('/api/avisos').json()['total'], 0)
 
+    def test_solo_los_avisos_del_deposito_cambian_de_enlace(self):
+        Notificacion.objects.create(destinatario=self.dueña, origen='dispositivo', titulo='Tu equipo se conectó', enlace='#huerto')
+        Notificacion.objects.create(destinatario=self.dueña, origen='sistema', titulo='Tu depósito necesita agua', enlace='#huerto')
+        Notificacion.objects.create(destinatario=self.dueña, origen='dispositivo', titulo='Tu depósito necesita agua', enlace='')
+        enlaces = sorted((a['origin'], a['title'], a['link'] or '') for a in self.client.get('/api/avisos').json()['items'])
+        self.assertEqual(enlaces, [('dispositivo', 'Tu depósito necesita agua', ''), ('dispositivo', 'Tu equipo se conectó', '#huerto'),
+                                   ('sistema', 'Tu depósito necesita agua', '#huerto')])
+
     def test_el_administrador_tiene_sus_avisos(self):
         admin = cuenta('huerto-admin@example.test', 'atender_soporte')
         self.aviso(admin)
@@ -652,14 +1148,45 @@ class SimuladorDeEquipoEntorno(SimpleTestCase):
 
     def test_se_niega_fuera_de_desarrollo(self):
         cambios = ({'CHILITO_DEBUG': '0'}, {'CHILITO_DEBUG': ''}, {'CHILITO_ENV': 'deployment'}, {'CHILITO_ENV': ''},
-                   {'CHILITO_SIM_DB': 'chilito_produccion'}, {'CHILITO_SIM_DB': ''}, {'CHILITO_SIM_CLAVE_IOT': ''})
+                   {'CHILITO_SIM_DB': 'chilito_produccion'}, {'CHILITO_SIM_DB': ''}, {'CHILITO_SIM_CLAVE_IOT': ''},
+                   # B-5: antes pasaban porque el nombre contenía «test» o «prueba».
+                   {'CHILITO_SIM_DB': 'chilito_prod_attest'}, {'CHILITO_SIM_DB': 'produccion_pruebas'}, {'CHILITO_SIM_DB': 'test_otra_app'},
+                   {'CHILITO_SIM_DB': 'test_chilito_x; DROP'})
         for cambio in cambios:
             with self.subTest(cambio=cambio), self.assertRaises(SystemExit):
                 simular_equipo.exigir_entorno({**self.BASE, **cambio})
 
+    def test_acepta_solo_bases_de_desarrollo_exactas(self):
+        for base in ('chilito_integracion_sinteticos', 'test_chilito_integracion_sinteticos', 'test_chilito_x'):
+            with self.subTest(base=base):
+                self.assertEqual(simular_equipo.exigir_entorno({**self.BASE, 'CHILITO_SIM_DB': base})['dbname'], base)
+
+    def test_argumentos_del_deposito(self):
+        argumentos = simular_equipo.leer_argumentos(['CHI-1', 'medir', '--sin-agua', '--hace', '48'])
+        self.assertEqual((argumentos.sin_agua, argumentos.hace), (True, 48.0))
+        self.assertEqual(simular_equipo.leer_argumentos(['CHI-1', 'correr']).hace, 0.0)
+
     def test_usa_solo_el_rol_iot_y_sus_variables(self):
         ajustes = simular_equipo.exigir_entorno({**self.BASE, 'CHILITO_DB_USER': 'chilito_pkg_runtime', 'CHILITO_DB_PASSWORD': 'de-la-app'})
         self.assertEqual((ajustes['user'], ajustes['password'], ajustes['dbname']), ('chilito_pkg_iot', 'x', 'test_chilito_x'))
+
+
+@unittest.skipIf(simular_equipo is None, 'Esta copia no incluye el simulador')
+class SimuladorCorrerSinAgua(SimpleTestCase):
+    """«correr --sin-agua» llega hasta cada medición: el flotador marca nivel bajo en todos los ciclos."""
+
+    def test_main_pasa_sin_agua_a_correr_y_a_cada_medicion(self):
+        self.assertTrue(simular_equipo.leer_argumentos(['CHI-1', 'correr', '--sin-agua']).sin_agua)
+        self.assertFalse(simular_equipo.leer_argumentos(['CHI-1', 'correr']).sin_agua)
+        mediciones = []
+        with patch.object(simular_equipo, 'exigir_entorno', return_value={}), patch.object(simular_equipo.psycopg, 'connect'), \
+                patch.object(simular_equipo, 'equipo', return_value={'id': 1, 'huerto': 1, 'firmware': 'x'}), \
+                patch.object(simular_equipo, 'marcar_simulado'), patch.object(simular_equipo, 'conexion'), \
+                patch.object(simular_equipo, 'atender', return_value=0), patch.object(simular_equipo.time, 'sleep'), \
+                patch.object(simular_equipo, 'medir', side_effect=lambda *a, **k: mediciones.append(k.get('sin_agua'))):
+            simular_equipo.main(['CHI-1', 'correr', '--sin-agua', '--ciclos', '3', '--cada', '0'])
+            simular_equipo.main(['CHI-1', 'correr', '--ciclos', '2', '--cada', '0'])
+        self.assertEqual(mediciones, [True, True, True, False, False])
 
 
 @unittest.skipIf(simular_equipo is None, 'Esta copia no incluye el simulador')
@@ -777,7 +1304,163 @@ class SimuladorDeEquipo(AyudasHuerto, TransactionTestCase):
         self.assertEqual((resultado['state'], resultado['error']), ('fallido', 'Falla simulada'))
         self.assertEqual(self.client.get(f'/api/huertos/{huerto_id}').json()['garden']['device']['connection'], 'desconectado')
 
+    def test_ciclo_del_deposito_con_el_rol_iot(self):
+        huerto_id = self.huerto_con_equipo()
+        with self.conexion_iot() as con:
+            dispositivo = simular_equipo.equipo(con, 'CHI-0001')
+            simular_equipo.medir(con, dispositivo, hace=3)
+            simular_equipo.medir(con, dispositivo, sin_agua=True, hace=2)
+            simular_equipo.medir(con, dispositivo)
+        self.assertFalse(Cuidado.objects.filter(huerto_id=huerto_id).exists())      # la recarga espera la confirmación
+        self.assertEqual(DepositoDeteccion.objects.get(huerto_id=huerto_id).estado, 'pendiente')
+        self.assertTrue(Notificacion.objects.filter(destinatario=self.dueña, titulo='Tu depósito necesita agua').exists())
+        self.assertTrue(Notificacion.objects.filter(destinatario=self.dueña, titulo='Confirma la recarga de tu depósito').exists())
+        medida = Medicion.objects.filter(huerto_id=huerto_id, deposito_con_agua=False).get().medida_en
+        self.assertAlmostEqual((timezone.now() - medida).total_seconds(), 2 * 3600, delta=60)
+
+    def test_solo_medir_sin_agua_pide_rellenar(self):
+        """El error reportado: tras un solo «medir --sin-agua», la tarjeta pide rellenar y no pregunta por una recarga."""
+        huerto_id = self.huerto_con_equipo()
+        with self.conexion_iot() as con:
+            simular_equipo.medir(con, simular_equipo.equipo(con, 'CHI-0001'), sin_agua=True)
+        tanque = self.client.get(f'/api/huertos/{huerto_id}').json()['tank']
+        self.assertEqual((tanque['state'], tanque['hasWater'], tanque['pendingRefill'], tanque['canRefill']), ('rellenar', False, None, True))
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=huerto_id).exists())
+        avisos = Notificacion.objects.filter(destinatario=self.dueña, origen='dispositivo')
+        self.assertEqual([(a.titulo, a.texto, a.enlace) for a in avisos],
+                         [('Tu depósito necesita agua', 'Tu depósito se quedó sin agua. Rellénalo y avísanos.', '#huerto')])
+
+    def test_correr_sin_agua_no_genera_recargas(self):
+        huerto_id = self.huerto_con_equipo()
+        with self.conexion_iot() as con:
+            dispositivo = simular_equipo.equipo(con, 'CHI-0001')
+            simular_equipo.medir(con, dispositivo, hace=1)                       # con agua antes de empezar
+            simular_equipo.correr(con, dispositivo, cada=0, ciclos=3, sin_agua=True, pausa=0)
+        lecturas = list(Medicion.objects.filter(huerto_id=huerto_id).order_by('medida_en').values_list('deposito_con_agua', flat=True))
+        self.assertEqual(lecturas, [True, False, False, False])
+        self.assertEqual(DispositivoEvento.objects.filter(huerto_id=huerto_id, tipo='deposito_bajo').count(), 1)
+        self.assertFalse(DispositivoEvento.objects.filter(huerto_id=huerto_id, tipo='deposito_recargado').exists())
+        self.assertFalse(DepositoDeteccion.objects.filter(huerto_id=huerto_id).exists())
+        self.assertFalse(Cuidado.objects.filter(huerto_id=huerto_id, tipo='rellenar_deposito').exists())
+        self.assertEqual(self.client.get(f'/api/huertos/{huerto_id}').json()['tank']['state'], 'rellenar')
+
     def test_solo_equipos_vinculados(self):
         equipo('CHI-0009', '02:00:00:00:00:09')
         with self.conexion_iot() as con, self.assertRaises(SystemExit):
             simular_equipo.equipo(con, 'CHI-0009')
+
+
+
+class SinHuerto(BaseHuerto):
+    """Doble capa (bug funcional 1): sin huerto activo, la cuenta ve las secciones y usa su cuenta, pero el servidor
+    rechaza cualquier escritura del huerto con 403 «huerto-requerido» y un mensaje claro."""
+    AJENO = '00000000-0000-4000-8000-000000000001'
+    ESCRITURAS = (
+        '/api/huertos/1/renombrar', '/api/huertos/1/archivar', '/api/huertos/1/codigo', '/api/huertos/1/desvincular',
+        '/api/huertos/1/plantas/1', '/api/huertos/1/plantas/1/terminar-ciclo', '/api/huertos/1/comandos', '/api/huertos/1/cuidados',
+        f'/api/huertos/1/deposito/detecciones/{AJENO}/confirmar', f'/api/huertos/1/deposito/detecciones/{AJENO}/descartar',
+        '/api/huertos/1/soporte', f'/api/soporte/{AJENO}/revocar', f'/api/soporte/{AJENO}/cancelar')
+
+    def test_toda_escritura_del_huerto_responde_403_con_mensaje(self):
+        from web.models import Idempotencia
+        for ruta in self.ESCRITURAS:
+            with self.subTest(ruta=ruta):
+                respuesta = self.post(ruta, {'name': 'X', 'type': 'sustrato', 'plant': 1})
+                self.assertEqual(respuesta.status_code, 403, respuesta.content)
+                cuerpo = respuesta.json()
+                self.assertEqual(cuerpo['code'], 'huerto-requerido')
+                self.assertIn('huerto', cuerpo['message'])
+        self.assertFalse(Idempotencia.objects.filter(actor=self.dueña).exists(), 'un rechazo no deja recibo')
+
+    def test_puede_ver_las_secciones(self):
+        self.assertEqual(self.client.get('/api/huertos').json()['items'], [])
+        self.assertEqual(self.client.get('/api/guias').status_code, 200)
+        perfil = self.client.get('/api/cuenta').json()
+        self.assertFalse(perfil['gardenAssigned'])
+
+    def test_la_cuenta_y_crear_el_huerto_siguen_permitidos(self):
+        self.assertEqual(self.post('/api/cuenta/perfil', {'firstName': 'Ana'}).status_code, 200)
+        self.assertEqual(self.post('/api/avisos/leer-todos').status_code, 200)
+        huerto_id = self.crear_huerto()
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/renombrar', {'name': 'Balcón'}).status_code, 200, 'con huerto ya escribe')
+
+    def test_archivar_el_ultimo_huerto_vuelve_a_bloquear(self):
+        huerto_id = self.crear_huerto()
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/archivar').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/cuidados', {'type': 'sustrato', 'plant': 1}).json()['code'], 'huerto-requerido')
+
+    def test_huerto_ajeno_sigue_siendo_404(self):
+        ajeno = self.crear_huerto(cliente=self.cliente(self.otra))
+        self.crear_huerto()
+        self.assertEqual(self.post(f'/api/huertos/{ajeno}/renombrar', {'name': 'Mío'}).status_code, 404)
+
+    def test_estado_de_orden_de_un_huerto_archivado_es_404(self):
+        """B-10: el estado de una orden solo se ve mientras su huerto siga activo y sea de la cuenta."""
+        huerto_id = self.huerto_con_equipo()
+        orden = self.post(f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'}).json()['command']['id']
+        self.assertEqual(self.client.get(f'/api/comandos/{orden}').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/desvincular').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{huerto_id}/archivar').status_code, 200)
+        self.assertEqual(self.client.get(f'/api/comandos/{orden}').status_code, 404)
+
+
+class HuertoSinVincular(BaseHuerto):
+    """Corrección BUG-1b: cada huerto es independiente. Uno creado pero sin equipo vinculado se ve completo, pero no
+    admite registros, ediciones ni órdenes (403 «huerto-sin-vincular»), aunque la cuenta tenga otro huerto vinculado."""
+    AJENO = '00000000-0000-4000-8000-000000000001'
+
+    def escrituras(self, huerto_id):
+        return ((f'/api/huertos/{huerto_id}/plantas/1', {'name': 'Chile'}),
+                (f'/api/huertos/{huerto_id}/plantas/1/terminar-ciclo', {'reason': 'otro'}),
+                (f'/api/huertos/{huerto_id}/comandos', {'type': 'autodiagnostico'}),
+                (f'/api/huertos/{huerto_id}/cuidados', {'type': 'sustrato', 'plant': 1}),
+                (f'/api/huertos/{huerto_id}/cuidados', {'type': 'rellenar_deposito'}),
+                (f'/api/huertos/{huerto_id}/deposito/detecciones/{self.AJENO}/confirmar', {}),
+                (f'/api/huertos/{huerto_id}/deposito/detecciones/{self.AJENO}/descartar', {}),
+                (f'/api/huertos/{huerto_id}/soporte', {'incident': 'bomba', 'consent': True}))
+
+    def setUp(self):
+        super().setUp()
+        self.vinculado = self.huerto_con_equipo()      # la cuenta ya tiene un huerto conectado…
+        self.sin_vincular = self.crear_huerto('Patio')  # …y crea otro que aún no vincula
+
+    def test_toda_escritura_del_huerto_sin_vincular_responde_403_con_mensaje(self):
+        from web.models import Idempotencia
+        for ruta, datos in self.escrituras(self.sin_vincular):
+            with self.subTest(ruta=ruta, datos=datos):
+                respuesta = self.post(ruta, datos)
+                self.assertEqual(respuesta.status_code, 403, respuesta.content)
+                self.assertEqual(respuesta.json()['code'], 'huerto-sin-vincular')
+                self.assertIn('Vincula', respuesta.json()['message'])
+        self.assertFalse(Cuidado.objects.filter(huerto_id=self.sin_vincular).exists())
+        self.assertFalse(Idempotencia.objects.filter(actor=self.dueña, ruta__contains=f'/huertos/{self.sin_vincular}/').exists())
+
+    def test_el_otro_huerto_vinculado_sigue_operando(self):
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/plantas/1', {'name': 'Chile'}).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/cuidados', {'type': 'sustrato', 'plant': 1}).status_code, 200)
+
+    def test_se_ve_todo(self):
+        for ruta in ('', '/plantas/1', '/cuidados', '/deposito', '/bitacora', '/telemetria', '/soporte'):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.client.get(f'/api/huertos/{self.sin_vincular}{ruta}').status_code, 200)
+
+    def test_gestion_del_huerto_permitida(self):
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/renombrar', {'name': 'Terraza'}).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/codigo').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/archivar').status_code, 200)
+
+    def test_al_vincular_se_habilita(self):
+        equipo('CHI-0002', '02:00:00:00:00:02')
+        self.assertEqual(self.vincular('CHI-0002', codigo=self.codigo(self.sin_vincular)).json()['result'], 'vinculado')
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/plantas/1', {'name': 'Chile'}).status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.sin_vincular}/cuidados', {'type': 'sustrato', 'plant': 1}).status_code, 200)
+
+    def test_al_desvincular_se_vuelve_a_bloquear(self):
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/desvincular').status_code, 200)
+        self.assertEqual(self.post(f'/api/huertos/{self.vinculado}/plantas/1', {'name': 'Chile'}).json()['code'], 'huerto-sin-vincular')
+
+    def test_huerto_ajeno_sigue_siendo_404(self):
+        ajena = self.con_huerto(self.otra)
+        for ruta, datos in self.escrituras(self.sin_vincular)[:4]:
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.post(ruta, datos, ajena).status_code, 404)

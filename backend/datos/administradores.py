@@ -10,6 +10,7 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
 from . import services as s
@@ -28,16 +29,12 @@ def _fecha(valor):
     return valor.isoformat() if valor else None
 
 
-def _texto_opcional(valor, maximo):
-    if valor is None or valor == '':
-        return None
-    if not isinstance(valor, str) or len(valor) > maximo or not valor.isprintable():
-        raise ValidationError('Texto no válido')
-    return valor.strip() or None
+def _texto_opcional(valor, maximo, campo):
+    return v.texto_libre(valor, campo, maximo=maximo) or None
 
 
 def _dia(valor):
-    texto = _texto_opcional(valor, 10)
+    texto = _texto_opcional(valor, 10, 'fecha')
     if texto is None:
         return None
     if len(texto) != 10:
@@ -68,7 +65,7 @@ def _historial_dto(fila):
 
 def historial(actor, cuenta, capacidad, desde, hasta, pagina):
     s.require_cap(actor, CAPACIDAD)
-    cuenta, capacidad = _texto_opcional(cuenta, MAXIMO_BUSQUEDA), _texto_opcional(capacidad, 40)
+    cuenta, capacidad = _texto_opcional(cuenta, MAXIMO_BUSQUEDA, 'cuenta'), _texto_opcional(capacidad, 40, 'capacidad')
     if capacidad and capacidad not in s.CAPS:
         raise ValidationError('Capacidad no válida')
     desde, hasta = _dia(desde), _dia(hasta)
@@ -98,7 +95,7 @@ def _actividad_dto(fila):
 
 def actividad(actor, cuenta, pagina):
     s.require_cap(actor, CAPACIDAD)
-    cuenta = _texto_opcional(cuenta, MAXIMO_BUSQUEDA)
+    cuenta = _texto_opcional(cuenta, MAXIMO_BUSQUEDA, 'cuenta')
     consulta = Auditoria.objects.select_related('actor').order_by('-creada_en', '-id')
     if cuenta:
         consulta = consulta.filter(actor__email__iexact=cuenta)
@@ -136,8 +133,7 @@ def cambiar_capacidades(actor, correo, capacidades, motivo):
     """Deja a la cuenta con exactamente `capacidades` (de las editables). Altas y bajas van juntas, con un solo motivo."""
     administrador = s.require_cap(actor, CAPACIDAD)
     finales = _capacidades_pedidas(capacidades)
-    if not isinstance(motivo, str) or not 1 <= len(motivo.strip()) <= MAXIMO_MOTIVO or not motivo.isprintable():
-        raise ValidationError('Motivo no válido')
+    motivo = v.texto_libre(motivo, 'reason', maximo=MAXIMO_MOTIVO, requerido=True)
     cuenta = _cuenta_objetivo(correo)
     if cuenta.pk == administrador.pk:
         raise ReglaDeNegocio('capacidad-propia', 'No puedes cambiar tus propias capacidades.')

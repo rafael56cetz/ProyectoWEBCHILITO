@@ -8,6 +8,7 @@ from django.db import DatabaseError, IntegrityError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from allauth.account.internal.flows.reauthentication import did_recently_reauthenticate
 from allauth.core import ratelimit
 
 from datos import guias
@@ -15,6 +16,7 @@ from datos import services as s
 from datos.paginacion import paginar
 
 from . import services as operacion
+from .validacion import CampoInvalido
 from .respuestas import EntradaInvalida as InputError, ReglaDeNegocio, error as failure, leer_json as body, respuesta_de_base
 
 logger = logging.getLogger(__name__)
@@ -49,9 +51,24 @@ def subida(request, campo):
     return request.FILES[campo]
 
 
-def endpoint(methods=('GET',), fields=(), cap=None, archivo=None):
+def endpoint(methods=('GET',), fields=(), cap=None, archivo=None, reciente=False, huerto=False, cuota_lectura=False, vinculado=False,
+             sin_recibo=False):
     """`archivo` nombra el campo de un POST multipart que solo transforma lo subido: sin recibo de idempotencia, porque no
-    cambia datos y la respuesta puede pesar más de lo que conviene guardar."""
+    cambia datos y la respuesta puede pesar más de lo que conviene guardar.
+
+    `reciente` (M-2): la acción es crítica y exige haber confirmado la contraseña o el segundo factor en los últimos
+    ACCOUNT_REAUTHENTICATION_TIMEOUT segundos (5 min). Responde 403 «reauthentication-required»; no 401, porque el
+    navegador trata 401 como sesión caducada.
+    `huerto`: una escritura que necesita un huerto activo. Sin ninguno responde 403 «huerto-requerido» (con mensaje).
+    Los GET no se bloquean: la cuenta puede ver la estructura de cada sección.
+    `vinculado`: además, el huerto de la ruta (`huerto_id`) debe tener su equipo vinculado. Un huerto propio sin equipo
+    responde 403 «huerto-sin-vincular» (con mensaje); uno ajeno sigue al servicio, que responde 404.
+    `cuota_lectura` (B-2): un GET costoso también cuenta en la cuota por minuto («read-heavy»).
+    `sin_recibo`: la escritura borra la propia cuenta. Se sigue exigiendo un `Idempotency-Key` válido, pero no se guarda
+    el recibo: apuntaría a una cuenta que ya no existe y la base rechazaría la transacción. Repetir la petición responde
+    401, porque la sesión ya no existe; ese es el resultado idempotente.
+    Las tres comprobaciones van antes de leer el cuerpo, de la cuota y del recibo de idempotencia: un rechazo no deja
+    recibo y el reintento usa una clave nueva."""
     def wrap(func):
         @wraps(func)
         def view(request, *args, **kwargs):
@@ -63,7 +80,15 @@ def endpoint(methods=('GET',), fields=(), cap=None, archivo=None):
                 s.identity(request.user)
                 if cap:
                     s.require_cap(request.user, cap)
+                if reciente and not did_recently_reauthenticate(request):
+                    return failure(403, 'reauthentication-required')
+                if (huerto or vinculado) and request.method != 'GET' and not s.has_garden(request.user):
+                    raise s.HuertoRequerido
+                if vinculado and request.method != 'GET' and s.huerto_vinculado(request.user, kwargs.get('huerto_id')) is False:
+                    raise s.HuertoSinVincular
                 if request.method == 'GET':
+                    if cuota_lectura and not operacion.dentro_de_cuota(request.user, request.path, 'read-heavy'):
+                        return failure(429, 'rate-limited')
                     resultado = func(request, {}, *args, **kwargs)
                     return resultado if isinstance(resultado, HttpResponse) else JsonResponse(resultado)
                 if archivo:
@@ -75,8 +100,12 @@ def endpoint(methods=('GET',), fields=(), cap=None, archivo=None):
                 if not operacion.dentro_de_cuota(request.user, request.path):
                     return failure(429, 'rate-limited')
                 key = uuid.UUID(request.headers.get('Idempotency-Key', ''))
+                if sin_recibo:
+                    return JsonResponse(func(request, data, *args, **kwargs))
                 return JsonResponse(operacion.ejecutar_idempotente(request.user, key, request.path, operacion.huella_de(data),
                                                                    lambda: func(request, data, *args, **kwargs)))
+            except CampoInvalido as campo:
+                return JsonResponse(campo.respuesta(), status=400)
             except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
                 return failure(400, 'invalid-input')
             except RequestDataTooBig:
@@ -87,6 +116,8 @@ def endpoint(methods=('GET',), fields=(), cap=None, archivo=None):
                 return failure(409, 'stale-record')
             except s.FactorRequerido:
                 return failure(403, 'mfa-required')
+            except (s.HuertoRequerido, s.HuertoSinVincular) as falta:
+                return JsonResponse({'status': 403, 'code': falta.code, 'message': falta.message}, status=403)
             except ReglaDeNegocio as regla:
                 return JsonResponse({'status': 409, 'code': regla.code, 'message': regla.message}, status=409)
             except Http404:
@@ -161,6 +192,8 @@ def contact(request):
         data = body(request, ('name', 'email', 'message', 'website'))
         if not data.get('website'):
             operacion.enviar_contacto(data)
+    except CampoInvalido as campo:
+        return JsonResponse(campo.respuesta(), status=400)
     except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
         return failure(400, 'invalid-input')
     except RequestDataTooBig:

@@ -138,7 +138,7 @@ def recorrer():
     r = c.get(A + '/totp')
     ok('alta de TOTP entrega secreto', r.status_code == 404 and 'secret' in r.json().get('meta', {}), r.status_code)
     secreto = r.json()['meta']['secret']
-    ok('URL con emisor', 'issuer=El%20Chilito' in r.json()['meta']['totp_url'])
+    ok('URL con emisor', 'issuer=YouGarden' in r.json()['meta']['totp_url'])
     r = c.get('/api/cuenta/seguridad/totp-qr')
     ok('QR generado en el servidor', r.status_code == 200 and r.json()['image'].startswith('data:image/svg+xml;base64,'), r.status_code)
     ok('código erróneo no activa', post(c, A + '/totp', code='000000').status_code == 400)

@@ -1,4 +1,4 @@
-/* Tokens de diseño de El Chilito: único lugar donde se declaran variables.
+/* Tokens de diseño de YouGarden: único lugar donde se declaran variables.
    Tres zonas: pública (portada, legales, cookies y avisos), acceso y panel (usuario y administración).
    Las demás hojas solo las consumen con var(). Se carga primero en index.html. */
 

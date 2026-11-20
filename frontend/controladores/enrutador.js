@@ -6,13 +6,15 @@ const SiteController = (() => {
   function start({authService = AuthService, appService = AppService, config = AuthConfig, assets = '', review = false, canEnter = options => authService.restore(options)} = {}) {
     const sections = ['inicio','el-proyecto','prototipo','consiguelo','como-funciona'];
     const app = document.getElementById('app');
-    let current = {}, controller = null, authContext = {}, renderId = 0, navigationRequest = null, heroShown = false, currentMenuKey = null, legalTarget = '#huerto';
+    let current = {}, controller = null, authContext = {}, renderId = 0, navigationRequest = null, heroShown = false, currentMenuKey = null, legalTarget = '#huerto', legalReminded = false;
     const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const replaceHash = hash => history.replaceState(null,'',location.pathname + location.search + hash);
     // Rutas del huerto: la ficha de planta pide su número (1 a 3); el huerto elegido viaja en ?h=.
     function gardenRoute(detail, extra, query) {
       const gardenId = new URLSearchParams(query).get('h');
       if(detail === 'plantas' && !['1','2','3'].includes(extra)) { replaceHash('#huerto'); return {screen:'huerto',detail:'',gardenId}; }
+      // La ficha de planta no muestra el número del huerto: si llega en la dirección, se usa una vez y se quita.
+      if(detail === 'plantas' && gardenId) replaceHash(`#huerto/plantas/${extra}`);
       return {screen:'huerto',detail,extra:detail === 'plantas' ? extra : '',gardenId};
     }
     function routeFromHash() {
@@ -94,6 +96,11 @@ const SiteController = (() => {
         }
         if(id !== renderId) return;
         const pendingLegal = session?.profile?.pendingLegal?.length > 0;
+        const legalExempt = pendingLegal && session?.status === 'authenticated' && AppModel.legalGateExempt(session);
+        if(legalExempt && route.screen !== 'aceptar-legales' && !legalReminded) {
+          legalReminded = true;
+          mostrarAviso('info', 'Tienes textos legales nuevos por aceptar. Puedes hacerlo cuando quieras desde la campana de avisos.');
+        }
         if(session?.status === 'authenticated' && route.screen === 'aceptar-legales' && !pendingLegal) {
           replaceHash(AppModel.panelHome(session));
           return render();
@@ -104,12 +111,12 @@ const SiteController = (() => {
           authContext = verifying ? {email:session.email,expiresAt:AuthModel.expiry(session.expiresAt)} : {feedback:session?.status === 'unavailable' ? 'No podemos comprobar tu sesión. Inténtalo de nuevo.' : 'Inicia sesión para continuar.'};
           history.replaceState(null,'',location.pathname + location.search + '#' + destination);
           route = {screen:destination};
-        } else if(pendingLegal) {
+        } else if(pendingLegal && !legalExempt) {
           // Con textos nuevos sin aceptar, solo se puede aceptarlos o cerrar sesión.
           if(route.screen !== 'aceptar-legales') legalTarget = location.hash || '#huerto';
           route = {screen:'aceptar-legales'};
           replaceHash('#aceptar-legales');
-        } else if((session.role==='admin') !== (route.screen==='admin') && !(session.role==='admin' && ['cuenta','avisos'].includes(route.screen))) {
+        } else if((session.role==='admin') !== (route.screen==='admin') && !(session.role==='admin' && ['cuenta','avisos',...(legalExempt ? ['aceptar-legales'] : [])].includes(route.screen))) {
           route=session.role==='admin'?{screen:'admin',detail:AppModel.adminHome(session).split('/')[1]}:{screen:'huerto'};
           history.replaceState(null,'',location.pathname+location.search+'#'+(route.screen==='admin'?'admin/'+route.detail:'huerto'));
         }
@@ -210,6 +217,8 @@ const SiteController = (() => {
     document.querySelector('.skip-link')?.addEventListener('click', event => {
       event.preventDefault(); SiteViews.focusMain();
     });
+    // Reglas de los campos (filtro de teclado y pegado, mensajes en línea) para toda la aplicación.
+    CamposVista.instalar(document);
     window.addEventListener('hashchange', render);
     window.addEventListener('pagehide', () => { renderId++; navigationRequest?.abort(); controller?.dispose(); controller = null; });
     ChilitoHTTP.onSessionExpired(() => {

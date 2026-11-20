@@ -11,6 +11,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from datos import services as s
+from web import validacion as v
 
 from .models import Idempotencia
 
@@ -28,15 +29,19 @@ def _esperar(texto):
         cursor.execute('SELECT pg_advisory_xact_lock(%s)', [_bloqueo(texto)])
 
 
-def dentro_de_cuota(actor, ruta):
+# Peticiones por minuto y cuenta. «read-heavy»: lecturas costosas (exportación CSV y telemetría), B-2.
+LIMITES_POR_MINUTO = {'write': 60, 'technical': 15, 'read-heavy': 30}
+
+
+def dentro_de_cuota(actor, ruta, alcance=None):
     tramo = int(timezone.now().timestamp()) // 60
-    alcance = 'technical' if '/soporte/' in ruta or '/sesiones/' in ruta else 'write'
+    alcance = alcance or ('technical' if '/soporte/' in ruta or '/sesiones/' in ruta else 'write')
     clave = f'web-rate:{actor.pk}:{alcance}:{tramo}'
     with transaction.atomic():
         _esperar(clave)
         total = cache.get(clave, 0) + 1
         cache.set(clave, total, 120)
-    return total <= (15 if alcance == 'technical' else 60)
+    return total <= LIMITES_POR_MINUTO[alcance]
 
 
 def _sin_secretos(valor):
@@ -67,23 +72,14 @@ def huella_de(datos):
 
 
 
-def _texto_contacto(valor, maximo, *, multilinea=False):
-    if not isinstance(valor, str):
-        raise ValidationError('Texto no válido')
-    limpio = valor.strip()
-    permitido = limpio.replace('\n', '').replace('\r', '') if multilinea else limpio
-    if len(limpio) > maximo or (permitido and not permitido.isprintable()):
-        raise ValidationError('Texto no válido')
-    return limpio
-
-
 def enviar_contacto(datos):
     """Consulta del producto: se guarda en el buzón administrativo; el aviso por correo lo encola la base.
     Un fallo del correo no pierde la consulta: el aviso queda como fallido y se reintenta."""
-    nombre = _texto_contacto(datos.get('name', ''), 100)
-    correo = _texto_contacto(datos.get('email'), 254)
-    mensaje = _texto_contacto(datos.get('message'), 2000, multilinea=True)
-    validate_email(correo)
-    if not mensaje:
-        raise ValidationError('Mensaje requerido')
+    nombre = v.nombre_persona(datos.get('name', ''), 'name', requerido=False)
+    correo = v.texto_libre(datos.get('email'), 'email', maximo=254, requerido=True)
+    try:
+        validate_email(correo)
+    except ValidationError:
+        raise v.CampoInvalido('email', 'correo-no-valido', 'Escribe un correo como nombre@dominio.com.') from None
+    mensaje = v.texto_libre(datos.get('message'), 'message', maximo=2000, multilinea=True, requerido=True)
     return s.record_inquiry(nombre, correo, mensaje)

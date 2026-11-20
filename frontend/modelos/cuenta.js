@@ -50,7 +50,8 @@ const AuthModel = Object.freeze({
   },
   // Lo que solo sabe el servidor se explica al rechazar; la contraseña nunca sale de este envío.
   passwordRejection(code) {
-    return {password_too_common:'Esa contraseña es demasiado común. Prueba con una frase larga que solo tú recuerdes.',
+    return {password_pwned:'Esa contraseña aparece en filtraciones conocidas. Elige otra que no uses en ningún otro sitio.',
+      password_too_common:'Esa contraseña es demasiado común. Prueba con una frase larga que solo tú recuerdes.',
       password_too_similar:'Se parece demasiado a tu correo o a los datos de tu cuenta. Elige una distinta.',
       password_entirely_numeric:'No puede tener solo números. Añade palabras o letras.',
       password_too_short:'Es demasiado corta. Revisa el mínimo de caracteres.'}[code] || 'El servidor no aceptó esta contraseña. Elige otra distinta.';
@@ -105,7 +106,11 @@ const ChilitoHTTP = (() => {
   let bootstrap = null;
   const pendingWrites = new Map();
   let onExpired = () => {};
-  const csrf = () => document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('csrftoken='))?.slice(10) || '';
+  // En el sitio publicado la cookie lleva el prefijo __Host- (no la puede fijar un subdominio); en local, el nombre de Django.
+  const CSRF_COOKIES = ['__Host-csrftoken=', 'csrftoken='];
+  const csrf = () => { const items = document.cookie.split(';').map(item => item.trim());
+    for(const name of CSRF_COOKIES) { const found = items.find(item => item.startsWith(name)); if(found) return found.slice(name.length); }
+    return ''; };
   async function request(path, {method='GET', body, signal, headers={}} = {}) {
     if (!path.startsWith('/api/') && !path.startsWith('/_allauth/browser/v1/')) throw new Error('Unsupported endpoint');
     if (method !== 'GET' && !csrf()) await configure(signal);
@@ -125,6 +130,9 @@ const ChilitoHTTP = (() => {
     let data = {};
     try { data = await response.json(); } catch { /* Never interpret an HTML error as success. */ }
     if(write && response.status < 500 && response.status !== 429) pendingWrites.delete(fingerprint);
+    // 400 con «field» y «message» (reglas de los campos): la vista lo pone junto al campo.
+    if(response.status === 400 && typeof data?.field === 'string' && typeof data?.message === 'string' && typeof CustomEvent === 'function')
+      window.dispatchEvent(new CustomEvent('chilito:campo', {detail:{field:data.field, code:data.code, message:data.message}}));
     return {http:response.status, body:data};
   }
   async function configure(signal) {
@@ -198,6 +206,7 @@ const AuthService = (() => {
       if (result.body?.code === 'terms-required') return {status:'terms-required'};
       if (result.body?.code === 'privacy-required') return {status:'privacy-required'};
       if (result.body?.code === 'registration-disabled') return {status:'registration-disabled'};
+      if (result.body?.code === 'legal-no-publicado') return {status:'legal-not-published'};
       if (failure(result)) return failure(result);
       if (result.http === 401 && pending(result)) {
         const next = await verificationContext({signal});
@@ -259,18 +268,22 @@ const AuthService = (() => {
   function forgetSession() {
     version++; session = {status:'unauthenticated'};
   }
+  // La sesión terminó en el servidor (cierre de sesión o cuenta eliminada): se olvida todo lo de la cuenta en el navegador.
+  function sessionEnded() {
+    forgetSession();
+    ChilitoHTTP.clearPending();
+    GardenModel.reset();
+  }
   // El servidor cierra la sesión técnica de soporte al cerrar la sesión de la cuenta.
   async function logout({signal}={}) {
     const result = await ChilitoHTTP.request(prefix+'auth/session',{method:'DELETE',signal});
     if (result.http === 401 && result.body.status === 401 && result.body?.meta?.is_authenticated === false) {
-      forgetSession();
-      ChilitoHTTP.clearPending();
-      GardenModel.reset();
+      sessionEnded();
       return {status:'accepted'};
     }
     return failure(result) || {status:'unavailable'};
   }
-  return Object.freeze({request,restore,verificationContext,logout,forgetSession,get session(){return session;}});
+  return Object.freeze({request,restore,verificationContext,logout,forgetSession,sessionEnded,get session(){return session;}});
 })();
 
 // ── Segundo factor ──
@@ -296,8 +309,8 @@ const MfaService = (() => {
   // Con un correo, abre el mensaje ya redactado. Nunca pide contraseñas ni códigos.
   function supportContact(contact) {
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) return {text:'Contacto: '+contact};
-    const body = 'Perdí el acceso a mi cuenta de El Chilito.\n\nCorreo de mi cuenta:\nQué perdí (app, llave, códigos):\nFecha aproximada en que me registré:\n\nNo incluyas tu contraseña ni códigos.';
-    return {text:'Escribir a soporte: '+contact, href:'mailto:'+contact+'?subject='+encodeURIComponent('Recuperar acceso a El Chilito')+'&body='+encodeURIComponent(body)};
+    const body = 'Perdí el acceso a mi cuenta de YouGarden.\n\nCorreo de mi cuenta:\nQué perdí (app, llave, códigos):\nFecha aproximada en que me registré:\n\nNo incluyas tu contraseña ni códigos.';
+    return {text:'Escribir a soporte: '+contact, href:'mailto:'+contact+'?subject='+encodeURIComponent('Recuperar acceso a YouGarden')+'&body='+encodeURIComponent(body)};
   }
   return Object.freeze({
     supportContact,

@@ -7,7 +7,7 @@ const EquipmentViews = (() => {
   const act = (...args) => AdminTableViews.button(...args);
   const STATES = {disponible:['Disponible', 'gris'], vinculado:['Vinculado', 'verde'], retirado:['Retirado', 'rojo']};
   const LINKS = {nunca:['Sin conexión aún', 'gris'], en_linea:['En línea', 'verde'], desconectado:['Desconectado', 'rojo']};
-  const ERRORS = {'equipo-duplicado':'Ya existe un equipo con ese identificador o esa MAC.', 'equipo-no-vinculado':'Este equipo no está vinculado a ningún huerto.',
+  const ERRORS = {'reauthentication-required':'Para esta acción hay que confirmar tu contraseña. Vuelve a intentarlo y escríbela cuando se te pida.', 'equipo-duplicado':'Ya existe un equipo con ese identificador o esa MAC.', 'equipo-no-vinculado':'Este equipo no está vinculado a ningún huerto.',
     'equipo-retirado':'Un equipo retirado no recibe credenciales nuevas.', 'equipo-no-disponible':'Solo se retira un equipo disponible. Desvincúlalo primero.',
     'rate-limited':'Demasiados intentos. Espera un momento.'};
   const errorText = (code, fallback = 'No se pudo completar la operación. Inténtalo de nuevo.') => ERRORS[code] || fallback;
@@ -42,9 +42,9 @@ const EquipmentViews = (() => {
   }
 
   const createForm = () => `<h2 id="admin-dialog-title">Dar de alta equipo</h2><form data-admin-form="equipment-create" novalidate>
-    <label for="eq-identifier">Identificador</label><input id="eq-identifier" name="identifier" type="text" maxlength="32" placeholder="ESP32-A1B2" autocomplete="off" required>
-    <label for="eq-mac">MAC</label><input id="eq-mac" name="mac" type="text" maxlength="17" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" required>
-    <label for="eq-firmware">Firmware (opcional)</label><input id="eq-firmware" name="firmware" type="text" maxlength="32" placeholder="1.0.0" autocomplete="off">
+    <label for="eq-identifier">Identificador</label><input id="eq-identifier" name="identifier" type="text" maxlength="32" data-campo="identificador" placeholder="ESP32-A1B2" autocomplete="off" required>
+    <label for="eq-mac">MAC</label><input id="eq-mac" name="mac" type="text" maxlength="17" data-campo="mac" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" required>
+    <label for="eq-firmware">Firmware (opcional)</label><input id="eq-firmware" name="firmware" type="text" maxlength="32" data-campo="firmware" placeholder="1.0.0" autocomplete="off">
     <p class="user-small-copy">Al crearlo generaremos su credencial y te la mostraremos una sola vez.</p>
     <div class="app-dialog-actions">${act('close-dialog', 'Cancelar')}<button class="button btn-liquid-brand" type="submit">Crear equipo</button></div></form>`;
 

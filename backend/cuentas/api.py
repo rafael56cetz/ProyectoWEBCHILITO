@@ -17,10 +17,12 @@ from allauth.headless.account import views as auth
 from allauth.headless.mfa import views as mfa
 from allauth.mfa.adapter import get_adapter as get_mfa_adapter
 from allauth.mfa.totp.internal.auth import SECRET_SESSION_KEY
+from web import validacion
 from cuentas.email import MailUnavailable, delivery_available, delivery_problem
 from cuentas.inputs import PASSWORD_INPUTS
 from cuentas.registration import local_registration_allowed
 from datos import services
+from privacidad.services import TextosLegalesNoPublicados, arranque_legal_permitido, textos_de_registro_publicados
 from web.respuestas import error, leer_json, respuesta_de_base
 
 
@@ -134,12 +136,20 @@ def browser_endpoint(view_class, methods, *, reset_mail=False, verified_only=Fal
                 services.identity(request.user)
             except PermissionDenied:
                 return error(403, 'verification-required')
+        if 'name' in data:
+            # Nombre de la llave de acceso: nombre de cosa (1 a 100). allauth lee el cuerpo original, así que solo se rechaza.
+            try:
+                validacion.nombre_cosa(data['name'], 'name', maximo=100)
+            except validacion.CampoInvalido as campo:
+                return JsonResponse(campo.respuesta(), status=400)
         if reset_mail and not delivery_available(data.get('email')):
             return error(503, 'mail-unavailable')
         try:
             return library_view(request, *args, **kwargs)
         except MailUnavailable:
             return error(503, 'mail-unavailable')
+        except TextosLegalesNoPublicados:
+            return error(503, 'legal-no-publicado')
         except (KeyError, TypeError, ValueError, AttributeError) as fallo:
             # fido2 no valida la forma de la credencial antes de leerla.
             if 'credential' not in _FIELDS[view_class]:
@@ -169,6 +179,10 @@ def registration(request):
         return error(400, 'privacy-required')
     # Invalid email/type/password are checked by the installed allauth input; the
     # preflight depends on delivery configuration, never whether the account exists.
+    # Sin términos ni aviso publicados no hay registro (la base lo exige), salvo el arranque inicial (web.0008).
+    # Antes esto acababa en un 500 genérico; ahora el formulario explica la causa.
+    if not textos_de_registro_publicados() and not arranque_legal_permitido():
+        return error(503, 'legal-no-publicado')
     if delivery_problem(data.get('email')):
         return error(503, 'mail-unavailable')
     return browser_endpoint(auth.SignupView, ['POST'])(request)

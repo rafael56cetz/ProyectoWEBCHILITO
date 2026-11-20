@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from privacidad import consentimientos, legales, politicas, services
 from web.api import InputError, body, bounds, endpoint, failure
 from web.respuestas import respuesta_de_base
+from web.validacion import CampoInvalido
 
 logger = logging.getLogger(__name__)
 CAMPOS_PERFIL = tuple(services.CAMPOS)
@@ -27,6 +28,8 @@ def _publica(vista):
     def envuelta(request, *args, **kwargs):
         try:
             return vista(request, *args, **kwargs)
+        except CampoInvalido as campo:
+            return JsonResponse(campo.respuesta(), status=400)
         except (InputError, ValueError, TypeError, ValidationError, UnicodeError, RecursionError):
             return failure(400, 'invalid-input')
         except DatabaseError as fallo:
@@ -102,21 +105,23 @@ def acceptances(request, data):
     return services.aceptaciones(request.user)
 
 
-@endpoint(('POST',), ('password',))
+@endpoint(('POST',), ('password',), sin_recibo=True)
 def _delete_account(request, data):
-    return services.solicitar_eliminacion(request.user, data.get('password'))
+    return services.eliminar_cuenta(request, data.get('password'))
 
 
 def delete_account(request):
-    """La cuota se gasta antes de la transacción de la escritura: si no, un intento fallido se revertiría con ella y no contaría."""
+    """Elimina la cuenta de inmediato (200) y cierra la sesión. Exige contraseña, CSRF e Idempotency-Key.
+
+    La cuota se gasta antes de la transacción de la escritura: si no, un intento fallido se revertiría con ella y no contaría.
+    Al terminar se borran también las cookies de privacidad de este navegador: su decisión era de la cuenta y ya no existe."""
     if request.method == 'POST' and request.user.is_authenticated and not ratelimit.consume(request, action='eliminar_cuenta', user=request.user):
         return failure(429, 'rate-limited')
-    return _delete_account(request)
-
-
-@endpoint(('POST',))
-def cancel_deletion(request, data):
-    return services.cancelar_eliminacion(request.user)
+    respuesta = _delete_account(request)
+    if respuesta.status_code == 200:
+        for nombre in (services.COOKIE_PREFERENCIA, services.COOKIE_ESTADISTICA):
+            respuesta.delete_cookie(nombre, samesite='Lax')
+    return respuesta
 
 
 def _filtro(request, nombre):
@@ -182,7 +187,16 @@ def admin_consents_summary(request, data):
     return consentimientos.resumen(request.user)
 
 
-@endpoint(cap='ver_consentimientos')
+@endpoint(cap='ver_consentimientos', reciente=True, cuota_lectura=True)
 def admin_consents_export(request, data):
     bounds(request, allowed=FILTROS_BITACORA)
     return consentimientos.exportar(request.user, *(_filtro(request, nombre) for nombre in FILTROS_BITACORA))
+
+
+FILTROS_CUENTAS = ('estado', 'busqueda', 'desde', 'hasta')
+
+
+@endpoint(cap='ver_consentimientos')
+def admin_consents_accounts(request, data):
+    pagina = bounds(request, allowed=(*FILTROS_CUENTAS, 'page'))
+    return consentimientos.cuentas(request.user, *(_filtro(request, nombre) for nombre in FILTROS_CUENTAS), pagina)

@@ -79,7 +79,16 @@ html body .auth-layout .password-input-group { background:rgba(255,255,255,.1);b
 html body .auth-layout .password-input-group input { background:transparent!important;border-color:transparent!important; }
 html body .auth-layout .password-eye-btn { color:#fff!important;background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.2)!important; }
 .auth-layout .field input::placeholder { color:rgba(255,255,255,.66);-webkit-text-fill-color:rgba(255,255,255,.66); }
-.auth-layout .field input:-webkit-autofill { -webkit-text-fill-color:#fff;box-shadow:inset 0 0 0 40px #26453a;caret-color:#fff; }
+/* Autocompletado de Chrome/Edge/Safari (también al pegar un correo, una contraseña o un código guardados): el navegador
+   pone su propio fondo claro y, con el texto blanco, no se veía nada. Se conserva el fondo del campo en todos los estados
+   (también con foco, que es cuando se pega) y el texto sigue blanco. La transición larga impide que el navegador
+   llegue a pintar su fondo; la sombra interior lo tapa en los navegadores que no respetan la transición. */
+html body .auth-layout .field input:is(:-webkit-autofill,:autofill),
+html body .auth-layout .field input:is(:-webkit-autofill,:autofill):is(:hover,:focus,:focus-visible,:active) {
+  -webkit-text-fill-color:#fff!important;color:#fff!important;caret-color:#fff!important;
+  box-shadow:inset 0 0 0 100px #26453a!important;
+  transition:background-color 600000s 0s,color 600000s 0s!important;
+}
 .auth-layout .field input:focus-visible { outline-color:#fff!important; }
 .auth-layout .password-input-group:focus-within { outline-color:#fff; }
 .auth-layout .auth-text-link,.auth-layout .auth-switch a,.auth-layout .terms-field a { color:#fff; }
@@ -784,6 +793,7 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .p
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading .button { color:#fff!important;background:var(--vidrio-sobre-verde)!important;border:1px solid var(--vidrio-sobre-verde-borde)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-5);margin-top:var(--esp-5); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns>.bento-panel { margin:0!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns>.bento-panel>.button { display:inline-flex;margin-top:var(--esp-5); }
 @media (max-width:900px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-columns { grid-template-columns:1fr; } }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating { color:#fff;background:var(--pieza-verde)!important;border-color:var(--pieza-verde-borde)!important;box-shadow:var(--pieza-verde-filo)!important; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-operating :is(h2,p,label) { color:#fff!important; }
@@ -855,23 +865,6 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
   html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-water-form>.button { grid-area:3/1/4/3;width:100%; }
 }
 
-/* Mantenimiento: el formulario a la izquierda y los accesos rápidos como fichas a la derecha. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register { grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:var(--esp-4) var(--esp-6);align-items:start;max-width:none; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>h2 { grid-column:1/-1;margin:0!important; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form { grid-column:1; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form>.button[type=submit] { justify-self:end;min-width:160px;margin-top:var(--esp-2); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions {
-  grid-column:2;grid-row:2;display:grid;grid-template-columns:1fr;gap:var(--esp-2);margin:0;padding:0 0 0 var(--esp-6);
-  border-top:0;box-shadow:inset 1px 0 0 var(--claro-linea);
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-actions>.button { justify-content:flex-start;gap:var(--esp-3);min-height:52px!important;padding:0 var(--esp-4)!important;border-radius:16px!important;white-space:normal;text-align:left; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-actions>.button .icon { flex:0 0 20px;color:var(--claro-verde); }
-@media (max-width:900px) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register { grid-template-columns:1fr; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions { grid-column:1;grid-row:auto;grid-template-columns:repeat(2,minmax(0,1fr));padding:var(--esp-4) 0 0;box-shadow:inset 0 1px 0 var(--claro-linea); }
-}
-@media (max-width:480px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>.care-actions { grid-template-columns:1fr; } html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-register>form>.button[type=submit] { justify-self:stretch; } }
-
 /* Historiales (cuidados, solicitudes, planta, resúmenes): cada registro es una fila de vidrio base con su ícono en un medallón,
    el título firme arriba y fecha y lugar debajo. Las insignias van a la derecha cuando hay espacio. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list { display:grid;gap:var(--esp-2); }
@@ -887,32 +880,380 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .u
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list :is(p,small) { margin:0;color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.45; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list li>div>p:first-child { color:var(--claro-tinta);font-size:var(--texto-etiqueta); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list .badge { justify-self:start;margin-top:var(--esp-1); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks { display:flex;flex-wrap:wrap;gap:var(--esp-2);margin-top:var(--esp-1); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks .badge { margin:0; }
-@media (min-width:720px) {
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row>div { grid-template-columns:minmax(0,1fr) auto;column-gap:var(--esp-4); }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row>div>:not(.care-row-marks) { grid-column:1; }
-  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row-marks { grid-column:2;grid-row:1/span 2;align-self:center;justify-content:flex-end;margin:0; }
-}
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided { background:var(--fila-anulada); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided>span { background:var(--insignia-rojo-fondo);color:var(--insignia-rojo-texto); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .care-row.is-voided h3 { color:var(--claro-suave); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list details { margin-top:var(--esp-1); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list summary { width:fit-content;color:var(--claro-verde);font-size:var(--texto-meta);font-weight:600;cursor:pointer; }
+
+/* Mantenimiento (panel del usuario): fila de estado, «Registrar un cuidado» e «Historial de cuidados».
+   Solo presentación; colores propios de estas tres zonas en variables locales. */
+html body[data-private=true][data-role=user] #app-page :is(.care-status,.care-register,.care-history) {
+  --cz-ficha:#fffaf5;--cz-ficha-borde:#f0e0d1;--cz-sombra:0 8px 30px rgba(120,70,30,.06);
+  --cz-verde:#2f6048;--cz-texto:#14281d;--cz-suave:#566a5e;--cz-control:#cdb8a4;--cz-acento:#e8694a;--cz-tinte:#e3efe6;
+  --cz-rojo-fondo:#fde3df;--cz-rojo-texto:#8a2b1f;--cz-ambar-fondo:#f9e6c8;--cz-ambar-texto:#6b3f06;
+}
+html body[data-private=true][data-role=user] #app-page :is(.care-status,.care-register,.care-history) .icon { stroke-width:2; }
+html body[data-private=true][data-role=user] #app-page :is(.care-status,.care-register,.care-history) :is(button,a,input,select,summary):focus-visible { outline:3px solid var(--cz-acento)!important;outline-offset:2px!important; }
+@media (prefers-reduced-motion:no-preference) {
+  html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) :is(.button,a,input,select,summary) { transition:background-color .15s ease,color .15s ease,border-color .15s ease,box-shadow .15s ease!important; }
+}
+
+/* 1 · Fila de tarjetas de estado */
+html body[data-private=true][data-role=user] #app-page .care-status { margin:0 0 20px; }
+html body[data-private=true][data-role=user] #app-page .care-status-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:14px;margin:0;padding:0;list-style:none; }
+html body[data-private=true][data-role=user] #app-page .care-status-card { display:grid;align-content:start;gap:4px;min-width:0;padding:16px 18px;border:1px solid var(--cz-ficha-borde);border-radius:20px;background:var(--cz-ficha);box-shadow:var(--cz-sombra); }
+html body[data-private=true][data-role=user] #app-page .care-status-card p { margin:0!important;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-status-label { color:var(--cz-suave)!important;font-size:13px;font-weight:700;line-height:1.35; }
+html body[data-private=true][data-role=user] #app-page .care-status-value { color:var(--cz-texto)!important;font-size:20px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums; }
+html body[data-private=true][data-role=user] #app-page .care-status-detail { color:var(--cz-suave)!important;font-size:13px;line-height:1.4; }
+
+/* Fichas: mismo marco para registrar e historial */
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) { display:grid;grid-template-columns:minmax(0,1fr);gap:20px;max-width:none;margin-bottom:0;padding:24px 28px;color:var(--cz-texto);border:1px solid var(--cz-ficha-borde)!important;border-radius:28px;background:var(--cz-ficha)!important;box-shadow:var(--cz-sombra)!important; }
+html body[data-private=true][data-role=user] #app-page .care-register + .care-history { margin-top:20px; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history)>h2 { margin:0!important;color:var(--cz-texto);font-size:22px!important;font-weight:800;line-height:1.25; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) :is(select,input:where(:not([type=checkbox]):not([type=radio]))) { width:100%;height:44px;min-height:44px;box-sizing:border-box;padding:0 12px;color:var(--cz-texto);font-size:14px;border:1px solid var(--cz-control)!important;border-radius:14px!important;background-color:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field input { padding-right:48px; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field button { width:44px;color:var(--cz-verde);border:0!important;border-radius:0 14px 14px 0!important;background:transparent!important; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field button:hover { background:var(--cz-tinte)!important; }
+html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) .maint-date-field .icon { color:var(--cz-verde); }
+
+/* 2 · «Registrar un cuidado» */
+html body[data-private=true][data-role=user] #app-page .care-register>form { display:grid;gap:20px;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-register>form label { display:block;margin:0 0 8px;color:var(--cz-texto);font-size:14px;font-weight:700;line-height:1.3; }
+/* El <select> del tipo sigue en el formulario (lo usa el controlador), oculto a la vista y a los lectores: los chips lo muestran. */
+html body[data-private=true][data-role=user] #app-page .care-register .care-hidden-select { position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;margin:-1px!important;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0!important;opacity:0;pointer-events:none; }
+html body[data-private=true][data-role=user] #app-page .care-type-field>label { pointer-events:none; }
+html body[data-private=true][data-role=user] #app-page .care-chips { display:flex;flex-wrap:wrap;gap:10px; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip { display:inline-flex;align-items:center;gap:8px;height:48px;min-height:48px!important;padding:0 18px!important;color:var(--cz-texto)!important;font-size:15px;font-weight:700;white-space:nowrap;border:1px solid var(--cz-control)!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip:hover { border-color:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip .icon { flex:0 0 20px;width:20px;height:20px;color:var(--cz-verde); }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip[aria-pressed=true] { color:#fff!important;border-color:var(--cz-verde)!important;background:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip[aria-pressed=true] .icon { color:#fff; }
+html body[data-private=true][data-role=user] #app-page .care-chips .care-chip[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-label { display:block;margin:0 0 8px;color:var(--cz-texto);font-size:14px;font-weight:700;line-height:1.3; }
+html body[data-private=true][data-role=user] #app-page .care-plant-field[hidden] { display:none!important; }
+/* «¿Cuándo?»: en el depósito se ve el campo de siempre; en los demás, las pestañas y el campo solo con «Elegir día». */
+html body[data-private=true][data-role=user] #app-page .care-when { display:grid;gap:12px;min-width:0; }
+html body[data-private=true][data-role=user] #app-page .care-when[data-when-mode=field] :is(.care-when-label,.care-when-chips) { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-when:not([data-when-mode=field]) .care-when-date>.maint-date-control>label { position:absolute!important;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap; }
+html body[data-private=true][data-role=user] #app-page .care-when .care-when-label { margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-when-date[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-when-date { max-width:400px; }
+/* Chiles: − número + (el número no se escribe; cambia con los botones). */
+html body[data-private=true][data-role=user] #app-page .care-stepper { display:inline-flex;align-items:center;gap:8px;padding:4px;border:1px solid var(--cz-control);border-radius:999px;background:#fff; }
+html body[data-private=true][data-role=user] #app-page .care-stepper .care-step { display:grid;place-items:center;width:44px;height:44px;min-height:44px!important;padding:0!important;color:var(--cz-verde)!important;border:1px solid var(--cz-control)!important;border-radius:50%!important;background:#fff!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-stepper .care-step:hover { border-color:var(--cz-verde)!important;background:var(--cz-tinte)!important; }
+html body[data-private=true][data-role=user] #app-page .care-stepper .care-step .icon { width:20px;height:20px; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input { width:72px!important;height:44px;min-height:44px;padding:0!important;text-align:center;font-size:18px!important;font-weight:800;font-variant-numeric:tabular-nums;border:0!important;background:transparent!important;-moz-appearance:textfield;appearance:textfield;cursor:default; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input::-webkit-inner-spin-button,html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-stepper input::placeholder { color:var(--cz-texto);opacity:1; }
+html body[data-private=true][data-role=user] #app-page .care-fields { display:flex;flex-wrap:wrap;gap:24px 36px;align-items:flex-start; }
+html body[data-private=true][data-role=user] #app-page .care-fields>* { flex:1 1 220px;min-width:0;max-width:340px; }
+html body[data-private=true][data-role=user] #app-page .care-fields>.care-when { flex:1 1 380px;max-width:480px; }
+html body[data-private=true][data-role=user] #app-page .care-plant-chips .care-chip { height:auto;min-height:48px!important;max-width:100%;white-space:normal!important;text-align:left;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-fields>[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-register #care-when-hint { margin:8px 0 0!important;color:var(--cz-suave)!important;font-size:13.5px;line-height:1.45; }
+html body[data-private=true][data-role=user] #app-page .care-register-footer { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 24px; }
+html body[data-private=true][data-role=user] #app-page .care-register-help { flex:1 1 260px;margin:0!important;color:var(--cz-suave)!important;font-size:14px;line-height:1.5; }
+html body[data-private=true][data-role=user] #app-page .care-register-help .care-guide-link { color:var(--cz-verde);font-weight:700;text-decoration:underline;text-underline-offset:3px;border-radius:4px; }
+html body[data-private=true][data-role=user] #app-page .care-register-help .care-guide-link:hover { color:var(--cz-texto); }
+html body[data-private=true][data-role=user] #app-page .care-register-actions { display:flex;flex-wrap:wrap;align-items:center;gap:12px; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-submit { height:52px;min-height:52px!important;padding:0 34px!important;color:#fff!important;font-size:16px;font-weight:800;border:1px solid var(--cz-verde)!important;border-radius:999px!important;background:var(--cz-verde)!important;box-shadow:0 6px 16px rgba(47,96,72,.3)!important; }
+html body[data-private=true][data-role=user] #app-page .care-register .care-submit:not(:disabled):hover { background:#26503c!important;box-shadow:0 8px 20px rgba(47,96,72,.36)!important; }
+
+/* 3 · «Historial de cuidados» */
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters { display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters>div:not(.app-actions) { flex:1 1 150px;min-width:min(150px,100%);gap:6px; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters :is(label,.maint-date-control>label) { margin:0;color:var(--cz-texto);font-size:13px;font-weight:700; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters>.care-range[hidden] { display:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .maint-date-field input[readonly] { cursor:pointer; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .maint-date-field input[readonly]::placeholder { color:var(--cz-suave);opacity:1; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions { display:flex;flex-wrap:wrap;gap:10px;margin:0 0 0 auto; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions .button { height:44px;min-height:44px!important;padding:0 22px!important;font-size:15px;font-weight:700;border-radius:999px!important;box-shadow:none!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-submit { color:#fff!important;border:1px solid var(--cz-verde)!important;background:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-submit:not(:disabled):hover { background:#26503c!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-clear { color:var(--cz-texto)!important;border:1px solid var(--cz-control)!important;background:#fff!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-filter-clear:hover { border-color:var(--cz-verde)!important; }
+html body[data-private=true][data-role=user] #app-page .care-history .user-history-list { display:grid;gap:10px; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row {
+  display:grid;grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"icon main marks" ". reason reason";align-items:center;gap:0 16px;
+  padding:14px 16px;border:1px solid var(--cz-ficha-borde);border-radius:18px;background:#fff;box-shadow:none;
+}
+html body[data-private=true][data-role=user] #app-page .care-history .care-row>.care-row-icon { grid-area:icon;display:grid;place-items:center;width:44px;height:44px;border-radius:14px;color:var(--cz-verde);background:var(--cz-tinte); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row>.care-row-icon .icon { width:22px;height:22px; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row>.care-row-main { grid-area:main;display:grid;gap:2px;min-width:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row h3 { margin:0;color:var(--cz-texto);font-size:16px;font-weight:800;line-height:1.35;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row .care-row-main>p { margin:0;color:var(--cz-suave)!important;font-size:14px;line-height:1.45;overflow-wrap:anywhere; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks { grid-area:marks;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks .badge { margin:0;padding:6px 14px;font-size:13px;font-weight:800;line-height:1.2;border:0;border-radius:999px;white-space:nowrap; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks .badge.tone-rojo { color:var(--cz-rojo-texto);background:var(--cz-rojo-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks .badge.tone-ambar { color:var(--cz-ambar-texto);background:var(--cz-ambar-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row.is-corrected>.care-row-icon { color:var(--cz-ambar-texto);background:var(--cz-ambar-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row.is-voided>.care-row-icon { color:var(--cz-rojo-texto);background:var(--cz-rojo-fondo); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row.is-voided h3,html body[data-private=true][data-role=user] #app-page .care-history .care-row h3 s { color:var(--cz-suave);text-decoration-thickness:2px; }
+/* «Motivo»: área de clic de 44 px y una flecha que gira al abrir. */
+html body[data-private=true][data-role=user] #app-page .care-history .care-row-reason { grid-area:reason;min-width:0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row details { margin:4px 0 0; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary { display:inline-flex;align-items:center;gap:8px;width:fit-content;min-height:44px;padding:0 10px;margin-left:-10px;color:var(--cz-verde);font-size:14px;font-weight:700;border-radius:14px;list-style:none;cursor:pointer; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary::-webkit-details-marker { display:none; }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary::after { content:"";width:7px;height:7px;margin-top:-4px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row details[open]>summary::after { margin-top:3px;transform:rotate(-135deg); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row summary:hover { background:var(--cz-tinte); }
+html body[data-private=true][data-role=user] #app-page .care-history .care-row details>p { margin:4px 0 0;padding:12px 14px;color:var(--cz-texto)!important;font-size:14px;line-height:1.5;border-radius:14px;background:var(--cz-ficha);overflow-wrap:anywhere; }
+
+@media (max-width:640px) {
+  html body[data-private=true][data-role=user] #app-page :is(.care-register,.care-history) { padding:20px; }
+  html body[data-private=true][data-role=user] #app-page .care-fields>* { flex-basis:100%;max-width:none; }
+  html body[data-private=true][data-role=user] #app-page .care-register-actions { width:100%; }
+  html body[data-private=true][data-role=user] #app-page .care-register-actions>.button { flex:1 1 100%;justify-content:center;width:100%; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions { flex:1 1 100%;margin:0; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-filters .app-actions .button { flex:1 1 0; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-row { grid-template-columns:44px minmax(0,1fr);grid-template-areas:"icon main" ". marks" ". reason"; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-row-marks { justify-content:flex-start;margin-top:8px; }
+}
+@media (max-width:420px) {
+  html body[data-private=true][data-role=user] #app-page .care-chips .care-chip { flex:1 1 auto;justify-content:center; }
+  html body[data-private=true][data-role=user] #app-page .care-history .care-row { padding:12px; gap:0 12px; }
+}
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .user-history-list details p { margin-top:var(--esp-1);color:var(--claro-tinta); }
 
-/* Soporte: los dos pasos lado a lado, cada uno con su número en una marca verde. */
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-steps { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-5);align-items:start;margin-bottom:var(--esp-5); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-steps>.support-step-card { max-width:none;margin:0; }
+/* ── Soporte técnico ─────────────────────────────────────────────────────────────────────────────
+   Dos pasos en vidrio: 01 revisar el equipo, 02 solicitar la revisión. El estado es una tira tintada
+   según el tono, el formulario se reparte en dos columnas y el historial cierra la pantalla.
+   Solo presentación: se conservan clases, ganchos, textos y el orden del documento. */
+
+/* Encabezado compacto: la pantalla es una tarea, no una portada; el huerto va como dato, sin punto coral. */
+html body[data-private=true][data-screen=soporte] #app-page .garden-welcome { margin:0 0 var(--esp-5); }
+html body[data-private=true][data-screen=soporte] #app-page .garden-welcome h1 {
+  display:block;font-size:clamp(28px,2.5vw,34px);font-weight:650;line-height:1.12;letter-spacing:-.03em;
+}
+html body[data-private=true][data-screen=soporte] #app-page .garden-welcome-garden {
+  display:block;margin-top:6px;color:var(--claro-suave);font-size:var(--texto-meta);font-weight:500;letter-spacing:0;line-height:1.4;
+}
+html body[data-private=true][data-screen=soporte] #app-page .garden-welcome-garden::before { display:none; }
+
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title) { max-width:none; }
-@media (max-width:1000px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-steps { grid-template-columns:1fr; } }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card>h2 { display:flex;align-items:center;gap:var(--esp-3);margin:0 0 var(--esp-1)!important;color:var(--claro-titulo);font-size:20px!important;font-weight:600; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step { display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;color:#fff;background:var(--pieza-verde);box-shadow:var(--pieza-verde-filo);font-size:15px;font-weight:650;font-variant-numeric:tabular-nums; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-sep { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card>.button { justify-self:start; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card textarea { min-height:120px;padding:var(--esp-3) 14px;resize:vertical;font:400 var(--texto-cuerpo)/1.5 var(--body); }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card form>.user-small-copy { justify-self:end; }
-html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-step-card form>.button[type=submit] { margin-top:var(--esp-2); }
+
+/* Pasos: el contador numera las fichas sin tocar el HTML. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-cards {
+  counter-reset:paso-soporte;display:grid;gap:var(--esp-5);margin-bottom:var(--esp-6);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card {
+  counter-increment:paso-soporte;display:flex;flex-direction:column;gap:var(--esp-4);min-width:0;margin:0;
+  padding:clamp(20px,2.2vw,30px)!important;border-radius:26px!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.64) 0%,rgba(255,249,242,.4) 55%,rgba(255,255,255,.52) 100%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%);backdrop-filter:blur(24px) saturate(145%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),inset 0 0 0 1px rgba(255,255,255,.22),0 26px 56px -38px rgba(120,70,30,.5)!important;
+  color:var(--claro-tinta);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card>h2 {
+  display:flex;align-items:center;gap:10px;margin:0!important;color:var(--claro-titulo);
+  font-size:var(--texto-titulo-tarjeta)!important;font-weight:650;line-height:1.25;letter-spacing:-.015em;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card>h2::before {
+  content:counter(paso-soporte,decimal-leading-zero);display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;
+  border:1px solid rgba(47,106,72,.18);border-radius:10px;background:rgba(255,255,255,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);color:var(--claro-verde);
+  font-size:12px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-sub {
+  margin:-6px 0 0;max-width:68ch;color:var(--claro-suave);font-size:var(--texto-etiqueta);line-height:1.5;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card .icon { stroke-width:1.7; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card :is(button,a,input,select,textarea,label):focus-visible,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card label:has(input:focus-visible) { outline:2px solid var(--foco-anillo);outline-offset:2px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card [data-diagnostic],
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check-result { display:flex;flex-direction:column;gap:var(--esp-4);min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card [data-order-card]:empty { display:none; }
+
+/* Estado del equipo: tira de vidrio tintada; el medallón queda claro y el color lo pone el fondo. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status {
+  display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px;padding:16px 18px;border-radius:20px;
+  border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.42);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 10px 24px -22px rgba(60,45,25,.55);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status.is-ok {
+  border-color:rgba(47,106,72,.22);background:linear-gradient(120deg,rgba(47,106,72,.13) 0%,rgba(255,255,255,.34) 65%);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status.is-alert {
+  border-color:rgba(184,116,30,.3);background:linear-gradient(120deg,rgba(184,116,30,.16) 0%,rgba(255,255,255,.34) 65%);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-mark {
+  display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:15px;
+  border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.62);color:var(--claro-verde);
+  box-shadow:inset 0 1px 0 #fff,0 8px 18px -14px rgba(60,45,25,.6);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-mark .icon { width:24px;height:24px;color:inherit; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status.is-alert .support-status-mark { background:rgba(255,255,255,.72);color:var(--insignia-ambar-texto); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status.is-alert .support-status-mark .icon { color:inherit; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-text { flex:1 1 240px;min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-text h3 {
+  margin:0;color:var(--claro-titulo);font-size:20px;font-weight:650;line-height:1.25;letter-spacing:-.01em;overflow-wrap:anywhere;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-when { margin:4px 0 0;color:var(--claro-suave);font-size:var(--texto-meta);line-height:1.45; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-count { margin:4px 0 0;color:var(--claro-verde);font-size:13px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card .support-primary {
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;margin-left:auto;
+  padding:0 20px!important;border-radius:var(--radio-boton)!important;font-size:14.5px;font-weight:600;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card .support-primary .icon { width:18px;height:18px; }
+
+/* Componentes revisados: rótulo de grupo, renglones de vidrio y la insignia del resultado a la derecha. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-groups { display:grid;gap:18px;margin-top:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-group { display:grid;gap:10px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-group-head {
+  display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;
+  padding-bottom:8px;border-bottom:1px solid var(--claro-linea);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-group-head h4 {
+  margin:0;color:var(--claro-suave);font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-group-head p { margin:0;color:var(--claro-suave);font-size:12.5px;font-weight:500; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-components {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:8px;margin:0;padding:0;list-style:none;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-components li {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;align-content:start;gap:4px 10px;min-width:0;
+  padding:10px 12px;border:1px solid rgba(255,255,255,.6);border-radius:12px;background:rgba(255,255,255,.42);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-component-name { align-self:start;min-width:0;color:var(--claro-titulo);font-size:14px;font-weight:500;line-height:1.35;overflow-wrap:anywhere; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-components li small { grid-column:1/-1;color:var(--claro-suave);font-size:12.5px;line-height:1.4; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-badge {
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border:1px solid transparent;border-radius:999px;
+  font-size:12px;font-weight:600;line-height:1.35;white-space:nowrap;justify-self:end;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-badge .icon { width:13px;height:13px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-badge.is-ok { border-color:var(--insignia-verde-borde);background:var(--insignia-verde-fondo);color:var(--insignia-verde-texto); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-badge.is-neutral { border-color:var(--claro-linea);background:rgba(70,40,20,.06);color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-badge.is-alert { border-color:var(--insignia-rojo-borde);background:var(--insignia-rojo-fondo);color:var(--insignia-rojo-texto); }
+
+/* Formulario: a la izquierda el motivo (radios reales), a la derecha la nota, la autorización y el envío. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-form {
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas:"incidente nota" "incidente adjunto" "incidente permiso" "incidente envio" ". pista";
+  gap:16px 28px;align-items:start;margin:0;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-form>* { margin:0!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-label { display:block;margin:0 0 8px!important;padding:0;color:var(--claro-titulo)!important;font-size:14px!important;font-weight:600!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-label span { color:var(--claro-suave);font-weight:400; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-incidents { grid-area:incidente;min-width:0;margin:0;padding:0;border:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-options { display:grid;gap:8px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option {
+  position:relative;display:flex!important;align-items:center;gap:12px;min-height:50px;margin:0!important;padding:0 14px;
+  border:1px solid rgba(70,40,20,.14);border-radius:14px;background:rgba(255,255,255,.46);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);color:var(--claro-tinta)!important;font-size:15px!important;font-weight:400!important;
+  cursor:pointer;transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option:hover { background:rgba(255,255,255,.72); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option input { position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-radio {
+  display:grid;place-items:center;flex:0 0 20px;width:20px;height:20px;border:1.5px solid rgba(70,40,20,.32);border-radius:50%;
+  background:rgba(255,255,255,.75);transition:background-color .16s ease,border-color .16s ease;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-radio .icon { width:12px;height:12px;color:#fff;opacity:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option:has(input:checked) {
+  border-color:rgba(47,106,72,.45);background:linear-gradient(120deg,rgba(47,106,72,.14) 0%,rgba(255,255,255,.5) 70%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 8px 18px -16px rgba(47,106,72,.6);font-weight:600!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option:has(input:checked) .support-radio { border-color:var(--claro-verde);background:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option:has(input:checked) .support-radio .icon { opacity:1; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-field { grid-area:nota;display:flex;flex-direction:column; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-form textarea {
+  min-height:calc(4 * 1.45em + 26px);padding:12px 14px;border:1px solid rgba(70,40,20,.16);border-radius:14px;
+  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 2px rgba(70,40,20,.06);color:var(--claro-tinta);
+  font-size:15px;line-height:1.45;resize:vertical;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-form textarea::placeholder { color:var(--campo-placeholder); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-note-count { margin:6px 0 0;align-self:flex-end;color:var(--claro-suave);font-size:12.5px;font-variant-numeric:tabular-nums; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check {
+  display:flex!important;align-items:flex-start;gap:12px;margin:0!important;padding:12px 14px;
+  border:1px solid rgba(70,40,20,.14);border-radius:14px;background:rgba(255,255,255,.42);
+  color:var(--claro-tinta)!important;font-size:14.5px!important;font-weight:500!important;line-height:1.45;cursor:pointer;
+  transition:background-color .16s ease,border-color .16s ease;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check:hover { background:rgba(255,255,255,.62); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check input { flex:0 0 20px;width:20px;height:20px;margin:1px 0 0;accent-color:var(--claro-verde);cursor:pointer; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check-text { display:flex;flex-direction:column;gap:2px;min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check-text small { color:var(--claro-suave);font-size:12.5px;font-weight:400; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check-attach { grid-area:adjunto; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check-consent { grid-area:permiso;border-color:rgba(70,40,20,.14);background:rgba(255,255,255,.42); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-check-consent:has(input:checked) {
+  border-color:rgba(47,106,72,.4);background:rgba(47,106,72,.09);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card .support-submit {
+  grid-area:envio;width:100%;min-height:52px;padding:0 24px!important;border-radius:var(--radio-boton)!important;
+  font-size:15px;font-weight:600;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card .support-submit:disabled {
+  border:1px solid rgba(70,40,20,.16)!important;background:rgba(70,40,20,.12)!important;color:rgba(60,45,25,.62)!important;box-shadow:none!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-submit-hint {
+  grid-area:pista;display:none;margin:0!important;color:var(--claro-suave);font-size:12.5px;line-height:1.45;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-submit:disabled+.support-submit-hint { display:block; }
+
+/* Historial y caso abierto: el mismo vidrio, para que la pantalla no cambie de material. */
+html body[data-private=true][data-screen=soporte] #app-page>.bento-panel:has(>.user-history-list) {
+  padding:clamp(20px,2.2vw,28px)!important;border-radius:26px!important;border:1px solid rgba(255,255,255,.7)!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.62) 0%,rgba(255,249,242,.42) 60%,rgba(255,255,255,.5) 100%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%);backdrop-filter:blur(24px) saturate(145%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 26px 56px -40px rgba(120,70,30,.45)!important;
+}
+html body[data-private=true][data-screen=soporte] #app-page>.bento-panel:has(>.user-history-list)>h2 { margin:0 0 var(--esp-4)!important; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title) {
+  gap:var(--esp-3);
+  padding:clamp(20px,2.2vw,30px)!important;border-radius:26px!important;border:1px solid rgba(255,255,255,.7)!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.64) 0%,rgba(255,249,242,.4) 55%,rgba(255,255,255,.52) 100%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%);backdrop-filter:blur(24px) saturate(145%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 26px 56px -38px rgba(120,70,30,.5)!important;
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title)>:is(h2,h3) { color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title)>h2 { margin:0 0 var(--esp-2)!important;font-size:var(--texto-titulo-tarjeta)!important;font-weight:650;letter-spacing:-.015em; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title)>h3 { margin:var(--esp-5) 0 var(--esp-2);font-size:16px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title)>p { margin:0 0 var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title) .app-actions {
+  margin-top:var(--esp-4);padding-top:var(--esp-4);box-shadow:inset 0 1px 0 var(--claro-linea);
+}
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .folio {
+  padding:2px 9px;border:1px solid var(--insignia-verde-borde);border-radius:999px;background:var(--insignia-verde-fondo);
+  color:var(--insignia-verde-texto);font-size:.74em;font-weight:600;letter-spacing:0;vertical-align:middle;
+}
+
+/* Pantallas angostas: una columna, el botón del estado a todo el ancho y el formulario en orden. */
+@media (max-width:900px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-form {
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"incidente" "nota" "adjunto" "permiso" "envio" "pista";
+  }
+}
+@media (max-width:640px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card { padding:18px 16px 20px!important;border-radius:22px!important; }
+  html body[data-private=true][data-screen=soporte] #app-page>.bento-panel:has(>.user-history-list) { padding:18px 16px!important;border-radius:22px!important; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-card .support-primary { width:100%;margin:0; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status {
+    display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;padding:14px;
+  }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-mark { grid-column:1;grid-row:1; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-text { grid-column:2;grid-row:1; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status .support-primary { grid-column:1/-1;grid-row:2; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-status-text h3 { font-size:18px; }
+  html body[data-private=true][data-screen=soporte] #app-page .user-history-list li { padding:12px;gap:10px 12px; }
+  html body[data-private=true][data-screen=soporte] #app-page .user-history-list h3 { font-size:15px; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.support-card,.support-status,.support-components li,.support-option,.support-check,.support-form textarea),
+  html body[data-private=true][data-screen=soporte] #app-page>.bento-panel:has(>.user-history-list),
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-form:has(#support-case-title) {
+    background:#fffaf4!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  }
+}
+@media (forced-colors:active) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.support-card,.support-status,.support-components li,.support-option,.support-check,.support-form textarea),
+  html body[data-private=true][data-screen=soporte] #app-page>.bento-panel:has(>.user-history-list) {
+    border:1px solid CanvasText!important;background:Canvas!important;box-shadow:none!important;
+  }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .support-option:has(input:checked) .support-radio { border-color:Highlight;background:Highlight; }
+}
 
 /* Resultado de la revisión: una cuadrícula de componentes, cada uno en su fila con su insignia. */
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .diagnostic-card { margin-top:var(--esp-2);padding:var(--esp-4)!important;background:var(--vidrio-base-fondo)!important; }
@@ -950,6 +1291,46 @@ html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .a
 @media (max-width:640px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .account-profile [data-profile] { grid-template-columns:minmax(0,1fr); } }
 /* La bienvenida usa los mismos campos: la ayuda del alias va debajo del campo, no a su lado. */
 html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] small { display:block;margin:var(--esp-2) 0 0;color:var(--claro-suave);font-size:var(--texto-meta);font-weight:400;line-height:1.4; }
+
+/* Ficha de bienvenida — Liquid Glass: etiquetas encima, 2 columnas, Alias ancho completo y pie de botones propio. */
+html body[data-private=true][data-role=user] dialog.app-dialog[data-welcome] {
+  box-sizing:border-box;width:min(480px,calc(100% - 32px));max-width:480px;padding:32px!important;border-radius:24px!important;
+  background:rgba(255,255,255,.62)!important;border:1px solid rgba(255,255,255,.72)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);
+  box-shadow:0 1px 0 rgba(255,255,255,.8) inset,0 28px 64px -24px rgba(24,40,28,.45)!important;
+}
+html body[data-private=true][data-role=user] dialog[data-welcome]::backdrop { background:rgba(24,30,22,.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px); }
+html body[data-private=true][data-role=user] dialog[data-welcome] h2 { margin:0 0 10px;font-size:24px;line-height:1.2; }
+html body[data-private=true][data-role=user] dialog[data-welcome] > p { margin:0 0 22px;line-height:1.5; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px;align-items:start;margin:0; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] label { display:flex;flex-direction:column;gap:6px;flex:none;min-width:0;margin:0;font-size:14px;font-weight:600; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] label:has([name=alias]),
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > p,
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions { grid-column:1/-1; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > p { margin:0; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] small { margin:0; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] input {
+  width:100%;box-sizing:border-box;min-height:44px;padding:10px 14px;border-radius:13px;
+  background:rgba(255,255,255,.72);border:1px solid rgba(31,25,21,.14);font:500 15px/1.3 var(--body);
+}
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] input:focus-visible {
+  outline:0;border-color:var(--claro-verde);box-shadow:0 0 0 3px rgba(47,106,72,.22);
+}
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-top:6px; }
+html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions .button { flex:0 0 auto;width:auto;min-width:120px;border-radius:999px!important; }
+@media (prefers-reduced-motion:no-preference) {
+  html body[data-private=true][data-role=user] dialog[data-welcome] .btn-liquid-brand:hover:not(:disabled) { transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(31,90,56,.6),var(--lg-solid)!important; }
+}
+@media (max-width:520px) {
+  html body[data-private=true][data-role=user] dialog.app-dialog[data-welcome] { padding:28px 22px!important; }
+  html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] { grid-template-columns:1fr; }
+  html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions { flex-direction:column-reverse; }
+  html body[data-private=true][data-role=user] dialog[data-welcome] [data-welcome-form] > .app-actions .button { width:100%; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true][data-role=user] dialog.app-dialog[data-welcome] { background:#fffdf9!important;-webkit-backdrop-filter:none;backdrop-filter:none; }
+  html body[data-private=true][data-role=user] dialog[data-welcome]::backdrop { -webkit-backdrop-filter:none;backdrop-filter:none; }
+}
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card { display:flex;flex-direction:column;gap:var(--esp-2); }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .security-card>.app-actions:last-child { margin-top:auto; }
 html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .my-garden>h2 { font-size:22px!important;font-weight:650;letter-spacing:-.02em; }
@@ -1279,3 +1660,606 @@ html body[data-private=true][data-role=admin] #app-page .care-admin-meta { font-
 html body[data-private=true][data-role=admin] #app-page :is([data-admin-form=legal],.care-admin-form) { display:grid;gap:0; }
 html body[data-private=true][data-role=admin] #app-page [data-admin-form=legal]>:is(input,textarea) { margin-bottom:var(--esp-4); }
 html body[data-private=true][data-role=admin] #app-page .care-admin-form>.care-admin-field { margin-bottom:var(--esp-4); }
+
+/* Depósito con flotador. Mi huerto: ficha simple (estado, una línea) y, si hay algo pendiente, la insignia hacia Mantenimiento. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank-panel { grid-template-columns:minmax(0,1fr); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-stat.garden-tank { display:flex;flex-direction:column; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-badge { align-self:flex-start;display:inline-flex;align-items:center;gap:4px;margin-top:var(--esp-2);padding:3px 10px;border-radius:999px;background:var(--insignia-ambar-fondo,#f9e6c8);color:var(--insignia-ambar-texto,#6b3f06);font-size:13px;font-weight:600;line-height:1.4;text-decoration:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-badge:hover { text-decoration:underline; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-tank .tank-badge:focus-visible { outline:3px solid var(--foco-anillo,#e8694a);outline-offset:2px; }
+/* Mantenimiento · sección «Depósito de agua»: estado, lo que toca hacer, recargas, duración e historial de cargas. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="refill"]:disabled,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page [data-garden-action="care-quick"]:disabled { opacity:.55;cursor:not-allowed; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .refill-reason { margin:var(--esp-2) 0 0;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section { display:flex;flex-direction:column;gap:var(--esp-4);margin-bottom:var(--esp-5); }
+/* Encabezado: título, estado como insignia a la derecha y el botón ⓘ con la capacidad y la nota. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-head { position:relative;display:flex;align-items:center;gap:var(--esp-2);flex-wrap:wrap; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-head>h2 { display:flex;align-items:center;gap:var(--esp-2);margin:0;flex:1 1 auto;min-width:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-state { flex-shrink:0;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info { position:static;flex-shrink:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary { display:inline-flex;align-items:center;justify-content:center;width:var(--boton-alto-compacto);height:var(--boton-alto-compacto);border-radius:var(--radio-boton);list-style:none;cursor:pointer;color:var(--claro-suave);border:1px solid var(--claro-linea);background:var(--boton-secundaria); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary::-webkit-details-marker { display:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary:hover,html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info[open]>summary { color:var(--claro-verde);border-color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary:focus-visible { outline:none;border-color:var(--foco-borde);box-shadow:var(--foco-halo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info>summary .icon { width:18px;height:18px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info-body { position:absolute;top:calc(100% + var(--esp-2));right:0;z-index:5;display:grid;gap:var(--esp-2);width:min(340px,100%);padding:var(--esp-3) var(--esp-4);border:1px solid var(--vidrio-flotante-borde);border-radius:var(--radio-campo);background:var(--vidrio-flotante-fondo);box-shadow:var(--vidrio-flotante-sombra);-webkit-backdrop-filter:var(--vidrio-flotante-desenfoque);backdrop-filter:var(--vidrio-flotante-desenfoque); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-info-body p { margin:0;font-size:13.5px;line-height:1.5;color:var(--claro-tinta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-since { margin:calc(var(--esp-2) * -1) 0 0;font-size:14px;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-actions { display:flex;flex-wrap:wrap;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-call { display:flex;align-items:center;gap:var(--esp-2);margin:0;font-size:1.05rem;font-weight:700;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-note { display:flex;align-items:flex-start;gap:var(--esp-2);margin:0;padding:var(--esp-3);border:1px solid var(--claro-linea);border-radius:var(--radio-campo);color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-note.is-warning { border-color:var(--insignia-ambar-borde);background:var(--insignia-ambar-fondo); }
+/* Recarga detectada sin aviso de la persona: «¿Ya lo rellenaste?» con «Sí, ya lo rellené» (primario) y «No fue una recarga». */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-pending { display:flex;flex-direction:column;gap:var(--esp-2);padding:var(--esp-3);border:1px solid var(--claro-verde);border-radius:var(--radio-campo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-pending-title { display:flex;align-items:center;gap:var(--esp-2);margin:0;font-weight:600;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-pending-copy { margin:0;color:var(--claro-suave); }
+/* Tres fichas en fila (una columna en teléfono). */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-facts { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--esp-3);margin:0;padding:0;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact { display:flex;flex-direction:column;gap:2px;min-width:0;padding:var(--esp-3) var(--esp-4);border:1px solid var(--vidrio-base-borde);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo);box-shadow:var(--vidrio-base-sombra); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-label { font-size:12.5px;font-weight:600;letter-spacing:.01em;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-value { display:flex;align-items:center;gap:var(--esp-2);flex-wrap:wrap;font-size:1.3rem;font-weight:650;line-height:1.25;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact.is-empty .tank-fact-value { color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-text { font-size:13px;line-height:1.4;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-fact-marks { display:inline-flex;gap:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-mark { display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:var(--insignia-verde-fondo);color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-mark .icon { width:15px;height:15px; }
+/* Historial compacto: fecha · duración · iconos; «Ver todo» despliega el resto. */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-loads { display:flex;flex-direction:column;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-loads h3 { margin:0;font-size:15px;font-weight:650;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-list { display:grid;gap:0;margin:0;padding:0;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load { display:grid;grid-template-columns:minmax(88px,auto) minmax(0,1fr) auto;align-items:center;gap:var(--esp-3);min-height:var(--fila-alto);padding:var(--esp-1) var(--esp-1);border-bottom:1px solid var(--claro-linea);font-size:14px; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load:last-child { border-bottom:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-date { font-weight:600;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-length { color:var(--claro-tinta); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load.is-open .tank-load-length { font-weight:600;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load-marks { display:inline-flex;gap:var(--esp-1);justify-content:flex-end; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-more>summary { display:inline-flex;align-items:center;gap:var(--esp-1);min-height:var(--boton-alto-compacto);cursor:pointer;font-size:14px;font-weight:600;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-more[open]>summary { margin-bottom:var(--esp-1); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-more-count { font-weight:500;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-empty { margin:0;font-size:14px;color:var(--claro-suave); }
+/* Teléfono: fichas en una columna y botones a todo el ancho. */
+@media (max-width:640px) {
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-facts { grid-template-columns:minmax(0,1fr); }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-actions { flex-direction:column;align-items:stretch; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-actions>.button { width:100%;justify-content:center; }
+  html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section .tank-load { grid-template-columns:auto minmax(0,1fr) auto;gap:var(--esp-2); }
+}
+@media (forced-colors:active) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .tank-section :is(.tank-fact,.tank-info-body,.tank-mark) { border:1px solid CanvasText; } }
+
+/* ── Mi huerto: vidrio y jerarquía ───────────────────────────────────────────────────────────────
+   Prueba de diseño sobre la pantalla de inicio del usuario. El saludo y el estado del equipo
+   comparten la primera línea; las cifras, el resumen y las acciones usan el mismo vidrio que
+   Soporte. Las tres tarjetas de planta y su título quedan intactos: este bloque no las toca. */
+
+/* Cabecera: saludo a la izquierda y estado del equipo a la derecha, alineados por la base. */
+html body[data-private=true][data-screen=huerto] #app-page .home-head {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px 30px;margin:0 0 var(--esp-5);
+}
+html body[data-private=true][data-screen=huerto] #app-page .home-head .garden-welcome { margin:0; }
+html body[data-private=true][data-screen=huerto] #app-page .home-head .user-status-line { margin:6px 0 0; }
+
+/* Saludo: el alias manda y el huerto pasa a ser una cápsula de contexto junto a él. */
+html body[data-private=true][data-screen=huerto] #app-page .garden-welcome h1 {
+  font-size:clamp(30px,3vw,42px);line-height:1.04;letter-spacing:-.04em;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-welcome-garden {
+  display:inline-flex;align-items:center;align-self:center;flex-basis:auto;gap:7px;
+  margin:0 0 4px;padding:4px 12px 4px 10px;border-radius:var(--radio-boton);
+  border:1px solid rgba(255,255,255,.7);background:linear-gradient(120deg,rgba(47,106,72,.13),rgba(255,255,255,.48));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+  color:var(--claro-verde);font-size:14px;font-weight:600;letter-spacing:0;line-height:1.3;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-welcome-garden::before {
+  width:7px;height:7px;flex:0 0 7px;margin:0;background:var(--claro-verde);box-shadow:0 0 0 3px rgba(47,106,72,.14);
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-welcome h1>.garden-welcome-garden:first-child { padding:0;border:0;background:none;box-shadow:none;font-size:inherit;font-weight:inherit; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-welcome h1>.garden-welcome-garden:first-child::before { display:none; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-welcome-phrase { margin-top:var(--esp-3);font-size:15.5px;line-height:1.5; }
+
+/* Estado del equipo: tira de vidrio tintada; el tono lo pone el fondo y el texto se lee entero. */
+html body[data-private=true][data-screen=huerto] #app-page .user-status-line {
+  border:1px solid rgba(255,255,255,.72);border-radius:16px;
+  background:linear-gradient(115deg,var(--insignia-fondo) 0%,rgba(255,255,255,.46) 78%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.88),0 16px 32px -28px rgba(60,45,25,.55);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-status-line p { font-size:14.5px!important;font-weight:550; }
+html body[data-private=true][data-screen=huerto] #app-page .user-status-mark {
+  width:34px;height:34px;flex-basis:34px;background:rgba(255,255,255,.62);
+  box-shadow:inset 0 1px 0 #fff,0 0 0 1px var(--insignia-borde);
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-status-mark .icon { width:18px;height:18px; }
+
+/* Cifras: cuatro fichas de vidrio, cada una con su ícono en un cuadro tenue. */
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) {
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:0 0 var(--esp-6);
+  padding:0!important;border:0!important;background:none!important;box-shadow:none!important;overflow:visible;
+}
+/* El depósito lleva más texto: ocupa dos columnas y así su altura se acerca a la de las otras cifras. */
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat:first-child { grid-column:span 2; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat {
+  display:flex;flex-direction:column;min-width:0;padding:16px 18px 18px!important;border-radius:20px;
+  border:1px solid rgba(255,255,255,.72);background:linear-gradient(150deg,rgba(255,255,255,.6) 0%,rgba(255,249,242,.4) 62%,rgba(255,255,255,.52) 100%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 22px 42px -36px rgba(120,70,30,.6);
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat+.garden-stat {
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 22px 42px -36px rgba(120,70,30,.6);
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat h2 {
+  display:flex;align-items:center;gap:9px;min-height:37px;margin:0 0 10px!important;
+  color:var(--claro-suave);font-size:14px!important;font-weight:600;line-height:1.3;letter-spacing:0;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat h2 .icon {
+  flex:0 0 26px;width:26px;height:26px;padding:5px;box-sizing:border-box;border-radius:8px;
+  background:rgba(47,106,72,.1);color:var(--claro-verde);
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat strong {
+  font-size:clamp(23px,2.2vw,29px);font-weight:600;line-height:1.1;letter-spacing:-.03em;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat strong small { font-size:.55em;font-weight:500; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat p { margin:6px 0 0;font-size:14px;line-height:1.45; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat .garden-tank-line { color:var(--claro-tinta);font-weight:500; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-stat.is-ok strong { color:var(--claro-verde); }
+html body[data-private=true][data-screen=huerto] #app-page .garden-stat.is-low strong { color:var(--insignia-ambar-texto); }
+
+/* Resumen con IA: dos columnas, la marca y el título en un riel y el texto a la derecha. */
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis {
+  display:grid;grid-template-columns:minmax(190px,250px) minmax(0,1fr);align-items:start;
+  column-gap:clamp(22px,3vw,40px);row-gap:0;padding:clamp(20px,2.4vw,28px)!important;border-radius:26px!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  background:linear-gradient(135deg,rgba(47,106,72,.11) 0%,rgba(255,255,255,.55) 42%,rgba(255,249,242,.52) 100%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%);backdrop-filter:blur(24px) saturate(145%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 26px 52px -40px rgba(120,70,30,.5)!important;
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-head {
+  grid-column:1;grid-row:1;flex-direction:column;align-items:flex-start;gap:var(--esp-3);padding-top:2px;
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-mark {
+  width:42px;height:42px;flex-basis:42px;border-radius:14px;
+  background:linear-gradient(160deg,#3a7656,#245039);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 14px 26px -16px rgba(23,60,47,.7);
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis h2 { font-size:19px!important;font-weight:650;line-height:1.25; }
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-copy {
+  grid-column:2;grid-row:1;min-width:0;padding-left:clamp(22px,3vw,40px);box-shadow:inset 1px 0 0 var(--claro-linea);
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-copy>p:first-child { max-width:none;font-size:16px;line-height:1.65; }
+html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-copy .button { margin-top:var(--esp-1); }
+
+/* Acciones rápidas: fichas de vidrio con el ícono en un cuadro; la revisión técnica va en verde. */
+html body[data-private=true][data-screen=huerto] #app-page .user-section-heading { margin:0 0 var(--esp-4); }
+html body[data-private=true][data-screen=huerto] #app-page .user-section-heading h2 { margin:0;font-size:25px;font-weight:600;letter-spacing:-.02em; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-actions { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:0 0 var(--esp-2); }
+html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button {
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:18px;
+  height:auto;min-height:104px!important;padding:16px 16px 15px!important;border-radius:18px!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  background:linear-gradient(150deg,rgba(255,255,255,.6) 0%,rgba(255,249,242,.42) 60%,rgba(255,255,255,.52) 100%)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 22px 42px -36px rgba(120,70,30,.6)!important;
+  color:var(--claro-titulo)!important;font-size:14.5px!important;font-weight:600!important;line-height:1.3!important;
+  white-space:normal;text-align:left;
+  transition:transform var(--duracion-boton) var(--curva-boton),box-shadow var(--duracion-boton) ease,background-color var(--duracion-boton) ease;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button .icon {
+  flex:0 0 34px;width:34px;height:34px;padding:7px;box-sizing:border-box;border-radius:10px;
+  background:rgba(47,106,72,.1);color:var(--claro-verde);
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button.is-featured {
+  border:1px solid rgba(255,255,255,.24)!important;
+  background:linear-gradient(158deg,#3c7958 0%,#25523b 70%,#1c4330 100%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 26px 46px -26px rgba(23,60,47,.8)!important;
+  color:#fff!important;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button.is-featured .icon { background:rgba(255,255,255,.16);color:#fff; }
+@media (hover:hover) {
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button:hover { transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 26px 44px -30px rgba(120,70,30,.6)!important; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button.is-featured:hover { filter:brightness(1.05); }
+}
+html body[data-private=true][data-screen=huerto] #app-page .user-safety-copy {
+  display:flex;align-items:flex-start;gap:8px;margin:var(--esp-3) 0 var(--esp-6);color:var(--claro-suave);
+}
+
+/* Sin equipo: la tarjeta de conexión y el depósito usan el mismo vidrio que el resto. */
+html body[data-private=true][data-screen=huerto] #app-page .garden-connect,
+html body[data-private=true][data-screen=huerto] #app-page .garden-tank-panel {
+  padding:clamp(20px,2.2vw,28px)!important;border-radius:26px!important;border:1px solid rgba(255,255,255,.72)!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.6) 0%,rgba(255,249,242,.42) 60%,rgba(255,255,255,.52) 100%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%);backdrop-filter:blur(24px) saturate(145%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 26px 52px -40px rgba(120,70,30,.5)!important;
+}
+html body[data-private=true][data-screen=huerto] #app-page .garden-tank-panel .garden-stat { padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;-webkit-backdrop-filter:none;backdrop-filter:none; }
+html body[data-private=true][data-screen=huerto] #app-page .garden-tank-panel .garden-stat h2 { min-height:0; }
+
+/* Pantallas angostas: una columna y el estado debajo del saludo, a todo el ancho. */
+@media (max-width:1100px) {
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat:first-child { grid-column:1/-1; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button.is-featured { grid-column:span 2; }
+}
+@media (max-width:900px) {
+  html body[data-private=true][data-screen=huerto] #app-page .home-head { grid-template-columns:minmax(0,1fr);align-items:start;gap:var(--esp-4); }
+  html body[data-private=true][data-screen=huerto] #app-page .home-head .user-status-line { margin:0;width:100%; }
+  html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis { grid-template-columns:minmax(0,1fr);row-gap:var(--esp-4); }
+  html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-head { grid-column:1;grid-row:1;flex-direction:row;align-items:center;gap:var(--esp-3); }
+  html body[data-private=true][data-screen=huerto] #app-page .user-diagnosis-copy { grid-column:1;grid-row:2;padding-left:0;box-shadow:none; }
+}
+@media (max-width:640px) {
+  html body[data-private=true][data-screen=huerto] #app-page .garden-welcome-garden { flex-basis:100%;margin-top:2px; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat:first-child { grid-column:1/-1; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat { padding:14px 16px 16px!important; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button { min-height:96px!important; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button.is-featured {
+    grid-column:1/-1;min-height:64px!important;flex-direction:row;align-items:center;justify-content:flex-start;gap:var(--esp-3);
+  }
+}
+@media (max-width:420px) {
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel) { grid-template-columns:minmax(0,1fr); }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat:first-child { grid-column:auto; }
+}
+
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true][data-screen=huerto] #app-page :is(.garden-stats:not(.garden-tank-panel)>.garden-stat,.user-diagnosis,.garden-actions>.button,.user-status-line,.garden-connect,.garden-tank-panel) {
+    background:#fffaf4!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button.is-featured { background:#25523b!important; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button { transition:none; }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-actions>.button:hover { transform:none; }
+}
+@media (forced-colors:active) {
+  html body[data-private=true][data-screen=huerto] #app-page :is(.garden-stats:not(.garden-tank-panel)>.garden-stat,.user-diagnosis,.garden-actions>.button,.user-status-line,.garden-connect,.garden-tank-panel) {
+    border:1px solid CanvasText!important;background:Canvas!important;box-shadow:none!important;
+  }
+  html body[data-private=true][data-screen=huerto] #app-page .garden-welcome-garden { border:1px solid CanvasText!important;background:Canvas!important; }
+}
+
+/* ── Panel técnico y Mantenimiento: el mismo vidrio que Mi huerto ───────────────────────────────
+   Las dos pantallas de operación comparten el encabezado de Mi huerto (título con el huerto como
+   cápsula y el estado del equipo a la derecha), las cifras en fichas de vidrio y los paneles con
+   el mismo material. Solo presentación: se conservan clases, ganchos, textos y el orden. */
+
+/* Cabecera: título a la izquierda y estado del equipo a la derecha, alineados por arriba. */
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .home-head {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px 30px;margin:0 0 var(--esp-5);
+}
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .home-head .garden-welcome { margin:0; }
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .home-head .user-status-line { margin:6px 0 0;max-width:min(420px,100%); }
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome h1 {
+  font-size:clamp(29px,2.7vw,37px);line-height:1.06;letter-spacing:-.04em;
+}
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome-garden {
+  display:inline-flex;align-items:center;align-self:center;flex-basis:auto;gap:7px;
+  margin:0 0 4px;padding:4px 12px 4px 10px;border-radius:var(--radio-boton);
+  border:1px solid rgba(255,255,255,.7);background:linear-gradient(120deg,rgba(47,106,72,.13),rgba(255,255,255,.48));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+  color:var(--claro-verde);font-size:14px;font-weight:600;letter-spacing:0;line-height:1.3;
+}
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome-garden::before {
+  width:7px;height:7px;flex:0 0 7px;margin:0;background:var(--claro-verde);box-shadow:0 0 0 3px rgba(47,106,72,.14);
+}
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome h1>.garden-welcome-garden:first-child { padding:0;border:0;background:none;box-shadow:none;font-size:inherit;font-weight:inherit; }
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome h1>.garden-welcome-garden:first-child::before { display:none; }
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome-phrase { margin-top:var(--esp-3);font-size:15.5px;line-height:1.5; }
+/* Sin huerto todavía: el encabezado genérico conserva la misma escala que el título de la pantalla. */
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .page-heading h1 { font-size:clamp(29px,2.7vw,37px);font-weight:650;letter-spacing:-.04em; }
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .page-heading p:not(.eyebrow) { font-size:15.5px; }
+
+/* Estado del equipo: tira de vidrio tintada, igual que en Mi huerto. */
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-status-line {
+  border:1px solid rgba(255,255,255,.72);border-radius:16px;
+  background:linear-gradient(115deg,var(--insignia-fondo) 0%,rgba(255,255,255,.46) 78%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.88),0 16px 32px -28px rgba(60,45,25,.55);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-status-line p { font-size:14.5px!important;font-weight:550; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-status-mark {
+  width:34px;height:34px;flex-basis:34px;background:rgba(255,255,255,.62);
+  box-shadow:inset 0 1px 0 #fff,0 0 0 1px var(--insignia-borde);
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-status-mark .icon { width:18px;height:18px; }
+
+/* Cifras del Panel técnico: cuatro fichas de vidrio con el ícono en un cuadro tenue. */
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) {
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 var(--esp-6);
+  padding:0!important;border:0!important;background:none!important;box-shadow:none!important;overflow:visible;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats.is-3:not(.garden-tank-panel) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat {
+  display:flex;flex-direction:column;min-width:0;padding:16px 18px 18px!important;border-radius:20px;
+  border:1px solid rgba(255,255,255,.72);background:linear-gradient(150deg,rgba(255,255,255,.6) 0%,rgba(255,249,242,.4) 62%,rgba(255,255,255,.52) 100%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 22px 42px -36px rgba(120,70,30,.6);
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat h2 {
+  display:flex;align-items:center;gap:9px;min-height:37px;margin:0 0 10px!important;
+  color:var(--claro-suave);font-size:14px!important;font-weight:600;line-height:1.3;letter-spacing:0;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat h2 .icon {
+  flex:0 0 26px;width:26px;height:26px;padding:5px;box-sizing:border-box;border-radius:8px;
+  background:rgba(47,106,72,.1);color:var(--claro-verde);
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat strong {
+  font-size:clamp(22px,2vw,26px);font-weight:600;line-height:1.1;letter-spacing:-.03em;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat strong small { font-size:.55em;font-weight:500; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) .garden-stat p { margin:6px 0 0;font-size:14px;line-height:1.45; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stat.is-ok strong { color:var(--claro-verde); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stat.is-low strong { color:var(--insignia-ambar-texto); }
+
+/* Encabezado de la sección de gráficas y selector de periodo en vidrio. */
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-toolbar { margin:var(--esp-6) 0 var(--esp-4);gap:12px 18px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-toolbar h2 { font-size:clamp(21px,1.8vw,25px);font-weight:650;letter-spacing:-.025em; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .toolbar-title { gap:10px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .toolbar-title>.button {
+  width:40px;height:40px;min-height:40px!important;padding:0!important;border-radius:50%!important;
+  border:1px solid rgba(255,255,255,.72)!important;background:rgba(255,255,255,.5)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 10px 22px -20px rgba(120,70,30,.55)!important;
+  color:var(--claro-verde)!important;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-range-control {
+  border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.34)!important;
+  box-shadow:inset 0 1px 2px rgba(60,45,25,.06),inset 0 1px 0 rgba(255,255,255,.8)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+}
+
+/* Paneles: el mismo vidrio cálido en las gráficas, la tabla, la bitácora y el agua. */
+html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .bento-panel:not(dialog) {
+  border:1px solid rgba(255,255,255,.72)!important;border-radius:26px!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.62) 0%,rgba(255,249,242,.4) 58%,rgba(255,255,255,.5) 100%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(140%);backdrop-filter:blur(22px) saturate(140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 24px 48px -38px rgba(120,70,30,.5)!important;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-grid-layout { gap:14px;margin-bottom:var(--esp-6); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart { padding:20px 22px 16px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart h2 { font-size:16px;font-weight:650;letter-spacing:-.01em; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-heading { margin-bottom:4px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-heading p { font-size:26px;font-weight:650; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-legend { gap:14px;font-size:13px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-legend li { color:var(--claro-suave); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page :is(.user-table-scroll,.user-log-panel) { border-radius:20px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-table th {
+  padding:12px 14px;color:var(--claro-suave)!important;font-size:12.5px;font-weight:650;letter-spacing:.04em;text-transform:uppercase;
+  border-bottom:1px solid var(--claro-linea);
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-table td { padding:14px;font-size:14.5px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-table tbody tr+tr { border-top:1px solid rgba(70,40,20,.08); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-table tbody tr:hover { background:rgba(255,255,255,.4); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-log-panel { padding:20px 22px; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-log-panel .user-range-control { margin-bottom:var(--esp-4); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-pager { margin-top:var(--esp-4);padding-top:var(--esp-4);border-top:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-pager .button {
+  border:1px solid rgba(255,255,255,.72)!important;background:rgba(255,255,255,.5)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important;color:var(--claro-tinta)!important;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-pager span { color:var(--claro-suave);font-size:14px; }
+
+/* Riego: la acción protagonista conserva el verde sólido de Mi huerto. */
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating.user-operating {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px 28px;align-items:end;
+  padding:clamp(20px,2.2vw,26px)!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:26px!important;
+  background:linear-gradient(158deg,#3c7958 0%,#25523b 70%,#1c4330 100%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 26px 46px -26px rgba(23,60,47,.8)!important;
+  color:#fff;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating.user-operating>div { align-self:center; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating.user-operating h2 { margin:0 0 6px;color:#fff!important;font-size:22px;font-weight:600;letter-spacing:-.02em; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating.user-operating p { margin:0;max-width:52ch;color:rgba(255,255,255,.8)!important;font-size:14.5px;line-height:1.5; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form label { color:rgba(255,255,255,.82)!important;font-size:13px;font-weight:600; }
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating .user-water-form select {
+  background:rgba(255,255,255,.94)!important;border:1px solid rgba(255,255,255,.4)!important;color:var(--claro-tinta)!important;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating .user-water-form>.button {
+  min-height:var(--campo-alto)!important;padding:0 26px!important;border-radius:var(--radio-boton)!important;
+  border:1px solid rgba(255,255,255,.34)!important;background:rgba(255,255,255,.96)!important;color:var(--claro-titulo)!important;
+  box-shadow:inset 0 1px 0 #fff,0 10px 22px -16px rgba(0,0,0,.5)!important;font-weight:650;
+}
+html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating .user-water-form>.button:hover { background:#fff!important; }
+
+/* Mantenimiento · cifras: cuatro fichas de vidrio como las del resto del panel. */
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status { margin:0 0 var(--esp-5); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-grid {
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-card {
+  display:flex;flex-direction:column;align-content:start;gap:3px;min-width:0;padding:16px 18px 18px;
+  border:1px solid rgba(255,255,255,.72);border-radius:20px;
+  background:linear-gradient(150deg,rgba(255,255,255,.6) 0%,rgba(255,249,242,.4) 62%,rgba(255,255,255,.52) 100%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 22px 42px -36px rgba(120,70,30,.6);
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-label { min-height:38px;color:var(--claro-suave)!important;font-size:14px;font-weight:600;line-height:1.35; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-value { margin-top:6px!important;color:var(--claro-titulo)!important;font-size:20px;font-weight:650;line-height:1.25;letter-spacing:-.02em; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-detail { margin-top:4px!important;color:var(--claro-suave)!important;font-size:13.5px;line-height:1.4; }
+
+/* Mantenimiento · fichas: registrar, historial, depósito y guías comparten el vidrio. */
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page :is(.care-status,.care-register,.care-history) {
+  --cz-ficha:rgba(255,255,255,.46);--cz-ficha-borde:rgba(255,255,255,.72);--cz-sombra:inset 0 1px 0 rgba(255,255,255,.92),0 24px 48px -38px rgba(120,70,30,.5);
+  --cz-verde:var(--claro-verde);--cz-texto:var(--claro-titulo);--cz-suave:var(--claro-suave);--cz-control:rgba(47,106,72,.2);--cz-acento:var(--foco-anillo);--cz-tinte:rgba(47,106,72,.09);
+  --cz-rojo-fondo:var(--insignia-rojo-fondo);--cz-rojo-texto:var(--insignia-rojo-texto);--cz-ambar-fondo:var(--insignia-ambar-fondo);--cz-ambar-texto:var(--insignia-ambar-texto);
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page :is(.care-register,.care-history,.tank-history) {
+  display:grid;grid-template-columns:minmax(0,1fr);gap:18px;max-width:none;margin-bottom:0;
+  padding:clamp(20px,2.2vw,28px)!important;border:1px solid rgba(255,255,255,.72)!important;border-radius:26px!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.62) 0%,rgba(255,249,242,.4) 58%,rgba(255,255,255,.5) 100%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(140%);backdrop-filter:blur(22px) saturate(140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 24px 48px -38px rgba(120,70,30,.5)!important;
+  color:var(--claro-tinta);
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page :is(.care-register,.care-history,.tank-history)>h2 {
+  margin:0!important;color:var(--claro-titulo);font-size:clamp(21px,1.8vw,24px)!important;font-weight:650;line-height:1.2;letter-spacing:-.02em;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register>form { gap:22px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register>form label,
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register .care-label { margin:0 0 8px;color:var(--claro-titulo);font-size:14px;font-weight:600; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips { gap:8px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips .care-chip {
+  height:44px;min-height:44px!important;padding:0 16px!important;color:var(--claro-tinta)!important;font-size:14.5px;font-weight:600;
+  border:1px solid rgba(47,106,72,.18)!important;background:rgba(255,255,255,.5)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.85)!important;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips .care-chip .icon { width:18px;height:18px;flex-basis:18px;color:var(--claro-verde); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips .care-chip:hover { border-color:var(--claro-verde)!important;background:rgba(255,255,255,.76)!important; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips .care-chip[aria-pressed=true] {
+  color:#fff!important;border-color:rgba(47,106,72,.6)!important;
+  background:linear-gradient(170deg,#3a7656,#25523b)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 10px 20px -16px rgba(23,60,47,.8)!important;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips .care-chip[aria-pressed=true] .icon { color:#fff; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-plant-chips .care-chip { height:auto;min-height:44px!important; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page :is(.care-register,.care-history) :is(select,input:not([type=checkbox]):not([type=radio])) {
+  height:46px;min-height:46px;border:1px solid rgba(47,106,72,.18)!important;border-radius:14px!important;
+  background:rgba(255,255,255,.55)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)!important;font-size:14.5px;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page :is(.care-register,.care-history) :is(select,input):focus-visible {
+  border-color:var(--foco-borde)!important;box-shadow:var(--foco-halo)!important;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-stepper { border:1px solid rgba(47,106,72,.18);background:rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.8); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-stepper .care-step { border:1px solid rgba(47,106,72,.16)!important;background:rgba(255,255,255,.8)!important; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-stepper .care-step:hover { border-color:var(--claro-verde)!important;background:#fff!important; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register #care-when-hint { color:var(--claro-suave)!important;font-size:13.5px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register-footer { padding-top:var(--esp-4);border-top:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register-help { color:var(--claro-suave)!important;font-size:14px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register-help .care-guide-link { color:var(--claro-verde); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register .care-submit {
+  height:46px;min-height:46px!important;padding:0 28px!important;font-size:15px;font-weight:650;border-radius:var(--radio-boton)!important;
+  border:1px solid rgba(255,255,255,.24)!important;background:linear-gradient(170deg,#3a7656,#25523b)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 14px 26px -18px rgba(23,60,47,.85)!important;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register .care-submit:not(:disabled):hover { filter:brightness(1.06); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register .care-submit:disabled { opacity:.5;box-shadow:none!important; }
+
+/* Depósito de agua: la tarjeta de vidrio comparte el estilo; su contenido lo define «.tank-section». */
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history { margin-bottom:var(--esp-5); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .tank-history .tank-head>h2 { margin:0!important;color:var(--claro-titulo);font-size:clamp(21px,1.8vw,24px)!important;font-weight:650;line-height:1.2;letter-spacing:-.02em; }
+
+/* Historial de cuidados: filtros en una cuadrícula clara y filas de vidrio. */
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history { margin-bottom:var(--esp-5); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters { gap:12px 14px;padding-bottom:var(--esp-4);border-bottom:1px solid var(--claro-linea); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters>div:not(.app-actions) { gap:6px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters :is(label,.maint-date-control>label) { color:var(--claro-suave);font-size:13px;font-weight:600; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters .app-actions .button {
+  height:44px;min-height:44px!important;padding:0 20px!important;border-radius:var(--radio-boton)!important;font-size:14.5px;font-weight:600;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filter-submit {
+  border:1px solid rgba(255,255,255,.24)!important;background:linear-gradient(170deg,#3a7656,#25523b)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24)!important;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filter-clear {
+  border:1px solid rgba(47,106,72,.18)!important;background:rgba(255,255,255,.55)!important;color:var(--claro-tinta)!important;
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filter-clear:hover { border-color:var(--claro-verde)!important;background:#fff!important; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .user-history-list { gap:10px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-row {
+  padding:14px 16px;border:1px solid rgba(255,255,255,.7);border-radius:18px;background:rgba(255,255,255,.42);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-row>.care-row-icon { width:42px;height:42px;border-radius:12px;background:rgba(47,106,72,.1); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-row h3 { font-size:15.5px;font-weight:600; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-row .care-row-main>p { font-size:14px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-row-marks .badge { font-size:12.5px;font-weight:650; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-row details>p { background:rgba(255,255,255,.5); }
+
+/* Guías de cuidado: mismo encabezado y vidrio que el resto de la pantalla. */
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guides { margin-top:0; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guides .user-section-heading { margin:0 0 var(--esp-4); }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide-list { gap:10px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide { border:1px solid rgba(255,255,255,.72)!important;border-radius:20px!important;background:rgba(255,255,255,.42)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.85)!important; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide summary { padding:16px 20px;font-size:16px;font-weight:600; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide-answer { padding:0 20px 18px 44px; }
+html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide-answer p { font-size:15px; }
+
+/* Responsive: una sola columna en la cabecera y las cifras, sin apretar el texto. */
+@media (max-width:1100px) {
+  html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .home-head { grid-template-columns:minmax(0,1fr);gap:var(--esp-4); }
+  html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .home-head .user-status-line { margin:0;width:100%;max-width:none; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel),
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats.is-3:not(.garden-tank-panel),
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:900px) {
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating.user-operating { grid-template-columns:minmax(0,1fr);align-items:start; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form { flex:1 1 auto;width:100%; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-chart-toolbar { align-items:flex-start; }
+}
+@media (max-width:640px) {
+  html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome-garden { flex-basis:auto;align-self:flex-start;margin-top:4px; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel) { gap:10px; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel)>.garden-stat,
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-card { padding:14px 16px 16px; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating { padding:20px!important; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form { grid-template-columns:minmax(0,1fr);gap:6px; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form label[for=water-plant] { grid-area:auto; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form #water-plant { grid-area:auto; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form label[for=water-seconds] { grid-area:auto; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form #water-seconds { grid-area:auto; }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-water-form>.button { grid-area:auto;width:100%;margin-top:6px; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page :is(.care-register,.care-history,.tank-history) { padding:20px!important; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register-actions { width:100%; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-register-actions>.button { flex:1 1 100%;justify-content:center;width:100%; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters .app-actions { flex:1 1 100%;margin:0; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-history .care-filters .app-actions .button { flex:1 1 0; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide summary { padding:16px;font-size:15.5px; }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-guide-answer { padding:0 16px 16px; }
+}
+@media (max-width:420px) {
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats:not(.garden-tank-panel),
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .garden-stats.is-3:not(.garden-tank-panel),
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-status-grid { grid-template-columns:minmax(0,1fr); }
+  html body[data-private=true][data-role=user][data-screen=mantenimiento] #app-page .care-chips .care-chip { flex:0 1 auto;justify-content:center; }
+}
+
+@media (prefers-reduced-transparency:reduce) {
+  html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page :is(.garden-stats:not(.garden-tank-panel)>.garden-stat,.care-status-card,.care-register,.care-history,.tank-history,.bento-panel:not(dialog),.user-chart,.user-status-line,.care-chips .care-chip,.tank-history .user-history-list li,.care-history .care-row) {
+    background:#fffaf4!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  }
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating { background:#25523b!important; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html body[data-private=true][data-role=user][data-screen=telemetria] #app-page .user-operating .user-water-form>.button { transition:none; }
+}
+@media (forced-colors:active) {
+  html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page :is(.garden-stats:not(.garden-tank-panel)>.garden-stat,.care-status-card,.care-register,.care-history,.tank-history,.bento-panel:not(dialog),.user-chart,.user-status-line,.care-chips .care-chip,.tank-history .user-history-list li,.care-history .care-row,.user-operating) {
+    border:1px solid CanvasText!important;background:Canvas!important;box-shadow:none!important;
+  }
+  html body[data-private=true][data-role=user]:is([data-screen=telemetria],[data-screen=mantenimiento]) #app-page .garden-welcome-garden { border:1px solid CanvasText!important;background:Canvas!important; }
+}
+
+/* ── Campos: mensaje en línea de la regla de cada campo (CamposVista) ───────────────────────────── */
+.campo-aviso { display:flex;align-items:flex-start;gap:var(--esp-1);margin:var(--esp-1) 0 0;font-size:13.5px;font-weight:500;line-height:1.4;color:var(--error); }
+.campo-aviso::before { content:"";flex:0 0 auto;width:6px;height:6px;margin-top:.5em;border-radius:50%;background:currentColor; }
+:is(input,textarea)[aria-invalid=true] { border-color:var(--error)!important; }
+html body[data-private=true] #app-page .campo-aviso { color:var(--claro-peligro); }
+.contact-form .campo-aviso { color:var(--aviso-error); }
+.contact-form :is(input,textarea)[aria-invalid=true] { border-color:var(--aviso-error)!important; }
+html body[data-private=true] #app-page :is(input,textarea)[aria-invalid=true] { border-color:var(--claro-peligro)!important; }
+@media (forced-colors:active) { .campo-aviso { color:CanvasText; } :is(input,textarea)[aria-invalid=true] { border:2px solid CanvasText!important; } }
+
+/* ── Ficha de planta: ciclo actual y «Ciclos anteriores» plegable (solo lectura) ─────────────────── */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-current { margin:var(--esp-1) 0 0;font-size:14px;font-weight:600;color:var(--claro-verde); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-hero .page-heading>.app-actions { display:flex;flex-wrap:wrap;gap:var(--esp-2); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles { margin-top:var(--esp-5); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary { display:flex;align-items:center;gap:var(--esp-2);cursor:pointer;list-style:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary::-webkit-details-marker,
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle>summary::-webkit-details-marker { display:none; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary::after { content:"";width:8px;height:8px;margin-left:auto;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform var(--duracion-corta) ease; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle[open]>summary::after { transform:rotate(225deg); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>summary h2 { margin:0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-count { display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 8px;border-radius:var(--radio-boton);background:var(--insignia-gris-fondo);color:var(--insignia-gris-texto);font-size:13px;font-weight:600; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycles-toggle>p { margin:var(--esp-3) 0; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle { margin-top:var(--esp-2);border:1px solid var(--claro-linea);border-radius:var(--radio-campo);background:var(--vidrio-base-fondo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle>summary { min-height:var(--fila-alto);display:flex;align-items:center;padding:var(--esp-2) var(--esp-4);cursor:pointer;list-style:none;font-weight:600;color:var(--claro-titulo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page :is(.plant-cycles-toggle,.plant-cycle)>summary:focus-visible { outline:none;border-radius:var(--radio-campo);box-shadow:var(--foco-halo); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-body { padding:0 var(--esp-4) var(--esp-4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-note { margin:0 0 var(--esp-3);padding:var(--esp-2) var(--esp-3);border-left:3px solid var(--claro-linea);white-space:pre-line;color:var(--claro-suave); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--esp-4); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns h3 { margin:0 0 var(--esp-2);font-size:14px; }
+@media (max-width:700px) { html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .plant-cycle-columns { grid-template-columns:1fr; } }
+
+/* Sin huerto activo: cada sección se ve con su estructura, pero de solo lectura (<fieldset disabled>). */
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page fieldset.garden-locked { border:0;padding:0;margin:0;min-width:0;display:grid;gap:var(--esp-5);opacity:.6;filter:saturate(.6); }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page fieldset.garden-locked :is(button,input,select,textarea,label) { cursor:not-allowed; }
+html body[data-private=true]:is([data-role=admin],[data-role=user]) #app-page .garden-lock-note { margin-bottom:var(--esp-5); }

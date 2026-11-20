@@ -30,6 +30,8 @@ AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend','allauth.ac
 DEFAULT_AUTO_FIELD='django.db.models.BigAutoField'
 LANGUAGE_CODE='es-mx';TIME_ZONE='America/Mexico_City';USE_TZ=True;USE_I18N=True
 STATIC_URL='/static/'
+# Bases sintéticas (demostración y pruebas). Producción exige CHILITO_DB_NAME explícito y distinto de estas (B-4).
+BASES_SINTETICAS=frozenset({'chilito_integracion_sinteticos','test_chilito_integracion_sinteticos'})
 DATABASES={'default':{'ENGINE':'django.db.backends.postgresql','NAME':os.environ.get('CHILITO_DB_NAME','chilito_integracion_sinteticos'),
  'USER':os.environ.get('CHILITO_DB_USER','chilito_pkg_runtime'),'PASSWORD':os.environ.get('CHILITO_DB_PASSWORD',''),
  'HOST':os.environ.get('CHILITO_DB_HOST','127.0.0.1'),'PORT':os.environ.get('CHILITO_DB_PORT','5432'),
@@ -39,7 +41,14 @@ DATABASES={'default':{'ENGINE':'django.db.backends.postgresql','NAME':os.environ
 AUTH_PASSWORD_VALIDATORS=[{'NAME':'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
  {'NAME':'django.contrib.auth.password_validation.MinimumLengthValidator','OPTIONS':{'min_length':15}},
  {'NAME':'django.contrib.auth.password_validation.CommonPasswordValidator'},
- {'NAME':'django.contrib.auth.password_validation.NumericPasswordValidator'}]
+ {'NAME':'django.contrib.auth.password_validation.NumericPasswordValidator'},
+ # B-8: contraseñas filtradas (k-anonimato). Solo consulta si CHILITO_VERIFICAR_FILTRADAS está activo.
+ {'NAME':'cuentas.validadores.ContrasenaFiltrada'}]
+CHILITO_VERIFICAR_FILTRADAS=os.environ.get('CHILITO_VERIFICAR_FILTRADAS','0')=='1'
+# Arranque inicial (sin textos legales publicados): permite crear SOLO la primera cuenta de una base vacía para
+# designarla superadministradora y publicar los textos desde el panel. Apagado por defecto; la base (web.0008) lo
+# limita a ese caso y deja de tener efecto en cuanto hay textos publicados u otra cuenta.
+CHILITO_BYPASS_LEGAL_CHECK=os.environ.get('CHILITO_BYPASS_LEGAL_CHECK','0')=='1'
 ACCOUNT_ADAPTER='cuentas.adapters.ClosedRegistrationAdapter'
 ACCOUNT_USER_MODEL_USERNAME_FIELD=None
 ACCOUNT_LOGIN_METHODS={'email'}
@@ -54,7 +63,7 @@ ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS=3
 ACCOUNT_LOGIN_BY_CODE_FORMAT={'length':6,'numeric':True,'dashed':False}
 MFA_ADAPTER='cuentas.adapters.AdaptadorMFA'
 MFA_SUPPORTED_TYPES=['totp','recovery_codes','webauthn']
-MFA_TOTP_ISSUER='El Chilito'
+MFA_TOTP_ISSUER='YouGarden'
 MFA_RECOVERY_CODE_COUNT=10
 MFA_RECOVERY_CODES_SHOW_ONCE=True
 MFA_PASSKEY_LOGIN_ENABLED=False
@@ -73,16 +82,20 @@ ACCOUNT_EMAIL_VERIFICATION_SUPPORTS_CHANGE=False
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION=True
 ACCOUNT_LOGIN_ON_PASSWORD_RESET=False
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE=False
+# M-2: ventana de la reautenticación reciente que exigen las acciones críticas (`@endpoint(reciente=True)`).
+ACCOUNT_REAUTHENTICATION_TIMEOUT=300
 ACCOUNT_RATE_LIMITS={'signup':'10/m/ip','login':'30/m/ip','login_failed':'10/m/ip,5/300s/key',
  'confirm_email':'1/60s/key','reset_password':'10/m/ip,1/60s/key','reset_password_from_key':'20/m/ip','change_password':'5/m/user',
  'request_login_code':'20/m/ip,3/m/key','reauthenticate':'10/m/user',
- 'privacidad_cookies':'20/m/ip','estadistica_seccion':'60/m/ip','contacto_producto':'5/h/ip','vincular_dispositivo':'20/m/ip,5/m/key','eliminar_cuenta':'5/m/user'}
+ 'privacidad_cookies':'20/m/ip','estadistica_seccion':'60/m/ip','contacto_producto':'5/h/ip','vincular_dispositivo':'20/m/ip,5/m/key','eliminar_cuenta':'5/m/user',
+ # B-3: tope global antes de PBKDF2, sea cual sea la IP (clave fija «global»).
+ 'vincular_dispositivo_global':'300/m/key'}
 PASSWORD_RESET_TIMEOUT=600
 SESSION_ENGINE='django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE=28800
 CHILITO_SESION_ABSOLUTA=28800
-CHILITO_INACTIVIDAD_USUARIO=1800
-CHILITO_INACTIVIDAD_ADMIN=900
+CHILITO_INACTIVIDAD_USUARIO=900
+CHILITO_INACTIVIDAD_ADMIN=600
 SESSION_EXPIRE_AT_BROWSER_CLOSE=True
 SESSION_COOKIE_HTTPONLY=True
 SESSION_COOKIE_SAMESITE='Lax'
@@ -112,10 +125,12 @@ EMAIL_PORT=int(os.environ.get('CHILITO_SMTP_PORT','587'))
 EMAIL_HOST_USER=os.environ.get('CHILITO_SMTP_USER','')
 EMAIL_HOST_PASSWORD=os.environ.get('CHILITO_SMTP_PASSWORD','')
 EMAIL_USE_TLS=True;EMAIL_USE_SSL=False;EMAIL_TIMEOUT=10
-DEFAULT_FROM_EMAIL=os.environ.get('CHILITO_FROM_EMAIL','El Chilito <no-reply@example.test>')
-ACCOUNT_EMAIL_SUBJECT_PREFIX='[El Chilito] '
+DEFAULT_FROM_EMAIL=os.environ.get('CHILITO_FROM_EMAIL','YouGarden <no-reply@example.test>')
+ACCOUNT_EMAIL_SUBJECT_PREFIX='[YouGarden] '
 DATA_UPLOAD_MAX_MEMORY_SIZE=32768
-CACHES={'default':{'BACKEND':'django.core.cache.backends.db.DatabaseCache','LOCATION':'cuentas_cuotas_acceso','TIMEOUT':3600,'OPTIONS':{'MAX_ENTRIES':10000}}}
+# M-3: las cuotas viven aquí (allauth solo usa `default`). La purga solo quita expirados: un contador vigente no se
+# desaloja aunque se generen muchas claves. MAX_ENTRIES solo decide cuándo purgar expirados.
+CACHES={'default':{'BACKEND':'web.cache.CacheSinDesalojo','LOCATION':'cuentas_cuotas_acceso','TIMEOUT':3600,'OPTIONS':{'MAX_ENTRIES':1000000}}}
 LOGGING={'version':1,'disable_existing_loggers':False,
  'formatters':{'seguro':{'()':'config.registro.FormatoSeguro','format':'%(asctime)s %(levelname)s %(name)s %(message)s'}},
  'handlers':{'consola':{'class':'logging.StreamHandler','formatter':'seguro'},'null':{'class':'logging.NullHandler'}},

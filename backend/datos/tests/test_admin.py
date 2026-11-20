@@ -1,11 +1,13 @@
 """Administración nueva sobre PostgreSQL temporal: equipos, administradores, ventas (aquí) con cuenta con y sin capacidad."""
 import json
+import time as time_module
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.db import connection
 from django.test import Client, TestCase
@@ -15,7 +17,8 @@ from datos import ventas
 from datos.models import (Auditoria, Comando, Cuidado, Dispositivo, DispositivoEvento, ResumenHoraHuerto, ResumenHoraPlanta,
                           SoporteCaso, SoporteSesion, Venta)
 from huerto.services import ZONA_MERIDA
-from tests import cuenta, publicar_textos
+from tests import cuenta, publicar_textos, reautenticado
+from web import sesion
 from web.models import Idempotencia
 
 MAC = '02:00:00:00:aa:{:02x}'
@@ -38,6 +41,7 @@ class BaseAdmin(TestCase):
         cliente = Client(HTTP_HOST='127.0.0.1')
         if usuario is not None:
             cliente.force_login(usuario, backend='django.contrib.auth.backends.ModelBackend')
+            reautenticado(cliente)     # M-2: estas pruebas parten de una contraseña confirmada (tests/test_correcciones_auditoria.py prueba lo contrario)
         return cliente
 
     def post(self, cliente, ruta, datos=None):
@@ -71,7 +75,7 @@ class Capacidades(BaseAdmin):
         ('post', '/api/admin/ventas/1/cancelar', 'gestionar_ventas'),
         ('get', '/api/admin/legales?tipo=terminos', 'gestionar_legales'), ('post', '/api/admin/legales/vista-previa', 'gestionar_legales'),
         ('get', '/api/admin/consentimientos', 'ver_consentimientos'), ('get', '/api/admin/consentimientos/resumen', 'ver_consentimientos'),
-        ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos'),
+        ('get', '/api/admin/consentimientos/exportar', 'ver_consentimientos'), ('get', '/api/admin/consentimientos/cuentas', 'ver_consentimientos'),
         ('get', '/api/admin/flota', 'ver_flota'), ('get', '/api/admin/soporte', 'atender_soporte'),
         ('get', f'/api/admin/soporte/{FOLIO_AJENO}', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/atender', 'atender_soporte'),
         ('post', f'/api/admin/soporte/{UUID_AJENO}/conectar', 'atender_soporte'), ('post', f'/api/admin/soporte/{UUID_AJENO}/resolver', 'atender_soporte'),
@@ -582,6 +586,43 @@ class Consola(BaseAdmin):
         self.assertEqual((cerrada.motivo_cierre, cerrada.cerrada_en is not None), ('cierre_sesion', True))
         self.assertTrue(Auditoria.objects.filter(actor=self.ana, accion='cerrar_sesion_tecnica', detalle={'motivo': 'cierre_sesion'}).exists())
 
+    @staticmethod
+    def inactiva(cliente, segundos):
+        """Lleva la última actividad registrada de la sesión del cliente `segundos` atrás (marca del servidor)."""
+        datos = cliente.session
+        datos[sesion.VISTO] = int(time_module.time()) - segundos
+        datos.save()
+        return datos.session_key
+
+    def test_vencer_por_inactividad_cierra_la_sesion_tecnica(self):
+        # ASVS V7: al vencer en el servidor se borra la sesión de la cuenta y se termina la sesión técnica de soporte.
+        tecnica = self.conectar()
+        llave = self.inactiva(self.admin_ana, 601)
+        self.assertEqual(self.admin_ana.get('/api/cuenta').status_code, 401)
+        self.assertFalse(Session.objects.filter(session_key=llave).exists())
+        cerrada = SoporteSesion.objects.get(pk=tecnica)
+        self.assertEqual((cerrada.motivo_cierre, cerrada.cerrada_en is not None), ('cierre_sesion', True))
+        self.assertTrue(Auditoria.objects.filter(actor=self.ana, accion='cerrar_sesion_tecnica', detalle={'motivo': 'cierre_sesion'}).exists())
+
+    def test_una_capacidad_real_aplica_los_10_minutos(self):
+        # Sin simular is_admin: la concesión directa basta para el límite de administrador; la persona dueña conserva sus 15 min.
+        self.inactiva(self.admin_ana, 601)
+        self.inactiva(self.persona, 601)
+        self.assertEqual(self.admin_ana.get('/api/cuenta').status_code, 401)
+        self.assertEqual(self.persona.get('/api/cuenta').status_code, 200)
+        self.inactiva(self.admin_beto, 599)
+        self.assertEqual(self.admin_beto.get('/api/cuenta').status_code, 200)
+
+    def test_el_sondeo_no_mantiene_viva_la_consola(self):
+        # La consola abierta sin tocarla sondea con X-Chilito-Sondeo: eso no renueva la actividad y la sesión vence igual.
+        tecnica = self.conectar()
+        self.inactiva(self.admin_ana, 540)
+        self.assertEqual(self.admin_ana.get(f'/api/admin/sesiones/{tecnica}', HTTP_X_CHILITO_SONDEO='1').status_code, 200)
+        datos = self.admin_ana.session
+        self.assertLessEqual(datos[sesion.VISTO], int(time_module.time()) - 540)
+        self.inactiva(self.admin_ana, 601)
+        self.assertEqual(self.admin_ana.get(f'/api/admin/sesiones/{tecnica}', HTTP_X_CHILITO_SONDEO='1').status_code, 401)
+
     def test_una_sola_sesion_abierta_por_administrador(self):
         self.conectar()
         self.numero += 1
@@ -656,8 +697,8 @@ class Mantenimientos(BaseAdmin):
         return self.post(self.admin, f'/api/admin/mantenimientos/{cuidado.pk}/corregir', datos)
 
     def test_lista_todos_los_huertos_con_paginacion_busqueda_y_filtros(self):
-        for _ in range(27):
-            self.cuidado()
+        for _ in range(27):     # inspecciones de todo el huerto: las recargas tienen su propio límite
+            self.cuidado('inspeccion')
         self.cuidado('sustrato', 1)
         pagina1 = self.admin.get('/api/admin/mantenimientos').json()
         self.assertEqual((pagina1['total'], len(pagina1['items']), pagina1['page']), (28, 25, 1))

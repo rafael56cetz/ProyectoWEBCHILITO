@@ -1,5 +1,5 @@
 // CONTROLADOR · Administración: flota, consola remota, consultas, ventas, administradores, textos legales, consentimientos y el panel general.
-// Define: FleetController, ConsoleController, InquiryController, SalesController, AdminAccessController, LegalAdminController, ConsentController, AppController.
+// Define: AdminReauthController, FleetController, ConsoleController, InquiryController, SalesController, AdminAccessController, LegalAdminController, ConsentController, AppController.
 
 // ── Administracion ──
 // Telemetría de flota: lista, filtros y panel de solo lectura. El servidor decide qué se ve según la capacidad.
@@ -61,20 +61,20 @@ const ConsoleController = (() => {
       if(state.detail) ConsoleViews.lockOrders(root, state.detail.orders);
     }
 
-    async function loadInbox(page) {
-      const result = await service.inbox(state.tab, page);
+    async function loadInbox(page, {quiet = false} = {}) {
+      const result = await service.inbox(state.tab, page, {quiet});
       if(life.signal.aborted) return;
       state = result.status === 'ready' ? {...state, status:'ready', counts:result.counts, inbox:{items:result.items, page:result.page, total:result.total}} : {...state, status:'error'};
     }
-    async function loadCase() {
-      const result = await service.detail(folio);
+    async function loadCase({quiet = false} = {}) {
+      const result = await service.detail(folio, {quiet});
       if(life.signal.aborted) return;
       state = result.status === 'ready' ? {...state, status:'ready', detail:{case:result.case, diagnostic:result.diagnostic, session:result.session, orders:result.orders}}
         : {...state, status:result.code === 'not-found' || result.code === 'invalid-input' ? 'not-found' : 'error', detail:null};
     }
-    async function refresh({page = state.inbox.page} = {}) {
+    async function refresh({page = state.inbox.page, quiet = false} = {}) {
       const id = ++serial;
-      await (folio ? loadCase() : loadInbox(page));
+      await (folio ? loadCase({quiet}) : loadInbox(page, {quiet}));
       if(life.signal.aborted || id !== serial) return;
       paint();
       if(sessionId()) startPolling(); else stopPolling();
@@ -99,7 +99,7 @@ const ConsoleController = (() => {
     async function sessionEnded(reason) {
       stopPolling();
       mostrarAviso('info', ConsoleViews.closingText(reason));
-      await refresh();
+      await refresh({quiet:true});
     }
 
     async function closeSession() {
@@ -182,11 +182,12 @@ const InquiryController = (() => {
     async function refresh() {
       if(busy || document.visibilityState !== 'visible') return;
       const result = await service.list(state, page, {background:true});
-      if(!life.signal.aborted && !busy && result.status === 'ready' && signature(result) !== shown) await load();
+      // La recarga también va como sondeo: una consulta nueva no alarga la sesión de quien no está tocando la consola.
+      if(!life.signal.aborted && !busy && result.status === 'ready' && signature(result) !== shown) await load({quiet:true});
     }
-    async function load() {
+    async function load({quiet = false} = {}) {
       view.loading();
-      const result = await service.list(state, page);
+      const result = await service.list(state, page, {background:quiet});
       if(life.signal.aborted) return;
       view.filter(state);
       if(result.status !== 'ready') { view.failed(result.status); return; }
@@ -509,6 +510,7 @@ const LegalAdminController = (() => {
       if(life.signal.aborted) return false;
       if(result.status !== 'accepted') { fail(result); return false; }
       mostrarAviso('exito', `Versión ${version} publicada. Se avisó a ${result.notified} cuentas.`);
+      if(type === 'politica_cookies') CookieController.refresh();
       return true;
     }
     async function publishFromEditor(form) {
@@ -520,6 +522,7 @@ const LegalAdminController = (() => {
       if(life.signal.aborted) return;
       if(result.status !== 'accepted') { fail(result); return; }
       mostrarAviso('exito', `Versión ${version} publicada. Se avisó a ${result.notified} cuentas.`);
+      if(type === 'politica_cookies') CookieController.refresh();
       location.hash = '#admin/legales';
     }
     async function remove(id, expectedAt) {
@@ -583,55 +586,127 @@ const LegalAdminController = (() => {
 })();
 
 // ── Consentimientos ──
-// Bitácora de solo lectura con resumen y exportación. La exportación es una descarga del navegador, no una llamada de aquí.
+// Bitácora de solo lectura con resumen y exportación, y padrón de cuentas. Cada vista guarda sus filtros al alternar;
+// cambiar de vista o pulsar «Actualizar» vuelve a consultar al servidor, así una cuenta eliminada desaparece de inmediato.
+// El nombre del rango rápido («hoy», «7»…) solo vive aquí: al servidor viajan desde/hasta, que es lo que su lista blanca acepta.
 const ConsentController = (() => {
   function mount({root, service = ConsentService}) {
     const life = new AbortController();
-    let state = {status:'loading', summary:null, list:{items:[], page:1, total:0}, filters:{}, exportUrl:service.exportUrl({}), exportLimit:Infinity};
+    const emptyList = () => ({items:[], page:1, total:0});
+    let state = {status:'loading', tab:'bitacora', summary:null, list:emptyList(), filters:{}, range:'todo', exportUrl:service.exportUrl({}), exportLimit:Infinity,
+      accounts:{status:'loading', list:emptyList(), totals:{total:0, activas:0, inactivas:0}, filters:{estado:'todas'}, range:'todo'}};
     let datesLife = null, dates = null, serial = 0, working = false;
     function paint() {
       AdminTableViews.paint(root, ConsentViews.screen(state));
-      datesLife?.abort();
-      if(state.status === 'ready') { datesLife = new AbortController(); dates = DateFilterViews.mount(root, datesLife.signal); }
+      datesLife?.abort(); dates = null;
+      if(state.tab === 'bitacora' && state.status === 'ready') { datesLife = new AbortController(); dates = DateFilterViews.mount(root, datesLife.signal); }
     }
-    async function load(page = 1) {
+    // Bitácora: el resumen se pide la primera vez y cada vez que se pulsa «Actualizar».
+    async function loadLog(page, fresh) {
       const id = ++serial;
-      const [list, summary] = await Promise.all([service.list(state.filters, page), state.summary ? Promise.resolve({status:'ready', ...state.summary}) : service.summary()]);
+      const [list, summary] = await Promise.all([service.list(state.filters, page), state.summary && !fresh ? Promise.resolve({status:'ready', ...state.summary}) : service.summary()]);
       if(life.signal.aborted || id !== serial) return;
       if(list.status !== 'ready' || summary.status !== 'ready') { state = {...state, status:'error'}; paint(); return; }
       state = {...state, status:'ready', summary, list:{items:list.items, page:list.page, total:list.total}, exportLimit:list.exportLimit, exportUrl:service.exportUrl(state.filters)};
       paint();
     }
+    async function loadAccounts(page) {
+      const id = ++serial;
+      const result = await service.accounts(state.accounts.filters, page);
+      if(life.signal.aborted || id !== serial) return;
+      const accounts = result.status === 'ready'
+        ? {...state.accounts, status:'ready', list:{items:result.items, page:result.page, total:result.total}, totals:result.totals}
+        : {...state.accounts, status:'error'};
+      state = {...state, accounts};
+      paint();
+    }
+    const load = (page = 1, fresh = false) => state.tab === 'cuentas' ? loadAccounts(page) : loadLog(page, fresh);
+    // Rango rápido de la vista abierta: fija desde/hasta y conserva los demás filtros.
+    function quickRange(preset) {
+      const {desde, hasta} = service.range(preset);
+      if(state.tab === 'cuentas') state = {...state, accounts:{...state.accounts, range:preset, filters:{...state.accounts.filters, desde, hasta}}};
+      else state = {...state, range:preset, filters:{...state.filters, desde, hasta}};
+    }
+    // Si las fechas escritas coinciden con un rango rápido, ese botón queda marcado; si no, ninguno.
+    function rangeOf({desde = '', hasta = ''}) {
+      return ['todo', 'hoy', '7', '30'].find(preset => { const range = service.range(preset); return range.desde === desde && range.hasta === hasta; }) || 'personalizado';
+    }
     async function filter(form) {
-      const invalid = dates.validate();
+      const invalid = dates?.validate();
       if(invalid) { mostrarAviso('error', invalid); return; }
       const values = Object.fromEntries(new FormData(form));
-      state.filters = {documento:values.documento, decision:values.decision, desde:values.since, hasta:values.until, cuenta:values.cuenta.trim(), version:values.version.trim()};
+      state.filters = {documento:values.documento, decision:values.decision, desde:values.since.trim(), hasta:values.until.trim(), cuenta:values.cuenta.trim(), version:values.version.trim()};
+      state.range = rangeOf(state.filters);
       await load(1);
+    }
+    async function clear() {
+      if(state.tab === 'cuentas') state = {...state, accounts:{...state.accounts, filters:{estado:'todas'}, range:'todo'}};
+      else state = {...state, filters:{}, range:'todo'};
+      await load(1);
+    }
+    // La búsqueda de la bitácora admite 60 caracteres; un correo más largo se busca por su inicio (coincide igual).
+    const byAccount = email => String(email || '').slice(0, 60);
+    async function act(action, data) {
+      // Al cambiar de vista se pinta en el acto (con lo último que se vio, o «Cargando») y luego se consulta de nuevo.
+      if(action === 'tab') { if(['bitacora', 'cuentas'].includes(data.tab) && data.tab !== state.tab) { state = {...state, tab:data.tab}; paint(); await load(1, true); } }
+      else if(action === 'refresh') await load(1, true);
+      else if(action === 'page' || action === 'accounts-page') await load(Number(data.page));
+      else if(action === 'quick-document') { state = {...state, filters:{...state.filters, documento:data.value}}; await load(1); }
+      else if(action === 'quick-status') { state = {...state, accounts:{...state.accounts, filters:{...state.accounts.filters, estado:data.value}}}; await load(1); }
+      else if(action === 'quick-range') { quickRange(data.value); await load(1); }
+      else if(action === 'clear') await clear();
+      else if(action === 'row') AdminTableViews.open(root, ConsentViews.detail(state.list.items.find(item => item.id === data.id)));
+      else if(action === 'account-history') { AdminTableViews.dismiss(root); state = {...state, filters:{cuenta:byAccount(data.account)}, range:'todo'}; await load(1); }
+      else if(action === 'account-consents') { state = {...state, tab:'bitacora', filters:{cuenta:byAccount(data.email)}, range:'todo'}; paint(); await load(1, true); }
+      else if(action === 'close-dialog') AdminTableViews.dismiss(root);
+      else if(action === 'export') await exportCsv();
     }
     root.addEventListener('click', async event => {
       const trigger = event.target.closest('[data-admin-action]');
-      if(!trigger || working) return;
-      const {adminAction: action, page, id, account} = trigger.dataset;
+      if(!trigger || working || trigger.disabled) return;
       working = true;
-      try {
-        if(action === 'page') await load(Number(page));
-        else if(action === 'clear') { state.filters = {}; ConsentViews.resetFilters(root); await load(1); }
-        else if(action === 'row') AdminTableViews.open(root, ConsentViews.detail(state.list.items.find(item => item.id === id)));
-        else if(action === 'account-history') { AdminTableViews.dismiss(root); state.filters = {cuenta:account}; await load(1); }
-        else if(action === 'close-dialog') AdminTableViews.dismiss(root);
-      } finally { working = false; }
+      try { await act(trigger.dataset.adminAction, trigger.dataset); } finally { working = false; }
     }, {signal:life.signal});
+    // Exportar exige contraseña reciente (M-2): el modelo la pide y reintenta; aquí solo se guarda el archivo o se avisa.
+    async function exportCsv() {
+      const result = await service.download(state.filters);
+      if(life.signal.aborted) return;
+      if(result.status === 'ready') AdminTableViews.saveFile(result.blob, 'consentimientos.csv');
+      else mostrarAviso('error', {'reauthentication-required':'Confirma tu contraseña para exportar.', 'rate-limited':'Demasiadas exportaciones seguidas. Espera un minuto.'}[result.code] || 'No se pudo exportar. Inténtalo de nuevo.');
+    }
     root.addEventListener('submit', async event => {
       event.preventDefault();
-      if(working || event.target.closest('[data-admin-form]')?.dataset.adminForm !== 'consent-filter') return;
+      const form = event.target.closest('[data-admin-form]')?.dataset.adminForm;
+      if(working || !['consent-filter', 'accounts-filter'].includes(form)) return;
       working = true;
-      try { await filter(event.target); } finally { working = false; }
+      try {
+        if(form === 'consent-filter') await filter(event.target);
+        else { state = {...state, accounts:{...state.accounts, filters:{...state.accounts.filters, busqueda:event.target.elements.busqueda.value.trim()}}}; await load(1); }
+      } finally { working = false; }
     }, {signal:life.signal});
     load(1);
     return {redraw() {}, dispose() { serial++; datesLife?.abort(); life.abort(); }};
   }
   return {mount};
+})();
+
+// ── Reautenticacion ──
+// Acciones críticas del panel (M-2): cuando el servidor pide confirmar la contraseña, se pide aquí y se confirma con allauth.
+const AdminReauthController = (() => {
+  let installed = false;
+  function install({http = AdminHTTP, mfa = MfaService, ask = pedirContrasena} = {}) {
+    if(installed) return;
+    installed = true;
+    http.onReauthentication(async () => {
+      const password = await ask();
+      if(!password) return false;
+      const result = await mfa.reauthenticate(password);
+      if(result.status === 'ok') return true;
+      mostrarAviso('error', 'La contraseña no es correcta. Inténtalo de nuevo.');
+      return false;
+    });
+  }
+  return {install};
 })();
 
 // ── Panel ──
@@ -648,6 +723,7 @@ const AppController = (() => {
   }
   // Preferencia de esta visita: no se guarda en el navegador ni en el servidor.
   function mount(route, {root, service = AppService, authService = AuthService, config = AuthConfig, review = false, onLogout} = {}) {
+    if(authService.session?.role === 'admin') AdminReauthController.install();
     const view = AppViews.frame(root, route, navigation(route, authService.session));
     WelcomeController.offer(root,authService.session,() => personalize());
     const lifetime = new AbortController();
@@ -721,7 +797,7 @@ const AppController = (() => {
       }
       if(route.screen === 'cuenta' && route.detail === 'privacidad') {
         privacy?.dispose();
-        privacy = PrivacyController.mount({root:page,onDeletion:refreshDeletion});
+        privacy = PrivacyController.mount({root:page,onDeletion:accountDeleted});
         return;
       }
       if(route.screen === 'cuenta' && route.detail === 'contrasena') {
@@ -791,20 +867,11 @@ const AppController = (() => {
       draw();
       mostrarAviso('exito', 'Aviso marcado como resuelto.');
     }
-    // Aviso fijo de eliminación pendiente (4.9): sale de la sesión y se vuelve a leer tras cada cambio.
-    const showDeletion = () => view.deletion(AppModel.deletionDate(authService.session));
-    async function refreshDeletion() {
-      await authService.restore();
-      if(!lifetime.signal.aborted) showDeletion();
-    }
-    async function cancelDeletion() {
-      if(!await confirmar(AppViews.confirmaciones.cancelarEliminacion)) return;
-      const response = await request('cancel-deletion');
-      if(lifetime.signal.aborted) return;
-      if(response.status !== 'accepted') { mostrarAviso('error', 'No se pudo cancelar la eliminación. Inténtalo de nuevo.'); return; }
-      await refreshDeletion();
-      mostrarAviso('exito', 'Eliminación cancelada. Tu cuenta se conserva.');
-      if(route.screen === 'cuenta' && route.detail === 'privacidad') await load();
+    // La cuenta ya no existe y el servidor cerró la sesión: se olvida aquí también y se vuelve al inicio público.
+    function accountDeleted() {
+      authService.sessionEnded();
+      CookieController.refresh();
+      location.hash = '#inicio';
     }
     async function logout() {
       if(busy || !await confirmar(AppViews.confirmaciones.cerrarSesion)) return;
@@ -854,7 +921,6 @@ const AppController = (() => {
       if(action === 'close-menu') { setMenuOpen(false,true); return; }
       if(action === 'reload') { await load(); if(!lifetime.signal.aborted) view.focusMain(); return; }
       if(action === 'logout') { await logout(); return; }
-      if(action === 'cancel-deletion') { await cancelDeletion(); return; }
       if(action === 'more') { await loadMore(); return; }
       if(action === 'mark-all-read') { await markAllRead(); return; }
       if(action === 'mark-resolved') await resolveNotice();
@@ -896,7 +962,6 @@ const AppController = (() => {
     root.addEventListener('focusin', keepFieldVisible, {signal:lifetime.signal});
     window.visualViewport?.addEventListener('resize', keepFieldVisible);
     load();
-    showDeletion();
     refreshBell();
     const bellTimer = setInterval(() => { if(!document.hidden) refreshBell(); }, 60000);
     return {update, dispose() {

@@ -42,12 +42,13 @@ const PrivacyData = (() => {
     welcome: values => post('/api/cuenta/bienvenida', values),
     acceptLegal: documents => post('/api/legales/aceptar', {documents}),
     acceptances: () => send('/api/cuenta/aceptaciones'),
-    cancelDeletion: () => post('/api/cuenta/eliminar/cancelar', {}),
-    // Pide borrar la cuenta con la contraseña: una contraseña incorrecta es 400 y se distingue de un fallo del servicio.
+    // Borra la cuenta de inmediato con la contraseña. 200 = ya no existe. Una contraseña incorrecta es 400 y se distingue de un
+    // fallo del servicio; 409 = cuenta con capacidades o con historial administrativo en registros ajenos.
     async requestDeletion(password) {
       try {
         const response = await ChilitoHTTP.request('/api/cuenta/eliminar', {method:'POST', body:{password}});
-        if(response.http === 200) return response.body;
+        if(response.http === 200 && response.body?.status === 'deleted') return {status:'deleted'};
+        if(response.http === 409) return {status:response.body?.code === 'cuenta-con-historial-administrativo' ? 'admin-history' : 'admin-account'};
         return {status:{400:'wrong-password', 401:'unauthenticated', 429:'limited'}[response.http] || 'unavailable'};
       } catch { return {status:'unavailable'}; }
     }
@@ -92,6 +93,9 @@ const AppModel = (() => {
   const supportMailUrl=()=>{const contact=ChilitoHTTP.configuration?.supportContact;
     return typeof contact==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)?'https://mail.google.com/mail/?authuser='+encodeURIComponent(contact):null;};
   const adminHome=session=>allowedAdmin(session)[0]?.id||'huerto';
+  // Quien administra a los administradores o los textos legales nunca queda atrapado en «Aceptar textos»: sin el panel
+  // nadie podría corregir ni publicar los textos. Se le recuerda que los tiene pendientes (aviso y campana).
+  const legalGateExempt=session=>['gestionar_administradores','gestionar_legales'].some(cap=>(session?.capabilities||[]).includes(cap));
   // Panel de cada sesión completa. El servidor sigue decidiendo qué puede abrirse.
   const panelHome=session=>session?.role==='admin'?(session.profile?.mfaRequired?'#cuenta/seguridad':'#'+adminHome(session)):'#huerto';
   const alias=session=>{const value=session?.profile?.profile?.alias;return typeof value==='string'?value.trim():'';};
@@ -121,10 +125,8 @@ const AppModel = (() => {
     if(items.some(item => !item) || new Set(items.map(item => item.id)).size !== items.length) return {status:'error', items:[], page:1, total:0};
     return {status:items.length ? 'ready' : 'empty', items, page:Number.isInteger(data.page) ? data.page : 1, total:Number.isInteger(data.total) ? data.total : items.length};
   }
-  // Fecha en que se borrará la cuenta, si la persona la pidió (la fija el servidor).
-  const deletionDate = session => dateValid(session?.profile?.deletionDate) ? session.profile.deletionDate : null;
   return {
-    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminMenu,adminRedirects,adminHome,panelHome,alias,addressed,gardenGreeting,notices,notice,idValid,deletionDate,NOTICE_FILTERS,
+    destinations,supportMailUrl,adminDestinations,adminCapabilities,allowedAdmin,adminMenu,adminRedirects,adminHome,panelHome,legalGateExempt,alias,addressed,gardenGreeting,notices,notice,idValid,NOTICE_FILTERS,
     isPrivate(screen) { return screen === 'admin' || destinations.some(item=>item.id===screen); },
     profile(data={}) { return data.status==='ready' && text(data.email) && data.verified===true
       ? {email:data.email,verified:true,status:'ready',firstName:(data.profile||data).firstName||'',lastName:(data.profile||data).lastName||'',alias:(data.profile||data).alias||'',greeting:(data.profile||data).greeting||''} : {email:null,verified:null,status:'error'}; },
@@ -145,8 +147,7 @@ const AppService = (() => {
     'mark-read':p => ({path:`/api/avisos/${p.id}/leido`, method:'POST', needsId:true}),
     'mark-resolved':p => ({path:`/api/avisos/${p.id}/resuelto`, method:'POST', needsId:true}),
     'mark-all-read':() => ({path:'/api/avisos/leer-todos', method:'POST'}),
-    counter:() => ({path:'/api/avisos/contador', headers:background}),
-    'cancel-deletion':() => ({path:'/api/cuenta/eliminar/cancelar', method:'POST'})
+    counter:() => ({path:'/api/avisos/contador', headers:background})
   };
   function adapt(action, body) {
     if(action === 'profile') return AppModel.profile(body);
@@ -187,3 +188,68 @@ const AvisoModel = Object.freeze({
     error:Object.freeze({icono:'alert',rol:'alert',ms:0})
   })
 });
+
+// ── Campos ──
+// Reglas de los campos de entrada. Son las mismas que exige el servidor (backend/web/validacion.py), que no confía en el navegador.
+// Cada campo declara la suya con data-campo; los límites salen de data-min/data-max (números) y de minlength/maxlength (texto).
+const Campos = (() => {
+  // Caracteres que se pueden escribir o pegar. Solo filtran los números, los importes, los nombres de persona y la MAC.
+  const PERMITIDOS = Object.freeze({
+    persona:/[\p{L}\p{M} '’-]/u, entero:/[0-9]/, digitos:/[0-9]/, dinero:/[0-9.]/, mac:/[0-9A-Fa-f:]/
+  });
+  const PERSONA = /^\p{L}[\p{L}\p{M} '’-]*$/u, COSA = /^[\p{L}\p{M}\p{N} -]+$/u, IMPORTE = /^[0-9]{1,8}(\.[0-9]{1,2})?$/;
+  // Formatos fijos: el patrón completo y el mensaje.
+  const FORMATOS = Object.freeze({
+    identificador:[/^[A-Za-z0-9][A-Za-z0-9-]{3,31}$/, 'De 4 a 32 letras, números o guiones; empieza con letra o número.'],
+    mac:[/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/, 'Escribe la MAC como AA:BB:CC:DD:EE:FF.'],
+    firmware:[/^[A-Za-z0-9._-]{1,32}$/, 'Solo letras, números, punto, guion y guion bajo.'],
+    version:[/^[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?$/, 'Escribe la versión como 1.2 o 1.2.3.']
+  });
+  // Caracteres de control (sin el salto de línea ni el tabulador de un texto de varias líneas).
+  const CONTROL = /[\p{Cc}\p{Cf}]/gu, CONTROL_MULTILINEA = /(?![\n\t])[\p{Cc}\p{Cf}]/gu, HAY_CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}]/u;
+  // Espacios raros (duro, fino…) pasan a espacio normal y los separadores de línea a salto: el servidor solo admite esos.
+  const espacios = (texto, multilinea) => texto.replace(/(?! )\p{Zs}/gu, ' ').replace(/[\p{Zl}\p{Zp}]/gu, multilinea ? '\n' : ' ');
+  const filtra = regla => Boolean(PERMITIDOS[regla]);
+  // Deja solo los caracteres permitidos (en los demás campos, quita los de control).
+  function filtrar(regla, texto, {multilinea = false} = {}) {
+    const original = String(texto ?? '');
+    const permitido = PERMITIDOS[regla], normal = espacios(original, multilinea);
+    let limpio = permitido ? Array.from(normal).filter(c => permitido.test(c)).join('') : normal.replace(multilinea ? CONTROL_MULTILINEA : CONTROL, '');
+    if(regla === 'dinero') {
+      const [entero, ...resto] = limpio.split('.');
+      limpio = resto.length ? `${entero}.${resto.join('').slice(0, 2)}` : entero;
+    }
+    // «quitado»: se descartó algún carácter (merece aviso); «cambiado»: el texto ya no es el original (también por espacios raros).
+    return {limpio, quitado:limpio !== normal, cambiado:limpio !== original};
+  }
+  // Mensaje de un carácter no permitido (al escribir o pegar).
+  function bloqueo(regla, {min = 0, max = 999} = {}) {
+    return {persona:'Solo letras', entero:`Solo números entre ${min} y ${max}`, digitos:'Solo números', dinero:'Solo números y un punto decimal',
+      mac:'Solo dígitos hexadecimales y dos puntos'}[regla] || 'Se quitaron caracteres no permitidos';
+  }
+  const cuenta = texto => Array.from(texto).length;
+  // ¿Cumple el valor completo su regla? null si sí; si no, el mensaje que va junto al campo.
+  function validar(regla, valor, {min, max, minimo, maximo, requerido = false} = {}) {
+    const texto = String(valor ?? '').trim();
+    if(!texto) return requerido ? 'Este campo es obligatorio' : null;
+    if(regla === 'persona') {
+      const desde = minimo ?? 2, hasta = maximo ?? 60;
+      if(!PERSONA.test(texto)) return 'Solo letras, espacios, apóstrofo y guion';
+      return cuenta(texto) < desde || cuenta(texto) > hasta ? `Escribe entre ${desde} y ${hasta} letras` : null;
+    }
+    if(regla === 'cosa') {
+      if(!COSA.test(texto)) return 'Solo letras, números, espacios y guion';
+      return maximo && cuenta(texto) > maximo ? `Escribe como máximo ${maximo} caracteres` : null;
+    }
+    if(regla === 'entero') {
+      const numero = Number(texto);
+      return /^[0-9]+$/.test(texto) && numero >= (min ?? 0) && numero <= (max ?? 999) ? null : `Solo números entre ${min ?? 0} y ${max ?? 999}`;
+    }
+    if(regla === 'digitos') return /^[0-9]+$/.test(texto) && (!maximo || texto.length <= maximo) ? null : 'Solo números';
+    if(regla === 'dinero') return IMPORTE.test(texto) ? null : 'Escribe un importe como 3500 o 3500.50';
+    if(regla in FORMATOS) return FORMATOS[regla][0].test(texto) ? null : FORMATOS[regla][1];
+    if(regla === 'libre') return HAY_CONTROL.test(texto) ? 'El texto tiene caracteres no permitidos' : maximo && cuenta(texto) > maximo ? `Escribe como máximo ${maximo} caracteres` : null;
+    return null;
+  }
+  return Object.freeze({filtra, filtrar, bloqueo, validar, REGLAS:Object.freeze(['persona', 'cosa', 'entero', 'digitos', 'dinero', 'libre', ...Object.keys(FORMATOS)])});
+})();

@@ -165,24 +165,35 @@ def recorrer():
     c.get('/api/guias')
     ok('actividad real renueva', c.session[sesion.VISTO] >= t)
 
-    alterar(c, **{sesion.VISTO: t - 1801})
+    alterar(c, **{sesion.VISTO: t - 901})
     llave_sesion = c.session.session_key
     r = c.get('/api/cuenta')
-    ok('30 min sin actividad: 401', r.status_code == 401, r.status_code)
+    ok('15 min sin actividad: 401', r.status_code == 401, r.status_code)
     ok('sesión borrada del servidor', not Session.objects.filter(session_key=llave_sesion).exists())
+    r = c.get(P + 'auth/session')
+    ok('tras vencer hay que iniciar sesión de nuevo', r.status_code == 401 and r.json()['meta']['is_authenticated'] is False, r.status_code)
+
+    c, t = sesion_activa()
+    alterar(c, **{sesion.VISTO: t - 840})
+    ok('14 min no vencen a un usuario', c.get('/api/cuenta').status_code == 200)
 
     c, t = sesion_activa()
     alterar(c, **{sesion.INICIO: t - 28801})
     ok('8 h absolutas: 401', c.get('/api/huertos').status_code == 401)
 
     c, t = sesion_activa()
-    alterar(c, **{sesion.VISTO: t - 901})
-    ok('15 min no vencen a un usuario', c.get('/api/cuenta').status_code == 200)
+    alterar(c, **{sesion.VISTO: t - 601})
+    ok('10 min no vencen a un usuario', c.get('/api/cuenta').status_code == 200)
 
     c, t = sesion_activa()
-    alterar(c, **{sesion.VISTO: t - 901})
+    alterar(c, **{sesion.VISTO: t - 540})
     with patch('datos.services.is_admin', return_value=True):
-        ok('15 min vencen a un administrador', c.get('/api/cuenta').status_code == 401)
+        ok('9 min no vencen a un administrador', c.get('/api/cuenta').status_code == 200)
+
+    c, t = sesion_activa()
+    alterar(c, **{sesion.VISTO: t - 601})
+    with patch('datos.services.is_admin', return_value=True):
+        ok('10 min vencen a un administrador', c.get('/api/cuenta').status_code == 401)
 
 
 def main():

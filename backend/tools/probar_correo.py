@@ -20,7 +20,7 @@ problema = delivery_problem(sys.argv[1])
 if problema:
     sys.exit(f'Configuración incompleta: {problema}')
 try:
-    send_mail('Prueba de correo de El Chilito', 'Si lees esto, el correo funciona.', None, [sys.argv[1]])
+    send_mail('Prueba de correo de YouGarden', 'Si lees esto, el correo funciona.', None, [sys.argv[1]])
 except MailUnavailable:
     sys.exit('Gmail rechazó el envío. Revisa la contraseña de aplicación y la verificación en dos pasos.')
 print('SMTP aceptó el mensaje. Revisa la bandeja de entrada y el spam.')

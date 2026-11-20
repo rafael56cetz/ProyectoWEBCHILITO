@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from huerto.models import Huerto
 from huerto.services import ZONA_MERIDA
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
 from . import services as s
@@ -56,8 +57,7 @@ def _like(texto):
 
 
 def _filtros(busqueda, estado, conexion, vendido):
-    if busqueda is not None and (not isinstance(busqueda, str) or len(busqueda) > MAXIMO_BUSQUEDA or not busqueda.isprintable()):
-        raise ValidationError('Búsqueda no válida')
+    busqueda = v.texto_libre(busqueda, 'busqueda', maximo=MAXIMO_BUSQUEDA) or None
     if estado not in (None, *ESTADOS) or conexion not in (None, *CONEXIONES) or vendido not in (None, *VENDIDO):
         raise ValidationError('Filtro no válido')
     donde, parametros = [], []
@@ -89,13 +89,9 @@ def _credencial_nueva():
 @transaction.atomic
 def crear(actor, identificador, mac, firmware):
     usuario = s.require_cap(actor, CAPACIDAD)
-    if not isinstance(identificador, str) or not IDENTIFICADOR.match(identificador):
-        raise ValidationError('Identificador no válido')
-    if not isinstance(mac, str) or not MAC.match(mac):
-        raise ValidationError('MAC no válida')
-    if firmware not in (None, '') and (not isinstance(firmware, str) or not FIRMWARE.match(firmware)):
-        raise ValidationError('Firmware no válido')
-    mac = mac.lower()
+    identificador = v.formato(identificador, 'identifier', IDENTIFICADOR, 'De 4 a 32 letras, números o guiones; empieza con letra o número.')
+    mac = v.formato(mac, 'mac', MAC, 'Escribe la MAC como AA:BB:CC:DD:EE:FF.').lower()
+    firmware = v.formato(firmware, 'firmware', FIRMWARE, 'Solo letras, números, punto, guion y guion bajo (hasta 32).', requerido=False)
     if Dispositivo.objects.filter(identificador__iexact=identificador).exists() or Dispositivo.objects.filter(mac=mac).exists():
         raise ReglaDeNegocio('equipo-duplicado', 'Ya existe un equipo con ese identificador o esa MAC.')
     credencial, hash_credencial = _credencial_nueva()

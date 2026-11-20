@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import Http404
 
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
 from . import services as s
@@ -22,7 +23,6 @@ MODALIDADES = ('domicilio', 'recogida')
 PAGOS = ('pendiente', 'parcial', 'completo')
 ENTREGAS = ('por_entregar', 'entregada')
 ESTADOS = ('vigente', 'cancelada')
-IMPORTE = re.compile(r'^\d{1,8}(\.\d{1,2})?$')
 CORREO = re.compile(r'^[^@\s]+@[^@\s]+$')
 PRECIO_MAXIMO = Decimal('99999999.99')
 MAXIMO_EQUIPOS_VENDIBLES = 500
@@ -52,23 +52,13 @@ def _dinero(valor):
     return f'{valor:.2f}'
 
 
-def _texto(valor, maximo, *, requerido=True, multilinea=False):
-    if valor is None or valor == '':
-        if requerido:
-            raise ValidationError('Texto requerido')
-        return ''
-    if not isinstance(valor, str) or len(valor) > maximo or not (valor.replace('\n', ' ') if multilinea else valor).isprintable():
-        raise ValidationError('Texto no válido')
-    texto = valor.strip()
-    if requerido and not texto:
-        raise ValidationError('Texto requerido')
-    return texto
+def _texto(valor, maximo, campo, *, requerido=True, multilinea=False):
+    return v.texto_libre(valor, campo, maximo=maximo, requerido=requerido, multilinea=multilinea)
 
 
-def _importe(valor):
-    if not isinstance(valor, str) or not IMPORTE.match(valor):
-        raise ValidationError('Importe no válido')
-    return Decimal(valor)
+def _importe(valor, campo):
+    """Dinero: decimal con hasta 2 decimales y ≥ 0 (solo dígitos ASCII)."""
+    return v.dinero(valor, campo)
 
 
 def _dia(valor, *, requerido=True):
@@ -97,7 +87,7 @@ def _filtradas(desde, hasta, pago, entrega, municipio, busqueda, estado):
     desde, hasta = _dia(desde, requerido=False), _dia(hasta, requerido=False)
     if desde and hasta and desde > hasta:
         raise ValidationError('Rango de fechas no válido')
-    busqueda = _texto(busqueda, 60, requerido=False)
+    busqueda = _texto(busqueda, 60, 'busqueda', requerido=False)
     consulta = Venta.objects.select_related('dispositivo')
     for campo, valor in (('vendida_en__gte', desde), ('vendida_en__lte', hasta), ('estado_pago', pago), ('municipio', municipio), ('estado', estado)):
         if valor:
@@ -121,10 +111,13 @@ def listar(actor, desde, hasta, pago, entrega, municipio, busqueda, estado, pagi
 @transaction.atomic
 def registrar(actor, datos):
     usuario = s.require_cap(actor, CAPACIDAD)
-    nombre, correo = _texto(datos.get('buyer'), 120), _texto(datos.get('email'), 254)
-    if not CORREO.match(correo) or datos.get('municipality') not in MUNICIPIOS_YUCATAN or datos.get('method') not in MODALIDADES:
+    nombre = v.nombre_persona(datos.get('buyer'), 'buyer')
+    correo = _texto(datos.get('email'), 254, 'email')
+    if not CORREO.match(correo):
+        raise v.CampoInvalido('email', 'correo-no-valido', 'Escribe un correo como nombre@dominio.com.')
+    if datos.get('municipality') not in MUNICIPIOS_YUCATAN or datos.get('method') not in MODALIDADES:
         raise ValidationError('Datos de la venta no válidos')
-    precio, recibido = _importe(datos.get('price')), _importe(datos.get('received', '0'))
+    precio, recibido = _importe(datos.get('price'), 'price'), _importe(datos.get('received', '0'), 'received')
     vendida, prevista = _dia(datos.get('soldAt')), _dia(datos.get('plannedDelivery'), requerido=False)
     if not 0 < precio <= PRECIO_MAXIMO or recibido > precio or vendida > _hoy() or (prevista and prevista < vendida):
         raise ValidationError('Importes o fechas no válidos')
@@ -136,8 +129,8 @@ def registrar(actor, datos):
     cuenta = get_user_model().objects.filter(email__iexact=correo, is_active=True).first()
     venta = Venta.objects.create(dispositivo=equipo, comprador_nombre=nombre, comprador_correo=correo, comprador_usuario=cuenta,
                                  municipio=datos['municipality'], precio_mxn=precio, importe_recibido_mxn=recibido,
-                                 referencia_pago=_texto(datos.get('reference'), 120, requerido=False), modalidad_entrega=datos['method'],
-                                 vendida_en=vendida, entrega_prevista_en=prevista, nota=_texto(datos.get('note'), 500, requerido=False, multilinea=True),
+                                 referencia_pago=_texto(datos.get('reference'), 120, 'reference', requerido=False), modalidad_entrega=datos['method'],
+                                 vendida_en=vendida, entrega_prevista_en=prevista, nota=_texto(datos.get('note'), 500, 'note', requerido=False, multilinea=True),
                                  registrada_por=usuario)
     s.auditar(usuario, 'registrar_venta', entidad='venta', entidad_id=venta.pk)
     return {'status': 'accepted', 'sale': _dto(Venta.objects.select_related('dispositivo').get(pk=venta.pk))}
@@ -155,11 +148,11 @@ def _venta(venta_id):
 @transaction.atomic
 def registrar_pago(actor, venta_id, importe, referencia):
     usuario = s.require_cap(actor, CAPACIDAD)
-    venta, nuevo = _venta(venta_id), _importe(importe)
+    venta, nuevo = _venta(venta_id), _importe(importe, 'received')
     if nuevo < venta.importe_recibido_mxn or nuevo > venta.precio_mxn:
         raise ReglaDeNegocio('importe-no-valido', 'El importe recibido no puede bajar ni superar el precio.')
     venta.importe_recibido_mxn = nuevo
-    venta.referencia_pago = _texto(referencia, 120, requerido=False) or venta.referencia_pago
+    venta.referencia_pago = _texto(referencia, 120, 'reference', requerido=False) or venta.referencia_pago
     venta.save(update_fields=['importe_recibido_mxn', 'referencia_pago'])
     s.auditar(usuario, 'registrar_pago', entidad='venta', entidad_id=venta.pk)
     return {'status': 'accepted', 'sale': _dto(Venta.objects.select_related('dispositivo').get(pk=venta.pk))}
@@ -183,7 +176,7 @@ def entregar(actor, venta_id, fecha):
 def editar_nota(actor, venta_id, nota):
     usuario = s.require_cap(actor, CAPACIDAD)
     venta = _venta(venta_id)
-    venta.nota = _texto(nota, 500, requerido=False, multilinea=True)
+    venta.nota = _texto(nota, 500, 'note', requerido=False, multilinea=True)
     venta.save(update_fields=['nota'])
     s.auditar(usuario, 'editar_nota_venta', entidad='venta', entidad_id=venta.pk)
     return {'status': 'accepted', 'sale': _dto(Venta.objects.select_related('dispositivo').get(pk=venta.pk))}

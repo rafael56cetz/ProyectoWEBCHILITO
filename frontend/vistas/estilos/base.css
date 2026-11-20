@@ -17,7 +17,7 @@ body:not([data-screen=inicio]){font-family:var(--body)}.private-content{min-widt
 @media(max-width:700px){.hero-content{padding-top:143px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
-/* El Chilito · Propuesta Geist + vidrio · 11 octubre 2026.
+/* YouGarden · Propuesta Geist + vidrio · 11 octubre 2026.
    Refinamiento visual: conserva rutas y funciones del prototipo. */
 
 html {
@@ -784,7 +784,7 @@ html{scroll-padding-top:calc(var(--header-height) + 16px)}
    OFFICIAL LOGO SYSTEM: EL HABANERO TRIANGULAR
    ========================================================================== */
 
-/* Contenedor del Imagotipo (Isotipo + Texto "El Chilito") */
+/* Contenedor del Imagotipo (Isotipo + Texto "YouGarden") */
 .brand-mark {
   display: inline-flex !important;
   align-items: center !important;
@@ -830,7 +830,7 @@ html{scroll-padding-top:calc(var(--header-height) + 16px)}
   flex-shrink: 0;
 }
 
-/* Texto "El Chilito" junto al isotipo */
+/* Texto "YouGarden" junto al isotipo */
 .brand-name {
   font-weight: 600;
   font-size: 1.18rem;

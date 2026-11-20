@@ -394,7 +394,8 @@ class ConcurrenciaReal(Ayudas, TransactionTestCase):
 
 class CargaInicial(TestCase):
     def test_nueve_guias_publicadas_en_orden_y_sin_autor(self):
-        guias_iniciales = GuiaCuidado.objects.order_by('orden')
+        # Las 9 de la carga inicial (orden 10 a 90); web.0007 añadió otras dos con orden 100 y 110.
+        guias_iniciales = GuiaCuidado.objects.filter(orden__lt=100).order_by('orden')
         self.assertEqual([g.pregunta for g in guias_iniciales], PREGUNTAS)
         self.assertEqual({g.estado for g in guias_iniciales}, {'publicada'})
         self.assertFalse(GuiaCuidado.objects.exclude(creado_por=None).exists())
@@ -402,7 +403,12 @@ class CargaInicial(TestCase):
     def test_aclaraciones_y_limites_del_contenido(self):
         textos = {g.clave: g.respuesta for g in GuiaCuidado.objects.all()}
         self.assertIn('declara una acción que ya realizaste físicamente', textos['deposito-recarga'])
-        self.assertIn('El flotador detecta nivel bajo', textos['deposito-recarga'])
+        self.assertIn('El flotador solo detecta nivel bajo', textos['deposito-recarga'])
+        self.assertIn('cada 12 horas', textos['deposito-recarga'])
+        self.assertIn('«Es hora de rellenar tu depósito»', textos['deposito-recarga'])
+        self.assertIn('«Sí, ya lo rellené»', textos['deposito-recarga'])
+        self.assertIn('«No fue una recarga»', textos['deposito-recarga'])
+        self.assertNotIn('Confirmar recarga', textos['deposito-recarga'])
         self.assertIn('Sin lecturas válidas no puede deducirse el estado de la planta', textos['sin-lecturas'])
         for guia in GuiaCuidado.objects.all():
             with self.subTest(guia.clave):

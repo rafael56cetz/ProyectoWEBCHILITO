@@ -23,9 +23,10 @@ const GardenOrderCard = (() => {
     GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(order));
     if(GardenModel.FINAL_ORDER_STATES.includes(order.state)) return {stop() {}};
     const timer = setInterval(async () => {
-      if(Date.now() - started > POLL_LIMIT_MS) { clearInterval(timer); return; }
+      if(signal.aborted || Date.now() - started > POLL_LIMIT_MS) { clearInterval(timer); return; }
       const result = await service.orderState(order.id, signal);
-      if(signal.aborted || result.status !== 'ready') return;
+      if(signal.aborted) { clearInterval(timer); return; }
+      if(result.status !== 'ready') return;
       GardenViews.fillSlot(root, '[data-order-card]', GardenViews.orderCard(result.command));
       if(!GardenModel.FINAL_ORDER_STATES.includes(result.command.state)) return;
       clearInterval(timer);
@@ -80,7 +81,7 @@ const GardenSummaryController = (() => {
     }
     // Tras una orden resuelta se vuelve a leer el huerto (p. ej. el estado de la lámpara) sin borrar la tarjeta.
     async function refreshQuietly(order) {
-      const detail = await service.detail(state.detail.garden.id, life.signal);
+      const detail = await service.detail(state.detail.garden.id, life.signal, {quiet:true});
       if(life.signal.aborted || detail.status !== 'ready') return;
       state = {...state, detail};
       paint();
@@ -88,10 +89,6 @@ const GardenSummaryController = (() => {
     }
     async function confirmOrder(type) {
       if(await confirmar(GardenViews.confirmations[type])) await runOrder({type});
-    }
-    async function recordRefill() {
-      const result = await service.care(state.detail.garden.id, {type:'rellenar_deposito'});
-      mostrarAviso(result.status === 'accepted' ? 'exito' : 'error', result.status === 'accepted' ? 'Recarga registrada.' : GardenViews.errorText(result.code));
     }
     async function showSummaries() {
       const result = await service.summaries(state.detail.garden.id, 1);
@@ -104,8 +101,9 @@ const GardenSummaryController = (() => {
       if(!trigger) return;
       const {gardenAction: action, type} = trigger.dataset;
       if(action === 'reload') await load();
+      else if(!state.gardens?.length) return;     // sin huerto: vista previa de solo lectura
+      else if(action !== 'summaries' && !GardenModel.linked(state.detail?.garden)) return;   // huerto sin vincular
       else if(action === 'summaries') await showSummaries();
-      else if(action === 'refill') await recordRefill();
       else if(action === 'order' && !working) await runOrder({type});
       else if(action === 'order-confirm' && !working) await confirmOrder(type);
     }, {signal:life.signal});
@@ -210,6 +208,8 @@ const PlantController = (() => {
         const {garden} = await GardenContext.resolve({service, route, signal:life.signal});
         if(life.signal.aborted) return;
         if(!garden) { location.hash = '#huerto'; return; }
+        // Huerto sin vincular: sus plantas se ven en Mi huerto, pero su ficha (editar, terminar ciclo, regar) no se abre.
+        if(!GardenModel.linked(garden)) { mostrarAviso('info', 'Vincula el equipo de este huerto para abrir sus plantas.'); location.hash = '#huerto'; return; }
         gardenId = garden.id;
       }
       const result = await service.plant(gardenId, route.extra, range);
@@ -227,6 +227,23 @@ const PlantController = (() => {
       mostrarAviso('exito', 'Planta actualizada.');
       await load();
     }
+    // «Terminar ciclo»: el motivo es obligatorio; se pide confirmación («No se puede deshacer») antes de enviar.
+    let ending = false;
+    async function endCycle(form) {
+      const reason = form.elements.reason.value, note = form.elements.note.value.trim();
+      if(ending) return;
+      if(!reason) { GardenViews.missing(form.elements.reason, 'Elige un motivo'); return; }
+      GardenViews.closeDialog(root);
+      if(!await confirmar(GardenViews.confirmations.endCycle(data.cycle.number, data.plant.name, reason))) return;
+      ending = true;
+      try {
+        const result = await service.endCycle(gardenId, route.extra, {reason, note});
+        if(life.signal.aborted) return;
+        if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code, 'No pudimos terminar el ciclo. Inténtalo de nuevo.')); return; }
+        mostrarAviso('exito', `Empezó el ciclo ${result.cycle.number}. El anterior quedó en «Ciclos anteriores».`);
+        await load();
+      } finally { ending = false; }
+    }
     async function water(form) {
       const result = await service.order(gardenId, {type:'regar', plant:Number(route.extra), duration:Number(form.elements.duration.value)});
       if(life.signal.aborted) return;
@@ -238,11 +255,12 @@ const PlantController = (() => {
     root.addEventListener('click', async event => {
       const trigger = event.target.closest('[data-garden-action]');
       if(!trigger || !data) return;
-      const dialogs = GardenViews.plantDialogs(data.plant, data.hasDevice);
+      const dialogs = GardenViews.plantDialogs(data.plant, data.hasDevice, data.cycle);
       const action = trigger.dataset.gardenAction;
       if(action === 'range') { range = trigger.dataset.range; await load(); }
       else if(action === 'edit') GardenViews.openDialog(root, dialogs.edit);
       else if(action === 'water') GardenViews.openDialog(root, dialogs.water);
+      else if(action === 'end-cycle') GardenViews.openDialog(root, dialogs.endCycle);
       else if(action === 'close-dialog') GardenViews.closeDialog(root);
     }, {signal:life.signal});
     root.addEventListener('submit', event => {
@@ -250,6 +268,7 @@ const PlantController = (() => {
       const kind = event.target.closest('[data-garden-form]')?.dataset.gardenForm;
       if(kind === 'plant') save(event.target);
       else if(kind === 'water') water(event.target);
+      else if(kind === 'end-cycle') endCycle(event.target);
     }, {signal:life.signal});
     load();
     return {redraw() {}, dispose() { tracker?.stop(); life.abort(); }};
@@ -322,29 +341,32 @@ const TechnicalController = (() => {
   function mount({root, route, service}) {
     const life = new AbortController();
     let state = {status:'loading', gardens:[], garden:null, data:null, range:'24h', log:{type:'ordenes', status:'loading', items:[], page:1, total:0}};
-    let tracker = null, serial = 0;
+    let tracker = null, serial = 0, logSerial = 0, dataSerial = 0;
     const paint = () => GardenViews.paint(root, TechnicalViews.screen(state));
     const paintLog = () => GardenViews.fillSlot(root, '[data-log-panel]', TechnicalViews.logPanel(state.log));
-    async function loadLog(type, page) {
-      const result = await service.log(state.garden.id, type, page);
-      if(life.signal.aborted) return;
+    async function loadLog(type, page, {quiet = false} = {}) {
+      const id = ++logSerial;
+      const result = await service.log(state.garden.id, type, page, {quiet});
+      if(life.signal.aborted || id !== logSerial) return;
       state.log = result.status === 'ready' ? {type, status:'ready', items:result.items, page:result.page, total:result.total} : {type, status:'error', items:[], page:1, total:0};
     }
     async function loadData() {
+      const id = ++dataSerial;
       const [telemetry] = await Promise.all([service.telemetry(state.garden.id, state.range, life.signal), loadLog(state.log.type, 1)]);
-      if(life.signal.aborted) return false;
+      if(life.signal.aborted || id !== dataSerial) return null;   // descartada: ya hay una carga más reciente
       if(telemetry.status !== 'ready') return false;
       state.data = telemetry;
       return true;
     }
     async function load() {
       const id = ++serial;
+      tracker?.stop(); tracker = null;
       state = {...state, status:'loading'};
       paint();
       const context = await GardenContext.resolve({service, route, signal:life.signal});
       if(life.signal.aborted || id !== serial) return;
       state = {...state, status:context.ok ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null};
-      if(state.status === 'ready' && state.garden?.device && !await loadData()) state.status = 'error';
+      if(state.status === 'ready' && state.garden?.device && await loadData() === false) state.status = 'error';
       if(life.signal.aborted || id !== serial) return;
       paint();
     }
@@ -356,21 +378,22 @@ const TechnicalController = (() => {
       if(life.signal.aborted) return;
       if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code)); return; }
       tracker?.stop();
-      tracker = GardenOrderCard.track({root, order:result.command, service, signal:life.signal, onResolved:async () => { await loadLog(state.log.type, 1); paintLog(); }});
+      tracker = GardenOrderCard.track({root, order:result.command, service, signal:life.signal, onResolved:async () => { await loadLog(state.log.type, 1, {quiet:true}); paintLog(); }});
     }
     root.addEventListener('click', async event => {
       const trigger = event.target.closest('[data-garden-action]');
       if(!trigger) return;
       const {gardenAction: action, range, log, page} = trigger.dataset;
       if(action === 'reload') await load();
-      else if(action === 'range') { state.range = range; if(await loadData()) paint(); else mostrarAviso('error', 'No se pudo cargar el periodo.'); }
+      else if(!GardenModel.linked(state.garden)) return;   // sin huerto o sin vincular: vista de solo lectura
+      else if(action === 'range') { state.range = range; const loaded = await loadData(); if(loaded) paint(); else if(loaded === false) mostrarAviso('error', 'No se pudo cargar el periodo.'); }
       else if(action === 'log-tab') { await loadLog(log, 1); paintLog(); }
       else if(action === 'log-page') { await loadLog(state.log.type, Number(page)); paintLog(); }
     }, {signal:life.signal});
     root.addEventListener('submit', event => {
       event.preventDefault();
       const form = event.target.closest('[data-garden-form="water"]');
-      if(form) water(form);
+      if(form && GardenModel.linked(state.garden)) water(form);
     }, {signal:life.signal});
     load();
     return {redraw() {}, dispose() { serial++; tracker?.stop(); life.abort(); }};
@@ -381,48 +404,85 @@ const TechnicalController = (() => {
 const CareController = (() => {
   function mount({root, route, service}) {
     const life = new AbortController();
-    let state = {status:'loading', gardens:[], garden:null, plants:[]}, cares = {status:'loading', items:[], page:1, total:0}, filters = {}, dates = null, guides = null, serial = 0;
+    let state = {status:'loading', gardens:[], garden:null, plants:[], tank:null}, cares = {status:'loading', items:[], page:1, total:0}, filters = {}, dates = null, guides = null, serial = 0, caresSerial = 0, working = false;
     async function loadCares(page = 1) {
+      const id = ++caresSerial;
       const result = await service.cares(state.garden.id, filters, page);
-      if(life.signal.aborted) return;
-      cares = result.status === 'ready' ? {status:'ready', items:result.items, page:result.page, total:result.total} : {status:'error', items:[], page:1, total:0};
+      if(life.signal.aborted || id !== caresSerial) return;      // una respuesta vieja no pisa a la más reciente
+      cares = result.status === 'ready' ? {status:'ready', items:result.items, page:result.page, total:result.total, latest:result.latest || null} : {status:'error', items:[], page:1, total:0};
       GardenViews.fillSlot(root, '[data-care-list]', CareViews.list(cares));
+      // Fila de estado (solo lectura): se pinta con esta misma respuesta cuando es el historial sin filtros, página 1.
+      if(cares.page === 1 && !Object.values(filters).some(Boolean)) GardenViews.fillSlot(root, '[data-care-status]', CareViews.status(cares, state.plants));
     }
     async function load() {
       const id = ++serial;
       state = {...state, status:'loading'};
       GardenViews.paint(root, CareViews.screen(state));
       const context = await GardenContext.resolve({service, route, signal:life.signal});
-      const detail = context.garden ? await service.detail(context.garden.id, life.signal) : {status:'ready', plants:[]};
+      const [detail, tank] = context.garden ? await Promise.all([service.detail(context.garden.id, life.signal), service.tank(context.garden.id, life.signal)])
+        : [{status:'ready', plants:[]}, null];
       if(life.signal.aborted || id !== serial) return;
-      state = {status:context.ok && detail.status === 'ready' ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null, plants:detail.plants || []};
+      state = {status:context.ok && detail.status === 'ready' ? 'ready' : 'error', gardens:context.gardens || [], garden:context.garden || null, plants:detail.plants || [],
+        tank:tank?.status === 'ready' ? tank : null};
       GardenViews.paint(root, CareViews.screen(state));
-      if(state.status !== 'ready' || !state.garden) return;
-      dates = DateFilterViews.mount(root, life.signal);
+      if(state.status !== 'ready') return;
       guides = CareGuideUserController.attach({root, signal:life.signal, screen:'mantenimiento', detail:route.detail});
       guides.paint(true);
+      if(!state.garden) return;                   // sin huerto: solo las guías; el resto es vista previa
+      dates = DateFilterViews.mount(root, life.signal);
       await loadCares(1);
+    }
+    async function loadTank() {
+      const tank = await service.tank(state.garden.id, life.signal);
+      if(life.signal.aborted) return;
+      state = {...state, tank:tank.status === 'ready' ? tank : null};
+      CareViews.syncTank(root, state.tank);
     }
     async function register(values) {
       const result = await service.care(state.garden.id, values);
       if(life.signal.aborted) return false;
-      if(result.status !== 'accepted') { mostrarAviso('error', GardenViews.errorText(result.code, 'Revisa los datos del cuidado e inténtalo de nuevo.')); return false; }
+      if(result.status !== 'accepted') {
+        mostrarAviso('error', GardenViews.errorText(result.code, 'Revisa los datos del cuidado e inténtalo de nuevo.'));
+        if(String(result.code).startsWith('deposito-')) await loadTank();
+        return false;
+      }
       mostrarAviso('exito', 'Cuidado registrado.');
-      await loadCares(1);
+      await Promise.all([loadCares(1), values.type === 'rellenar_deposito' ? loadTank() : null]);
       return true;
     }
+    // Sección Depósito: «Ya lo rellené» con la confirmación estándar.
+    async function recordRefill() {
+      if(working || !await confirmar(GardenViews.confirmations.refill) || working) return;
+      working = true;
+      try { await register({type:'rellenar_deposito'}); } finally { working = false; }
+    }
+    // Recarga detectada: confirmarla o descartarla (con confirmación) y volver a pintar la sección y el historial.
+    async function decideRefill(action, detectionId) {
+      const discard = action === 'refill-discard';
+      if(discard && !await confirmar(GardenViews.confirmations['refill-discard'])) return;
+      working = true;
+      try {
+        const result = await (discard ? service.discardRefill(state.garden.id, detectionId) : service.confirmRefill(state.garden.id, detectionId));
+        if(life.signal.aborted) return;
+        const ok = result.status === 'accepted';
+        mostrarAviso(ok ? 'exito' : 'error', ok ? (discard ? 'Listo: no registramos ninguna recarga.' : 'Recarga confirmada.') : GardenViews.errorText(result.code));
+        await Promise.all([loadTank(), ok && !discard ? loadCares(1) : null]);
+      } finally { working = false; }
+    }
     async function submitCare(form) {
-      const invalid = dates.validate();
+      if(working) return;
+      const invalid = dates.validate(form);
       if(invalid) { mostrarAviso('error', invalid); return; }
       const type = form.elements.type.value, plant = form.elements.plant.value, chiles = form.elements.chiles.value;
       const moment = GardenModel.careMoment(form.elements.when.value.trim());
       if(!moment.valid) { mostrarAviso('error', 'Elige un día de hasta 7 días atrás, sin fechas futuras.'); return; }
       if(GardenModel.CARE_NEEDS_PLANT.includes(type) && !plant) { mostrarAviso('error', 'Elige en qué planta lo hiciste.'); return; }
       const values = {type, ...(plant ? {plant:Number(plant)} : {}), ...(type === 'cosecha' && chiles !== '' ? {chiles:Number(chiles)} : {}), ...(moment.at ? {doneAt:moment.at} : {})};
-      if(await register(values)) CareViews.reset(root);
+      working = true;
+      try { if(await register(values)) CareViews.reset(root); } finally { working = false; }
     }
     async function submitFilter(form) {
-      const invalid = dates.validate();
+      const invalid = dates.validate(form);
       if(invalid) { mostrarAviso('error', invalid); return; }
       const values = Object.fromEntries(new FormData(form));
       filters = {planta:values.planta, tipo:values.tipo, desde:values.since, hasta:values.until};
@@ -433,19 +493,27 @@ const CareController = (() => {
       if(!trigger) return;
       const {gardenAction: action, type, page} = trigger.dataset;
       if(action === 'reload') await load();
-      else if(action === 'care-quick' && type === 'rellenar_deposito') await register({type});
-      else if(action === 'care-quick') CareViews.prepare(root, type);
+      else if(!GardenModel.linked(state.garden)) return;   // sin huerto o sin vincular: vista de solo lectura
+      else if(action === 'care-type') CareViews.pickType(root, type);
+      else if(action === 'care-plant') CareViews.pickPlant(root, trigger.dataset.plant);
+      else if(action === 'care-when') CareViews.pickWhen(root, trigger.dataset.when);
+      else if(action === 'care-chiles') CareViews.stepChiles(root, trigger.dataset.step);
+      else if(action === 'care-date') CareViews.openDate(root, trigger.dataset.date);
+      else if(action === 'refill') await recordRefill();
+      else if((action === 'refill-confirm' || action === 'refill-discard') && !working) await decideRefill(action, trigger.dataset.detection);
       else if(action === 'care-page') await loadCares(Number(page));
       else if(action === 'care-clear') { filters = {}; CareViews.resetFilters(root); await loadCares(1); }
     }, {signal:life.signal});
     root.addEventListener('submit', event => {
       event.preventDefault();
       const kind = event.target.closest('[data-garden-form]')?.dataset.gardenForm;
+      if(!GardenModel.linked(state.garden)) return;
       if(kind === 'care') submitCare(event.target);
       else if(kind === 'care-filter') submitFilter(event.target);
     }, {signal:life.signal});
     root.addEventListener('change', event => {
       if(event.target.id === 'care-type') CareViews.adjust(root, event.target.value);
+      else if(event.target.id === 'filter-period') CareViews.period(root, event.target.value);
     }, {signal:life.signal});
     load();
     return {redraw() {}, dispose() { serial++; life.abort(); }};
@@ -522,6 +590,7 @@ const SupportController = (() => {
       const trigger = event.target.closest('[data-garden-action]');
       if(!trigger || working) return;
       const {gardenAction: action, case: caseId} = trigger.dataset;
+      if(action !== 'reload' && !state.data?.hasDevice) return;   // sin huerto o sin vincular: vista de solo lectura
       working = true;
       try {
         if(action === 'reload') await load();
@@ -532,7 +601,7 @@ const SupportController = (() => {
     root.addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.target.closest('[data-garden-form="support"]');
-      if(!form || working || !form.elements.consent.checked) return;
+      if(!form || working || !state.data?.hasDevice || !form.elements.consent.checked) return;
       working = true;
       try { await openCase(form); } finally { working = false; }
     }, {signal:life.signal});

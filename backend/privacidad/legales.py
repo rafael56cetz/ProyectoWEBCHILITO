@@ -15,6 +15,7 @@ from django.http import Http404
 
 from datos import services as s
 from web.respuestas import ReglaDeNegocio
+from web import validacion as v
 
 from .documentos_html import sanear_html
 from .models import DocumentoLegal
@@ -58,13 +59,13 @@ def _tipo(valor):
 
 
 def _datos(version, titulo, contenido):
-    if not isinstance(version, str) or not VERSION.match(version):
-        raise ValidationError('Versión no válida')
-    if not isinstance(titulo, str) or not 1 <= len(titulo.strip()) <= MAXIMO_TITULO or not titulo.isprintable():
-        raise ValidationError('Título no válido')
-    if not isinstance(contenido, str) or not contenido.strip() or len(contenido) > MAXIMO_CONTENIDO or '\x00' in contenido:
-        raise ValidationError('Contenido no válido')
-    return version, titulo.strip(), contenido
+    version = v.formato(version, 'version', VERSION, 'Escribe la versión como 1.2 o 1.2.3.')
+    titulo = v.texto_libre(titulo, 'title', maximo=MAXIMO_TITULO, requerido=True)
+    if not isinstance(contenido, str) or not contenido.strip() or '\x00' in contenido:
+        raise v.CampoInvalido('content', 'campo-requerido', 'Escribe el contenido del documento.')
+    if len(contenido) > MAXIMO_CONTENIDO:
+        raise v.CampoInvalido('content', 'largo-no-valido', f'Escribe como máximo {MAXIMO_CONTENIDO} caracteres.')
+    return version, titulo, contenido
 
 
 def _numerica(version):

@@ -23,7 +23,8 @@ const GardenService = (() => {
   return Object.freeze({
     validId,
     list: signal => call(base, {signal}),
-    detail: (id, signal) => get(garden(id), {signal}),
+    // `quiet`: lectura automática tras un sondeo (orden resuelta). No cuenta como actividad de la sesión.
+    detail: (id, signal, {quiet = false} = {}) => get(garden(id), {signal, headers:quiet ? background : undefined}),
     create: name => post(base, name ? {name} : {}),
     rename: (id, name) => post(garden(id, '/renombrar'), {name}),
     archive: id => post(garden(id, '/archivar')),
@@ -33,12 +34,17 @@ const GardenService = (() => {
     unlink: id => post(garden(id, '/desvincular')),
     plant: (id, number, range = '24h') => get(garden(id, `/plantas/${Number(number)}?rango=${encodeURIComponent(range)}`)),
     editPlant: (id, number, values) => post(garden(id, `/plantas/${Number(number)}`), values),
+    endCycle: (id, number, values) => post(garden(id, `/plantas/${Number(number)}/terminar-ciclo`), values),
     order: (id, values) => post(garden(id, '/comandos'), values),
     orderState: (orderId, signal) => get(validUuid(orderId) ? `/api/comandos/${orderId}` : null, {signal, headers:background}),
     care: (id, values) => post(garden(id, '/cuidados'), values),
     telemetry: (id, range, signal) => get(garden(id, `/telemetria${query({rango:range})}`), {signal}),
-    log: (id, type, page) => get(garden(id, `/bitacora${query({tipo:type, page:Number(page) || 1})}`)),
+    log: (id, type, page, {quiet = false} = {}) => get(garden(id, `/bitacora${query({tipo:type, page:Number(page) || 1})}`), {headers:quiet ? background : undefined}),
     cares: (id, filters, page) => get(garden(id, `/cuidados${query({...filters, page:Number(page) || 1})}`)),
+    tank: (id, signal) => get(garden(id, '/deposito'), {signal}),
+    // Recarga detectada por el flotador: la confirma o la descarta el dueño (solo una pendiente por huerto).
+    confirmRefill: (id, detectionId) => post(validUuid(detectionId) ? garden(id, `/deposito/detecciones/${detectionId}/confirmar`) : null),
+    discardRefill: (id, detectionId) => post(validUuid(detectionId) ? garden(id, `/deposito/detecciones/${detectionId}/descartar`) : null),
     support: (id, {signal, quiet = false} = {}) => get(garden(id, '/soporte'), {signal, headers:quiet ? background : undefined}),
     openCase: (id, values) => post(garden(id, '/soporte'), values),
     revokeCase: caseId => post(validUuid(caseId) ? `/api/soporte/${caseId}/revocar` : null),
@@ -58,6 +64,9 @@ const GardenModel = (() => {
     conexion:'Conexión inestable', otro:'Otro problema'});
   const CARE_NEEDS_PLANT = ['sustrato', 'germinacion', 'cosecha'];
   const CARE_WINDOW_DAYS = 7;
+  // El huerto elegido se recuerda en la visita (también al recargar), para no llevar su número en la dirección.
+  const KEY = 'huerto-elegido';
+  const store = () => { try { return typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { return null; } };
   let chosen = null;
   function ago(value, now = Date.now()) {
     const minutes = Math.floor((now - Date.parse(value)) / 60000);
@@ -65,7 +74,7 @@ const GardenModel = (() => {
     if(minutes < 1) return 'hace menos de 1 min';
     if(minutes < 60) return `hace ${minutes} min`;
     if(minutes < 1440) return `hace ${Math.floor(minutes / 60)} h`;
-    return `hace ${Math.floor(minutes / 1440)} días`;
+    return `hace ${plural(Math.floor(minutes / 1440), 'día', 'días')}`;
   }
   // Línea de estado 3.2: tono y texto salen de la conexión del equipo y de su última lectura.
   function connection(device, now = Date.now()) {
@@ -82,11 +91,13 @@ const GardenModel = (() => {
     const values = plants.map(plant => plant.moisture).filter(Number.isFinite);
     return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
   }
+  // Un huerto está vinculado cuando tiene su equipo. Sin equipo se ve todo, pero no se registra ni se ordena nada.
+  const linked = garden => Boolean(garden?.device);
   function pick(gardens, requested) {
-    return gardens.find(item => item.id === requested) || gardens.find(item => item.id === chosen) || gardens[0] || null;
+    return gardens.find(item => item.id === requested) || gardens.find(item => item.id === (chosen ?? store()?.getItem(KEY))) || gardens[0] || null;
   }
-  const remember = id => { chosen = id; };
-  const reset = () => { chosen = null; };
+  const remember = id => { chosen = id; try { store()?.setItem(KEY, id); } catch {} };
+  const reset = () => { chosen = null; try { store()?.removeItem(KEY); } catch {} };
   // El código se escribe en el equipo como XXXX-XXXX; aquí solo se agrupa para mostrarlo.
   const groupCode = code => typeof code === 'string' ? code.replace(/^(.{4})(.{4})$/, '$1-$2') : '';
   // «Cuándo» del cuidado: vacío o hoy es ahora (lo fija el servidor); otro día, a mediodía. Hasta 7 días atrás y nunca futuro.
@@ -98,7 +109,7 @@ const GardenModel = (() => {
     const [year, month, date] = value.split('-').map(Number);
     return {valid:true, at:new Date(year, month - 1, date, 12).toISOString()};
   }
-  const problems = checks => checks.filter(check => ['falla', 'sin_respuesta'].includes(check.result)).length;
+  const problems = (checks = []) => (checks || []).filter(check => ['falla', 'sin_respuesta'].includes(check.result)).length;
   // Tiempo que queda de una autorización: «18 h 42 min».
   function lapse(until, now = Date.now()) {
     const minutes = Math.max(0, Math.floor((Date.parse(until) - now) / 60000));
@@ -106,8 +117,143 @@ const GardenModel = (() => {
   }
   const remainingSeconds = (expiresAt, now = Date.now()) => Math.max(0, Math.floor((Date.parse(expiresAt) - now) / 1000));
   const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+  // ── Depósito ── Fechas en hora de Mérida y duraciones en días y horas. Las reglas las decide el servidor (tank.canRefill).
+  const MERIDA = 'America/Merida';
+  const plainSpaces = text => String(text).replace(/[\u00a0\u202f]/g, ' ');
+  const meridaKey = value => new Date(value).toLocaleDateString('en-CA', {timeZone:MERIDA});
+  const dayOffset = (value, now) => Math.round((Date.parse(meridaKey(value)) - Date.parse(meridaKey(now))) / 864e5);
+  const meridaTime = value => plainSpaces(new Date(value).toLocaleTimeString('es-MX', {timeZone:MERIDA, hour:'2-digit', minute:'2-digit', hourCycle:'h23'}));
+  // «hoy a las 14:05», «ayer a las 9:30», «mañana a las 8:00» o «el 18 nov a las 14:05».
+  function meridaWhen(value, now = Date.now()) {
+    if(!value || !Number.isFinite(Date.parse(value))) return '';
+    const offset = dayOffset(value, now);
+    const day = {0:'hoy', [-1]:'ayer', 1:'mañana'}[offset]
+      ?? `el ${plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, day:'numeric', month:'short'})).replace(/\./g, '')}`;
+    return `${day} a las ${meridaTime(value)}`;
+  }
+  // «jueves 20 de noviembre».
+  const meridaDay = value => plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, weekday:'long', day:'numeric', month:'long'})).replace(',', '');
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  function humanDuration(seconds) {
+    if(!Number.isFinite(seconds) || seconds < 3600) return 'menos de 1 hora';
+    const hours = Math.floor(seconds / 3600), days = Math.floor(hours / 24), rest = hours % 24;
+    if(!days) return plural(hours, 'hora', 'horas');
+    return rest ? `${plural(days, 'día', 'días')} y ${plural(rest, 'hora', 'horas')}` : plural(days, 'día', 'días');
+  }
+  // Una recarga del equipo confirmada dice quién la confirmó; las automáticas anteriores (sin autor), solo que la detectó el equipo.
+  const DETECTED = item => item.confirmed ? `Detectada por tu equipo · confirmada por ${item.byOwner ? 'ti' : 'soporte'}` : 'Detectada por tu equipo';
+  const REFILL_AUTHOR = refill => refill.origin === 'equipo' ? DETECTED(refill).replace(/^D/, 'd') : refill.byOwner ? 'registrada por ti' : 'registrada por soporte';
+  // Fase de la tarjeta Depósito (la decide el servidor): con_agua | rellenar | detectada | esperando_lectura | sigue_bajo |
+  // sin_lectura | sin_equipo. Sin «state» (respuesta anterior), se deduce lo mínimo y nunca se supone una detección.
+  function tankStage(tank) {
+    if(!tank) return null;
+    if(tank.state) return tank.state;
+    if(!tank.hasDevice) return 'sin_equipo';
+    return tank.hasWater === true ? 'con_agua' : tank.hasWater === false ? 'rellenar' : 'sin_lectura';
+  }
+  // La pregunta «¿Ya lo rellenaste?» solo con una detección real: pendiente, en fase «detectada» y con agua en la última lectura.
+  const pendingRefill = (tank, now = Date.now()) => tank?.pendingRefill && tankStage(tank) === 'detectada' && tank.hasWater === true
+    ? `Detectada ${meridaWhen(tank.pendingRefill.detectedAt, now)}.` : '';
+  // Lo que la tarjeta destaca en cada fase (título, aviso o espera), además del estado y la última recarga.
+  function tankNotice(tank, now = Date.now()) {
+    const stage = tankStage(tank);
+    if(stage === 'rellenar') return {kind:'refill', title:'Es hora de rellenar tu depósito', text:''};
+    if(stage === 'sigue_bajo') return {kind:'warning', title:'', text:'Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.'};
+    if(stage === 'esperando_lectura') return {kind:'waiting', title:'', text:`Registraste la recarga ${tank.lastRefill ? meridaWhen(tank.lastRefill.at, now) : ''}. Esperamos la siguiente lectura de tu equipo.`.replace(' .', '.')};
+    if(stage === 'detectada' && pendingRefill(tank, now)) return {kind:'detected', title:'Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?', text:pendingRefill(tank, now)};
+    return null;
+  }
+  // ¿Se puede registrar una recarga a mano? Si no, el motivo que se muestra junto al botón.
+  function refillState(tank, now = Date.now()) {
+    if(!tank || tank.canRefill) return {allowed:true, reason:''};
+    const last = tank.lastRefill ? meridaWhen(tank.lastRefill.at, now) : '';
+    if(tank.refillBlock === 'espera') {
+      const next = meridaWhen(tank.nextRefillAt, now);
+      return {allowed:false, reason:`Podrás registrar otra recarga ${next.startsWith('hoy ') ? next.slice(4) : next}.`};
+    }
+    if(tank.refillBlock === 'repetida') return {allowed:false, reason:`Ya registraste esta recarga (${last}): no hace falta registrar otra.`};
+    return {allowed:false, reason:last ? `Tu depósito tiene agua desde tu última recarga (${last}).` : 'Tu depósito tiene agua: podrás registrar una recarga cuando el flotador marque nivel bajo.'};
+  }
+  // Textos de la tarjeta Depósito: estado, desde cuándo, última recarga y duración (o frecuencia sin equipo).
+  function tankSummary(tank, now = Date.now()) {
+    const status = tank?.hasWater === true ? 'Con agua' : tank?.hasWater === false ? 'Nivel bajo' : 'Sin lectura';
+    const lowSince = tank?.hasWater === false && tank.lowSince ? meridaWhen(tank.lowSince, now) : '';
+    const lines = [];
+    if(!tank) return {status, tone:'', lowSince, lines};
+    lines.push(tank.lastRefill ? `Última recarga: ${meridaWhen(tank.lastRefill.at, now)} (${REFILL_AUTHOR(tank.lastRefill)})` : 'Aún no hay recargas registradas.');
+    if(tank.hasDevice) {
+      if(Number.isFinite(tank.averageSeconds)) {
+        lines.push(`Tu depósito dura en promedio ${humanDuration(tank.averageSeconds)}.`);
+        if(tank.estimatedLowAt) lines.push(Date.parse(tank.estimatedLowAt) > now
+          ? `Al ritmo actual, necesitará agua alrededor del ${meridaDay(tank.estimatedLowAt)}.` : 'Al ritmo actual, ya podría necesitar agua.');
+      } else lines.push('Te diremos cuánto dura tu depósito cuando se termine esta carga.');
+    } else if(Number.isFinite(tank.refillEverySeconds)) {
+      lines.push(`Sueles rellenar cada ${plural(Math.max(1, Math.round(tank.refillEverySeconds / 86400)), 'día', 'días')}.`);
+    }
+    return {status, tone:tank.hasWater === true ? ' is-ok' : tank.hasWater === false ? ' is-low' : '', lowSince, lines};
+  }
+  // Ficha de Mi huerto: el estado y una sola línea («Dura ~N días», «Última recarga hace …» o la capacidad).
+  function tankBrief(tank, now = Date.now()) {
+    const status = tank?.hasWater === true ? 'Con agua' : tank?.hasWater === false ? 'Nivel bajo' : 'Sin lectura';
+    const tone = tank?.hasWater === true ? ' is-ok' : tank?.hasWater === false ? ' is-low' : '';
+    const every = tank?.hasDevice ? tank.averageSeconds : tank?.refillEverySeconds;
+    const line = Number.isFinite(every) ? `Dura ~${plural(Math.max(1, Math.round(every / 86400)), 'día', 'días')}`
+      : tank?.lastRefill && ago(tank.lastRefill.at, now) ? `Última recarga ${ago(tank.lastRefill.at, now)}` : 'Depósito de 19 L';
+    return {status, tone, line};
+  }
+  // Fecha corta en Mérida para las fichas y el historial: «Hoy, 08:00», «Ayer, 21:00», «Mañana, 07:00» o «14 nov».
+  function meridaShort(value, now = Date.now()) {
+    if(!value || !Number.isFinite(Date.parse(value))) return '';
+    const day = {0:'Hoy', [-1]:'Ayer', 1:'Mañana'}[dayOffset(value, now)];
+    return day ? `${day}, ${meridaTime(value)}` : plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, day:'numeric', month:'short'})).replace(/\./g, '');
+  }
+  // «Necesitará agua»: «Hoy, ~14:00», «Mañana, ~08:00» o el día corto («vie 20 nov»).
+  function meridaForecast(value, now = Date.now()) {
+    const day = {0:'Hoy', 1:'Mañana'}[dayOffset(value, now)];
+    if(day) return `${day}, ~${meridaTime(value)}`;
+    const part = options => plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, ...options})).replace(/\./g, '');
+    return `${part({weekday:'short'})} ${part({day:'numeric'})} ${part({month:'short'})}`;
+  }
+  // Quién registró o detectó una recarga, como icono con su nombre accesible (fichas e historial del depósito).
+  function refillMarks(item) {
+    if(!item) return [];
+    if(item.origin !== 'equipo') return [{icon:'user', label:item.byOwner ? 'Registrada por ti' : 'Registrada por soporte'}];
+    return [{icon:'wifi', label:'Detectada por tu equipo'}, ...(item.confirmed ? [{icon:'check', label:item.byOwner ? 'Confirmada por ti' : 'Confirmada por soporte'}] : [])];
+  }
+  // Las tres fichas de la sección «Depósito de agua»: última recarga, duración y cuándo necesitará agua. Sin datos, «—» y una línea.
+  const AVERAGE_LOADS = 5;
+  function tankFacts(tank, now = Date.now()) {
+    const none = text => ({value:'—', text});
+    const last = tank?.lastRefill ? {value:meridaShort(tank.lastRefill.at, now), text:'', marks:refillMarks(tank.lastRefill)} : {...none('Aún no hay recargas'), marks:[]};
+    if(!tank?.hasDevice) {
+      const every = Number.isFinite(tank?.refillEverySeconds)
+        ? {value:plural(Math.max(1, Math.round(tank.refillEverySeconds / 86400)), 'día', 'días'), text:'entre tus recargas'} : none('Registra dos recargas para calcularlo');
+      return {last, average:{label:'Sueles rellenar cada', ...every}, next:none('Con tu equipo podremos estimarlo')};
+    }
+    const loads = Math.min(Number.isFinite(tank.averageLoads) ? tank.averageLoads : tank.completedLoads || 0, AVERAGE_LOADS);
+    const average = Number.isFinite(tank.averageSeconds)
+      ? {value:humanDuration(tank.averageSeconds), text:loads === 1 ? 'última carga' : `últimas ${loads} cargas`} : none('Lo sabremos al terminar una carga');
+    const next = tank.hasWater === false ? {value:'Ahora', text:'El flotador marca nivel bajo'}
+      : tank.estimatedLowAt && Date.parse(tank.estimatedLowAt) > now ? {value:meridaForecast(tank.estimatedLowAt, now), text:'al ritmo actual'}
+      : tank.estimatedLowAt ? {value:'Pronto', text:'Al ritmo actual ya podría necesitarla'} : none('Aún no hay datos suficientes');
+    return {last, average:{label:'Dura en promedio', ...average}, next};
+  }
+  // Ciclos de la planta: motivos de fin y «18 nov 2026 – 3 dic 2026» (en curso: «desde el 18 nov 2026»).
+  const CYCLE_REASONS = Object.freeze({cosecha_terminada:'Terminó la cosecha', planta_murio:'La planta murió', no_germino:'No germinó',
+    pudricion_plaga:'Pudrición o plaga', otro:'Otro motivo'});
+  const meridaDate = value => plainSpaces(new Date(value).toLocaleDateString('es-MX', {timeZone:MERIDA, day:'numeric', month:'short', year:'numeric'})).replace(/\./g, '');
+  function cycleRange(cycle) {
+    if(!cycle?.startedAt || !Number.isFinite(Date.parse(cycle.startedAt))) return '';
+    return cycle.endedAt ? `${meridaDate(cycle.startedAt)} – ${meridaDate(cycle.endedAt)}` : `desde el ${meridaDate(cycle.startedAt)}`;
+  }
+  // «Ciclo 2 · 18 nov 2026 – 3 dic 2026 · No germinó».
+  const cycleTitle = cycle => [`Ciclo ${cycle.number}`, cycleRange(cycle), CYCLE_REASONS[cycle.reason] || ''].filter(Boolean).join(' · ');
+  // Algo por hacer en Mantenimiento: nivel bajo sin recarga registrada o una recarga detectada por confirmar.
+  const tankPending = (tank, now = Date.now()) => tankStage(tank) === 'rellenar' || Boolean(pendingRefill(tank, now));
   return Object.freeze({FINAL_ORDER_STATES, WATERING_SECONDS, STAGES, RANGES, INCIDENTS, CARE_NEEDS_PLANT, ago, connection, averageMoisture,
-    pick, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock});
+    pick, linked, remember, reset, groupCode, careMoment, problems, lapse, remainingSeconds, clock,
+    CYCLE_REASONS, cycleRange, cycleTitle, meridaWhen, meridaDay, meridaShort, meridaForecast, refillMarks, tankFacts, humanDuration, refillState, tankSummary, tankBrief, tankPending, tankStage, tankNotice, pendingRefill, detectedLabel:DETECTED});
 })();
 
 // ── Guias ──

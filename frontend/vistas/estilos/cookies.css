@@ -104,3 +104,7 @@ html body .cookies-cerrar:hover { background:rgba(255,255,255,.12); }
   .cookies-interruptor input:checked + span { background:Highlight;border-color:Highlight; }
   .cookies-interruptor input:checked + span::after { background:Canvas; }
 }
+
+/* Sin política de cookies publicada no hay elección que configurar (ni su hueco en la lista). */
+[data-cookies-sin-politica] [data-cookie-settings],
+[data-cookies-sin-politica] li:has(> [data-cookie-settings]) { display:none; }

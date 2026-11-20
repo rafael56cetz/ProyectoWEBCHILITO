@@ -10,8 +10,10 @@ const CookieController = (() => {
   let pending = null, saving = null, loadId = 0, failed = false;
   const notify = () => listeners.forEach(listener => listener());
   // Sin respuesta del servidor la decisión es desconocida: se vuelve a preguntar, nunca se presume.
+  // Sin política de cookies publicada no hay nada que decidir: el aviso y «Configurar cookies» esperan a que se publique.
   function paint() {
-    view.banner(failed || (state !== null && !state.decided));
+    if(state !== null) view.settings(state.cookiesVersion != null);
+    view.banner(failed || (state !== null && !state.decided && state.cookiesVersion != null));
   }
   async function save(statistics) {
     const id = loadId;

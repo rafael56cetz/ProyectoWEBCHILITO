@@ -16,6 +16,7 @@ from django.http import Http404
 from django.utils import timezone
 
 from huerto.models import Huerto
+from web import validacion as v
 from web.respuestas import ReglaDeNegocio
 
 from . import avisos_correo
@@ -39,8 +40,6 @@ ACCIONES_SOPORTE = ('lectura_inmediata', 'autodiagnostico', 'probar_bomba', 'lam
 SEGUNDOS_PRUEBA_BOMBA = (1, 5)
 EVENTOS_DE_SESION = timedelta(hours=24)
 MAXIMO_LISTA_SESION = 50
-# La base anonimiza a los 15 días de la solicitud; aquí solo se usa para mostrar la fecha.
-DIAS_PARA_ELIMINAR = 15
 # Orden de las revisiones del autodiagnóstico en pantalla (3.7).
 COMPONENTES = ('conexion', 'sensor_ambiente', 'sensor_luz', 'sensor_sustrato_1', 'sensor_sustrato_2', 'sensor_sustrato_3',
                'flotador', 'bomba_1', 'bomba_2', 'bomba_3', 'lampara', 'ventilador')
@@ -50,6 +49,22 @@ FILTROS_AVISOS = {'todos': None, 'no_leidos': None, 'equipo': ('dispositivo', 'v
 
 class FactorRequerido(PermissionDenied):
     """Administrador sin TOTP ni WebAuthn: puede entrar a su cuenta, no al panel."""
+
+
+class HuertoRequerido(PermissionDenied):
+    """Cuenta sin huerto activo: puede ver las secciones y usar su cuenta, pero no escribir en el huerto."""
+
+    code = 'huerto-requerido'
+    message = 'Primero crea tu huerto y vincula tu equipo. Mientras tanto, puedes recorrer las secciones.'
+
+
+class HuertoSinVincular(PermissionDenied):
+    """El huerto elegido existe pero no tiene equipo vinculado: se ve todo, pero no se registra ni se ordena nada.
+    Cada huerto es independiente: tener otro huerto vinculado no habilita este."""
+
+    code = 'huerto-sin-vincular'
+    message = ('Vincula el equipo de este huerto para registrar cuidados, editar plantas o dar órdenes. '
+               'Mientras tanto puedes ver toda su información.')
 
 
 class RegistroDesactualizado(Exception):
@@ -90,8 +105,6 @@ def session_contract(actor):
     caps = sorted(capabilities(user))
     return {'status': 'authenticated', 'sessionConfirmed': True, 'role': 'admin' if caps else 'user',
             'capabilities': caps, 'mfaRequired': bool(caps) and not strong_factor(user),
-            'deletionRequestedAt': user.anonimizacion_solicitada_en.isoformat() if user.anonimizacion_solicitada_en else None,
-            'deletionDate': (user.anonimizacion_solicitada_en + timedelta(days=DIAS_PARA_ELIMINAR)).isoformat() if user.anonimizacion_solicitada_en else None,
             'profile': {'id': str(user.pk), 'email': user.email, 'verified': True, 'status': 'ready',
                         'firstName': user.first_name, 'lastName': user.last_name, 'alias': user.alias,
                         'greeting': user.nombre_presentacion, 'welcomePending': user.bienvenida_atendida_en is None}}
@@ -107,6 +120,15 @@ def aceptaciones_pendientes(actor):
 
 def has_garden(actor):
     return Huerto.objects.filter(propietario=identity(actor), estado='activo').exists()
+
+
+def huerto_vinculado(actor, huerto_id):
+    """True si el huerto activo de la cuenta tiene equipo; False si no lo tiene; None si no es un huerto activo propio
+    (así la ruta sigue respondiendo 404, igual que un huerto ajeno o inexistente)."""
+    huerto = Huerto.objects.filter(pk=huerto_id, propietario_id=actor.pk, estado='activo').first()
+    if huerto is None:
+        return None
+    return Dispositivo.objects.filter(huerto_id=huerto.pk).exists()
 
 
 def huerto_propio(actor, huerto_id, *, bloquear=False):
@@ -237,11 +259,7 @@ def soporte(actor, huerto_id):
 
 
 def _nota_de_caso(nota):
-    if nota is None:
-        return ''
-    if not isinstance(nota, str) or len(nota) > 500 or not nota.replace('\n', ' ').isprintable():
-        raise ValidationError('Nota no válida')
-    return nota.strip()
+    return v.texto_libre(nota, 'note', maximo=500, multilinea=True)
 
 
 def _diagnostico_adjunto(actor, huerto, valor):
@@ -467,8 +485,8 @@ def _orden_de_soporte_valida(tipo, planta, duracion):
         raise ValidationError('Orden no válida')
     if tipo == 'probar_bomba':
         minimo, maximo = SEGUNDOS_PRUEBA_BOMBA
-        if type(planta) is not int or not 1 <= planta <= 3 or type(duracion) is not int or not minimo <= duracion <= maximo:
-            raise ValidationError('Planta o duración no válidas')
+        v.entero(planta, 'plant', 1, 3)
+        v.entero(duracion, 'duration', minimo, maximo)
     elif planta is not None or duracion is not None:
         raise ValidationError('Datos que sobran')
 
@@ -537,10 +555,24 @@ def resolver_caso(actor, caso_id, resultado, nota):
 
 
 # Avisos: la misma tabla sirve a personas y administradores; cada quien ve solo los suyos.
+# Los avisos del depósito (nivel bajo y recarga detectada) los escribe la base con enlace a #huerto; lo que hay que hacer
+# vive en Mantenimiento, así que la API los lleva allí (también los avisos ya guardados).
+AVISOS_DEL_DEPOSITO = frozenset({'Tu depósito necesita agua', 'Confirma la recarga de tu depósito'})
+
+
+def _enlace_aviso(aviso):
+    if aviso.origen == 'dispositivo' and aviso.titulo in AVISOS_DEL_DEPOSITO and aviso.enlace == '#huerto':
+        return '#mantenimiento'
+    # Las recomendaciones de una planta (web.0007) guardan «#huerto/plantas/N»; el huerto viaja en ?h= (la base no admite «?»).
+    if aviso.enlace.startswith('#huerto/plantas/') and aviso.huerto_id:
+        return f'{aviso.enlace}?h={aviso.huerto_id}'
+    return aviso.enlace or None
+
+
 def _aviso_dto(aviso):
     return {'id': str(aviso.pk), 'origin': aviso.origen, 'severity': aviso.severidad, 'title': aviso.titulo, 'text': aviso.texto,
             'garden': aviso.huerto.nombre if aviso.huerto_id else None, 'gardenId': str(aviso.huerto_id) if aviso.huerto_id else None,
-            'link': aviso.enlace or None, 'createdAt': _fecha(aviso.creada_en), 'read': aviso.leida_en is not None,
+            'link': _enlace_aviso(aviso), 'createdAt': _fecha(aviso.creada_en), 'read': aviso.leida_en is not None,
             'resolvedAt': _fecha(aviso.resuelta_en),
             'resolvable': aviso.origen == 'dispositivo' and aviso.severidad == 'critico' and aviso.resuelta_en is None}
 

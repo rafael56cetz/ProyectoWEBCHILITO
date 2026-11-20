@@ -19,7 +19,12 @@ Object.assign(icons, {
  book:'<path d="M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2Z"/><path d="M12 6v14"/>',
  document:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
  clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1Z"/><path d="m9 13 2 2 4-4"/>',
- users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a6.5 6.5 0 0 1 13 0v1M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 5.8V20"/>'
+ users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a6.5 6.5 0 0 1 13 0v1M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 5.8V20"/>',
+ layers:'<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
+ sprout:'<path d="M12 21v-9"/><path d="M12 12c0-4-3-6-7-6 0 4 3 6 7 6Z"/><path d="M12 14c0-4 3-7 7-7 0 4-3 7-7 7Z"/>',
+ eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+ pencil:'<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+ minus:'<path d="M5 12h14"/>'
 });
 const icon=name=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.leaf}</svg>`;
 const iconEye=`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
@@ -113,6 +118,37 @@ const confirmar = (() => {
   };
 })();
 
+// Contraseña para confirmar una acción crítica (M-2). Resuelve la contraseña escrita, o null si se cancela.
+const pedirContrasena = (() => {
+  let dialogo = null;
+  function crear() {
+    dialogo = document.createElement('dialog');
+    dialogo.className = 'bento-panel app-dialog confirmar-dialogo';
+    dialogo.setAttribute('aria-labelledby','reautenticar-titulo');
+    dialogo.innerHTML = '<form method="dialog" class="dialog-form" novalidate><h2 id="reautenticar-titulo">Confirma tu contraseña</h2><p id="reautenticar-texto">Esta acción es sensible. Escribe tu contraseña para continuar; no te la volveremos a pedir durante 5 minutos.</p>'
+      + '<label for="reautenticar-clave">Contraseña</label><input id="reautenticar-clave" name="password" type="password" autocomplete="current-password" maxlength="256" required>'
+      + '<div class="app-dialog-actions"><button class="button btn-liquid-light" type="button" data-reautenticar="cancelar">Cancelar</button><button class="button btn-liquid-brand" type="submit" value="aceptar">Confirmar</button></div></form>';
+    dialogo.addEventListener('click',evento => { if(evento.target.closest('[data-reautenticar="cancelar"]')) dialogo.close('cancelar'); });
+    document.body.append(dialogo);
+  }
+  return function pedirContrasena() {
+    if(!dialogo) crear();
+    const previo = document.activeElement, campo = dialogo.querySelector('#reautenticar-clave');
+    campo.value = '';
+    return new Promise(resolver => {
+      dialogo.addEventListener('close',() => {
+        const clave = dialogo.returnValue === 'aceptar' && campo.value ? campo.value : null;
+        campo.value = '';
+        resolver(clave);
+        previo?.focus({preventScroll:true});
+      },{once:true});
+      dialogo.returnValue = '';
+      dialogo.showModal();
+      campo.focus();
+    });
+  };
+})();
+
 // ── Panel ──
 const AppViews = (() => {
   const date = value => `<time${value && Number.isFinite(new Date(value).getTime()) ? ` datetime="${escaparHTML(new Date(value).toISOString())}"` : ''}>${escaparHTML(AppModel.date(value))}</time>`;
@@ -135,8 +171,8 @@ const AppViews = (() => {
     const noticesLink=`<a class="button compact btn-liquid-nav account-icon-link bell-link" href="#avisos" aria-label="Avisos" title="Avisos"${selected==='avisos'?' aria-current="page"':''}>${icon('bell')}<span class="bell-badge" data-bell-count hidden></span></a>`;
     const menuButton=`<button class="button compact btn-liquid-nav private-menu-toggle" type="button" data-app-action="toggle-menu" aria-controls="garden-navigation" aria-expanded="false" aria-label="Abrir menú de navegación"><span class="private-menu-open-icon">${icon('menu')}</span><span class="private-menu-close-icon">${icon('close')}</span><span>Menú</span></button>`;
     // Sin barra superior: logotipo y botón de ocultar viven en el panel; perfil, avisos (solo usuario) y menú flotan arriba.
-    const topbar=`<div class="private-topbar"><div class="topbar-start">${brand('#inicio','El Chilito, inicio','topbar-brand')}</div><div class="topbar-actions">${accountLink}${noticesLink}${menuButton}</div></div>`;
-    const sidebarTop=`<div class="sidebar-top">${brand('#inicio','El Chilito, inicio','sidebar-brand')}</div><a class="sidebar-home" href="#inicio">${icon('home')}<span>Ver página principal</span></a>${isAdmin?'<p class="private-role-label">Administración</p>':''}`;
+    const topbar=`<div class="private-topbar"><div class="topbar-start">${brand('#inicio','YouGarden, inicio','topbar-brand')}</div><div class="topbar-actions">${accountLink}${noticesLink}${menuButton}</div></div>`;
+    const sidebarTop=`<div class="sidebar-top">${brand('#inicio','YouGarden, inicio','sidebar-brand')}</div><a class="sidebar-home" href="#inicio">${icon('home')}<span>Ver página principal</span></a>${isAdmin?'<p class="private-role-label">Administración</p>':''}`;
     // Enlace externo: abre otra pestaña y el panel sigue abierto. Si no hay correo configurado, no se muestra.
     const mailLink=()=>{const url=AppModel.supportMailUrl();return url?`<a class="private-mail-link" href="${escaparHTML(url)}" target="_blank" rel="noopener noreferrer">${icon('mail')}<span>Abrir correo de soporte</span>${icon('external')}<span class="sr-only">(se abre en otra pestaña)</span></a>`:'';};
     // Administración: los grupos del menú llegan ya filtrados por capacidad; el correo de soporte va antes de Mi cuenta.
@@ -144,7 +180,7 @@ const AppViews = (() => {
     const navigation=isAdmin?groups.map(groupHtml).join('')+mailLink()+link(account):links.map(link).join('');
     // La página principal ya tiene acceso fijo bajo el logotipo, también en móvil.
     const menuFooter=`<div class="private-menu-footer"><button class="button private-menu-logout" type="button" data-app-action="logout">${icon('logout')}<span>Cerrar sesión</span></button></div>`;
-    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="deletion-banner" class="deletion-banner" data-deletion-banner hidden></div><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
+    return `<div class="private-layout"><aside class="sidebar" id="garden-navigation">${sidebarTop}<nav class="private-nav" aria-label="Navegación de la aplicación">${navigation}</nav>${menuFooter}</aside><div class="private-content">${topbar}<main class="dashboard container" id="contenido" tabindex="-1"><div id="app-feedback" role="status" tabindex="-1" hidden></div><div id="app-page"></div></main></div></div><div class="private-menu-shade" data-app-action="close-menu" aria-hidden="true" hidden></div>`;
   }
   const FILTERS = [['todos', 'Todos'], ['no_leidos', 'No leídos'], ['equipo', 'Mi equipo'], ['ia', 'IA'], ['soporte', 'Soporte'], ['legales', 'Legales']];
   const SEVERITIES = {critico:['Crítico', 'rojo'], advertencia:['Advertencia', 'ambar'], informacion:['Información', 'gris']};
@@ -194,9 +230,6 @@ const AppViews = (() => {
       bell(unread){const badge=root.querySelector('[data-bell-count]'),link=badge?.closest('a');if(!badge)return;
         badge.hidden=!unread;badge.textContent=unread>9?'9+':String(unread||'');
         link.setAttribute('aria-label',unread?`Avisos, ${unread} sin leer`:'Avisos');},
-      // Aviso fijo mientras haya una eliminación de cuenta pendiente (4.9).
-      deletion(deletionDate){const banner=root.querySelector('[data-deletion-banner]');banner.hidden=!deletionDate;
-        banner.innerHTML=deletionDate?`<p>Tu cuenta se eliminará el ${date(deletionDate)}.</p><button class="button btn-liquid-light compact" type="button" data-app-action="cancel-deletion">Cancelar eliminación</button>`:'';},
       pageBusy(on){page.inert=on;if(on)page.setAttribute('aria-busy','true');else page.removeAttribute('aria-busy');},
       // Devuelve el contenedor del perfil cuando la cuenta está lista; el controlador monta su formulario.
       draw(screen,data,filter,detail,alias){
@@ -232,8 +265,7 @@ const AppViews = (() => {
         if(focused.getBoundingClientRect().bottom>available-16)focused.scrollIntoView({block:'center'});
       }};
   }
-  const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},
-    cancelarEliminacion:{titulo:'¿Cancelar la eliminación de tu cuenta?',texto:'Tu cuenta y tus datos se conservarán.',accion:'Cancelar eliminación'}};
+  const confirmaciones = {cerrarSesion:{titulo:'¿Cerrar sesión?',texto:'Tendrás que iniciar sesión de nuevo para entrar a tu cuenta.',accion:'Cerrar sesión'},};
   return {shell,frame,heading,state,empty,conFolio,kpi,date,notices,account,accountGreeting,accountTabs,confirmaciones
   };
 })();
@@ -400,6 +432,12 @@ const DateFilterViews = (() => {
 // Piezas que comparten las pantallas de administración: tabla, paginación visible, pestañas, calendario y diálogo.
 const AdminTableViews = (() => {
   const PAGE_SIZE = 25;
+  // Guarda un archivo descargado con fetch (exportaciones): enlace temporal a un objeto Blob, que se libera al terminar.
+  function saveFile(blob, name) {
+    const url = URL.createObjectURL(blob), link = Object.assign(document.createElement('a'), {href:url, download:name});
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
   const button = (action, label, kind = 'light', attrs = '') => `<button type="button" class="button btn-liquid-${kind}" data-admin-action="${action}" ${attrs}>${label}</button>`;
   // Cada celda lleva el nombre de su columna (la vista en tarjetas del móvil lo muestra) y la primera, su texto completo como título.
   function cells(row, heads) {
@@ -426,6 +464,14 @@ const AdminTableViews = (() => {
     <button type="button" data-date-open="${name}" data-date-label="${label}" aria-label="Abrir calendario: ${label}" aria-controls="maint-calendar" aria-expanded="false" aria-haspopup="dialog">${icon('calendar')}</button></div></div>`;
   const day = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString('es-MX', {dateStyle:'medium'}) : '—';
   const merida = value => new Date(value).toLocaleString('es-MX', {timeZone:'America/Merida', dateStyle:'medium', timeStyle:'short'});
+  // Fecha y hora completas de Mérida, sin abreviar: «20/11/2026 00:15:32».
+  const EXACT = new Intl.DateTimeFormat('es-MX', {timeZone:'America/Merida', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'});
+  function exact(value) {
+    const date = new Date(value);
+    if(!value || Number.isNaN(date.getTime())) return '—';
+    const part = Object.fromEntries(EXACT.formatToParts(date).map(({type, value: text}) => [type, text]));
+    return `${part.day}/${part.month}/${part.year} ${part.hour}:${part.minute}:${part.second}`;
+  }
   const money = value => new Intl.NumberFormat('es-MX', {style:'currency', currency:'MXN'}).format(Number(value));
   function open(root, html) {
     const box = root.querySelector('.admin-dialog');
@@ -435,5 +481,141 @@ const AdminTableViews = (() => {
   }
   function dismiss(root) { const box = root.querySelector('.admin-dialog'); if(box?.open) box.close(); }
   const paint = (root, html) => { root.innerHTML = html; };
-  return Object.freeze({button, table, pager, tabs, status, dialog, dateField, day, merida, money, open, dismiss, paint});
+  return Object.freeze({button, table, pager, tabs, status, dialog, dateField, day, merida, exact, money, open, dismiss, paint, saveFile});
+})();
+
+// ── Campos ──
+// Filtro de teclado y pegado, y mensajes en línea, para todo campo con data-campo (reglas en Campos, modelos/comun.js).
+// Números, importes, nombres de persona y MAC no admiten caracteres no válidos; los demás muestran el mensaje al salir
+// del campo o al enviar. En cualquier texto se quitan los caracteres de control. El servidor vuelve a validar todo.
+const CamposVista = (() => {
+  const LIBRES = 'input:not([type]),input[type=text],input[type=search],input[type=email],input[type=url],textarea';
+  const ENVOLTURAS = '.care-stepper,.maint-date-field,.password-input-group,.key-form-row';
+  const numero = valor => valor === null || valor === undefined || valor === '' ? undefined : Number(valor);
+  const reglaDe = el => el?.dataset?.campo || (el?.matches?.(LIBRES) ? 'libre' : null);
+  const limites = el => ({min:numero(el.dataset?.min), max:numero(el.dataset?.max), minimo:numero(el.getAttribute('minlength')),
+    maximo:numero(el.getAttribute('maxlength')), requerido:Boolean(el.required)});
+  const multilinea = el => el.tagName === 'TEXTAREA';
+  const activo = el => el && !el.readOnly && !el.disabled;
+  let ultimoFormulario = null;
+
+  // Mensaje en línea debajo del campo (o de su envoltura), unido con aria-describedby y aria-invalid.
+  function aviso(el, mensaje, tipo = 'regla') {
+    const id = `${el.id || el.name || 'campo'}-aviso`;
+    const caja = el.closest?.(ENVOLTURAS) || el;
+    const siguiente = caja.nextElementSibling;
+    let nota = siguiente?.classList?.contains('campo-aviso') ? siguiente : null;
+    const descritos = (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(item => item && item !== id);
+    if(!mensaje) {
+      nota?.remove();
+      el.removeAttribute('aria-invalid');
+      if(descritos.length) el.setAttribute('aria-describedby', descritos.join(' ')); else el.removeAttribute('aria-describedby');
+      return;
+    }
+    if(!nota) {
+      nota = document.createElement('p');
+      nota.className = 'campo-aviso';
+      nota.id = id;
+      nota.setAttribute('aria-live', 'polite');
+      caja.insertAdjacentElement('afterend', nota);
+    }
+    nota.dataset.tipo = tipo;
+    nota.textContent = mensaje;
+    el.setAttribute('aria-invalid', 'true');
+    el.setAttribute('aria-describedby', [...descritos, id].join(' '));
+  }
+  const tipoDeAviso = el => { const caja = el.closest?.(ENVOLTURAS) || el; return caja.nextElementSibling?.classList?.contains('campo-aviso') ? caja.nextElementSibling.dataset.tipo : null; };
+
+  // Inserta texto donde está el cursor (respeta maxlength) y avisa con «input», como si se hubiera escrito.
+  function insertar(el, texto) {
+    const maximo = numero(el.getAttribute('maxlength'));
+    const inicio = el.selectionStart ?? el.value.length, fin = el.selectionEnd ?? inicio;
+    const cabe = maximo === undefined ? texto : Array.from(texto).slice(0, Math.max(0, maximo - (el.value.length - (fin - inicio)))).join('');
+    if(!cabe) return;
+    try { el.setRangeText(cabe, inicio, fin, 'end'); } catch { el.value = el.value.slice(0, inicio) + cabe + el.value.slice(fin); }
+    el.dispatchEvent(new Event('input', {bubbles:true}));
+  }
+
+  // Al escribir: un carácter que dejaría el campo con algo no permitido no entra y se dice por qué.
+  function alEscribir(event) {
+    const el = event.target, regla = el?.dataset?.campo;
+    if(!activo(el) || !Campos.filtra(regla) || typeof event.data !== 'string' || !/^insert(Text|ReplacementText)$/.test(event.inputType)) return;
+    const inicio = el.selectionStart ?? el.value.length, fin = el.selectionEnd ?? inicio;
+    const nuevo = el.value.slice(0, inicio) + event.data + el.value.slice(fin);
+    if(!Campos.filtrar(regla, nuevo).cambiado) return;
+    event.preventDefault();
+    aviso(el, Campos.bloqueo(regla, limites(el)), 'bloqueo');
+  }
+  // Al pegar o soltar texto: entra solo la parte válida; si se quitó algo, se dice.
+  function alPegar(event) {
+    const el = event.target, regla = reglaDe(el);
+    if(!activo(el) || !regla) return;
+    const datos = (event.clipboardData || event.dataTransfer)?.getData('text') ?? '';
+    const resultado = Campos.filtrar(regla, datos, {multilinea:multilinea(el)});
+    if(!resultado.cambiado) return;
+    event.preventDefault();
+    if(el.type === 'number') { if(resultado.limpio === datos) insertar(el, datos); }
+    else insertar(el, resultado.limpio);
+    if(resultado.quitado) aviso(el, Campos.bloqueo(regla, limites(el)), 'bloqueo');
+  }
+  // Respaldo (autocompletar, teclados en pantalla, IME): limpia lo que haya entrado y quita el aviso cuando ya no aplica.
+  function alCambiar(event) {
+    const el = event.target, regla = reglaDe(el);
+    if(!activo(el) || !regla || el.type === 'number') return;
+    const resultado = Campos.filtrar(regla, el.value, {multilinea:multilinea(el)});
+    if(resultado.cambiado) {
+      const cursor = Math.max(0, (el.selectionStart ?? el.value.length) - (el.value.length - resultado.limpio.length));
+      el.value = resultado.limpio;
+      try { el.setSelectionRange(cursor, cursor); } catch { /* sin cursor (email, number) */ }
+      if(resultado.quitado) { aviso(el, Campos.bloqueo(regla, limites(el)), 'bloqueo'); return; }
+    }
+    const tipo = tipoDeAviso(el);
+    if(tipo === 'bloqueo' || (tipo && !Campos.validar(regla, el.value, limites(el)))) aviso(el, null);
+  }
+  // Al salir del campo: el valor completo con su regla (rango, largo, formato).
+  function alSalir(event) {
+    const el = event.target, regla = el?.dataset?.campo;
+    if(!activo(el) || !regla) return;
+    // Vacío no se marca al salir (el obligatorio se revisa al enviar).
+    aviso(el, el.value.trim() ? Campos.validar(regla, el.value, limites(el)) : null);
+  }
+  // Antes de que el controlador envíe: si un campo visible no cumple, no se envía y el foco va al primero.
+  function revisar(form) {
+    let primero = null;
+    form.querySelectorAll('[data-campo]').forEach(el => {
+      if(!activo(el) || el.closest('[hidden]')) return;
+      const mensaje = Campos.validar(el.dataset.campo, el.value, limites(el));
+      aviso(el, mensaje);
+      if(mensaje && !primero) primero = el;
+    });
+    primero?.focus();
+    return !primero;
+  }
+  function alEnviar(event) {
+    const form = event.target;
+    if(!form?.matches?.('form')) return;
+    ultimoFormulario = form;
+    if(revisar(form)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  // El servidor rechazó un campo (400 con field y message): el mensaje va junto a ese campo del último formulario enviado.
+  function rechazo(event) {
+    const {field, message} = event.detail || {};
+    const form = document.activeElement?.form || ultimoFormulario;
+    const el = form?.elements?.namedItem?.(field);
+    if(!el || typeof message !== 'string' || !el.matches?.('input,textarea,select')) return;
+    aviso(el, message);
+    el.focus();
+  }
+  function instalar(raiz = document) {
+    raiz.addEventListener('beforeinput', alEscribir, true);
+    raiz.addEventListener('paste', alPegar, true);
+    raiz.addEventListener('drop', alPegar, true);
+    raiz.addEventListener('input', alCambiar, true);
+    raiz.addEventListener('focusout', alSalir, true);
+    raiz.addEventListener('submit', alEnviar, true);
+    window.addEventListener('chilito:campo', rechazo);
+  }
+  return Object.freeze({instalar, revisar, aviso, alEscribir, alPegar, alCambiar, alSalir, alEnviar, rechazo});
 })();

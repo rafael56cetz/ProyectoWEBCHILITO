@@ -113,6 +113,36 @@ suite('administración: inventario, ventas, administradores, legales y consentim
   assert.ok(run('AdminTableViews.pager({page:2, total:60})').includes('Página 2 de 3'));
   context.bigConsent = {...context.consentState, list:{...context.consentState.list, total:50001}};
   assert.ok(run('ConsentViews.screen(bigConsent)').includes('disabled>Exportar CSV'), 'un filtro demasiado grande no ofrece una descarga que fallaría');
+  // Filtros rápidos de la bitácora: pestañas arriba, documento y fecha marcados, y las fechas del rango visibles en los campos.
+  assert.ok(consent.includes('data-tab="bitacora" aria-pressed="true"') && consent.includes('data-tab="cuentas" aria-pressed="false"') && consent.includes('data-admin-action="refresh"'));
+  context.cookieConsent = {...context.consentState, filters:{documento:'cookies', desde:'2026-11-14', hasta:'2026-11-20'}, range:'7'};
+  const quick = run('ConsentViews.screen(cookieConsent)');
+  assert.ok(/data-admin-action="quick-document"[^>]*data-value="cookies" aria-pressed="true">Política de cookies/.test(quick), 'el documento elegido queda marcado');
+  assert.ok(/data-admin-action="quick-range"[^>]*data-value="7" aria-pressed="true">Últimos 7 días/.test(quick) && quick.includes('value="2026-11-14"') && quick.includes('value="2026-11-20"'));
+  assert.ok(/data-value="" aria-pressed="false">Todos/.test(quick));
+  // Rangos rápidos: días de Mérida, incluido hoy; «todo» no manda fechas. El nombre del rango nunca viaja al servidor.
+  const dias = preset => { const {desde, hasta} = run(`ConsentService.range(${JSON.stringify(preset)})`); return [desde, hasta]; };
+  const tramo = ([desde, hasta]) => (Date.parse(hasta) - Date.parse(desde)) / 86400000;
+  assert.deepEqual(dias('todo'), ['', '']);
+  assert.deepEqual(dias('otro'), ['', '']);
+  for(const [preset, span] of [['hoy', 0], ['7', 6], ['30', 29]]) {
+    const range = dias(preset);
+    assert.ok(range.every(value => /^\d{4}-\d{2}-\d{2}$/.test(value)) && tramo(range) === span, preset);
+  }
+  assert.equal(dias('hoy')[0], new Intl.DateTimeFormat('en-CA', {timeZone:'America/Merida'}).format(new Date()));
+  // Padrón de cuentas: contadores, estado, fecha exacta y correo escapado.
+  assert.equal(run("AdminTableViews.exact('2026-11-20T06:15:32Z')"), '20/11/2026 00:15:32');
+  assert.equal(run("AdminTableViews.exact('')"), '—');
+  context.accountsState = {...context.consentState, tab:'cuentas', accounts:{status:'ready', range:'hoy', filters:{estado:'inactivas', busqueda:context.bad},
+    totals:{total:3, activas:2, inactivas:1}, list:{page:1, total:1, items:[{email:context.bad, status:'inactiva', emailVerified:false, createdAt:'2026-11-20T06:15:32Z', lastLogin:null}]}}};
+  const accounts = run('ConsentViews.screen(accountsState)');
+  assert.ok(!accounts.includes('<img src=x') && accounts.includes('&lt;img'), 'el correo va escapado en la tabla, el botón y el buscador');
+  assert.ok(accounts.includes('data-tab="cuentas" aria-pressed="true"') && !accounts.includes('Exportar CSV') && accounts.includes('data-admin-action="refresh"'));
+  for(const text of ['<h2>Total</h2><strong>3</strong>', '<h2>Activas</h2><strong>2</strong>', '<h2>Inactivas</h2><strong>1</strong>', 'Inactiva</span>', 'correo sin verificar', '20/11/2026 00:15:32', 'Correo electrónico', 'Fecha y hora de creación', 'data-admin-action="account-consents"', 'data-admin-form="accounts-filter"', 'maxlength="254"']) assert.ok(accounts.includes(text), text);
+  assert.ok(/data-admin-action="quick-status"[^>]*data-value="inactivas" aria-pressed="true"/.test(accounts) && /data-admin-action="quick-range"[^>]*data-value="hoy" aria-pressed="true"/.test(accounts));
+  context.noAccounts = {...context.accountsState, accounts:{...context.accountsState.accounts, list:{page:1, total:0, items:[]}}};
+  assert.ok(run('ConsentViews.screen(noAccounts)').includes('No hay cuentas con estos filtros'));
+  assert.ok(run("ConsentViews.screen({...accountsState, accounts:{status:'loading'}})").includes('Cuentas registradas'), 'mientras carga, las pestañas siguen a la vista');
   // Lo viejo ya no existe.
   const sources = ['modelos', 'vistas', 'controladores'].map(dir => ['administracion', 'equipos'].map(name => read(`${dir}/${name}.js`)).join('\n')).join('\n') + read('index.html');
   for(const gone of ['Commerce', 'BindingService', 'BindingViews', 'BindingAdminController', 'comercial.css', 'admin/comercial', 'admin/vinculacion']) assert.ok(!sources.includes(gone), gone);
@@ -297,6 +327,18 @@ suite('contrato de adaptadores', async () => {
   assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/accion`); assert.deepEqual(JSON.parse(calls.at(-1).options.body), {type:'probar_bomba', plant:1, duration:3});
   await evaluate("ConsoleService.detail('CS-1A2B3C4D')");
   assert.equal(calls.at(-1).path, '/api/admin/soporte/CS-1A2B3C4D');
+  // Recargas automáticas tras un sondeo (quiet): van como sondeo y no alargan la sesión. Las que pide la persona, no.
+  const sondeo = () => calls.at(-1).options.headers['X-Chilito-Sondeo'];
+  assert.equal(sondeo(), undefined);
+  await evaluate("ConsoleService.detail('CS-1A2B3C4D', {quiet:true})"); assert.equal(sondeo(), '1');
+  await evaluate("ConsoleService.inbox('abierto', 1)"); assert.equal(sondeo(), undefined);
+  await evaluate("ConsoleService.inbox('abierto', 1, {quiet:true})"); assert.equal(sondeo(), '1');
+  await evaluate("GardenService.detail('1')"); assert.equal(sondeo(), undefined);
+  await evaluate("GardenService.detail('1', undefined, {quiet:true})"); assert.equal(calls.at(-1).path, '/api/huertos/1'); assert.equal(sondeo(), '1');
+  await evaluate("GardenService.log('1', 'riego', 1)"); assert.equal(sondeo(), undefined);
+  await evaluate("GardenService.log('1', 'riego', 1, {quiet:true})"); assert.match(calls.at(-1).path, /^\/api\/huertos\/1\/bitacora/); assert.equal(sondeo(), '1');
+  await evaluate("InquiryService.list('', 1)"); assert.equal(sondeo(), undefined);
+  await evaluate("InquiryService.list('', 1, {background:true})"); assert.equal(sondeo(), '1');
   await evaluate(`ConsoleService.endSession('${caso}')`);
   assert.equal(calls.at(-1).path, `/api/admin/sesiones/${caso}/cerrar`); assert.equal(calls.at(-1).options.keepalive, undefined);
   assert.equal(evaluate("typeof AdminService"), 'undefined');
@@ -389,6 +431,8 @@ suite('Mi huerto y retirada de despliegues', async () => {
   vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
   const M = vm.runInContext('GardenModel', context), S = vm.runInContext('GardenService', context);
   const NOW = Date.parse('2026-11-08T12:00:00Z');
+  assert.equal(M.ago('2026-11-07T06:00:00Z', NOW), 'hace 1 día', 'singular entre 24 y 47 h');
+  assert.equal(M.ago('2026-11-05T12:00:00Z', NOW), 'hace 3 días');
   // Línea de estado 3.2: sale de la conexión del equipo y de su última lectura.
   const device = c => ({connection:'en_linea', lastReadingAt:'2026-11-08T11:58:00Z', lastConnectionAt:'2026-11-08T11:58:00Z', firmware:'1.0.3', ...c});
   assert.equal(M.connection(null, NOW), null);
@@ -415,16 +459,21 @@ suite('Mi huerto y retirada de despliegues', async () => {
   // Vistas: tres versiones, selector solo con 2 o más huertos, y texto del servidor siempre escapado.
   const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-08', today:() => 0},
     AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
-    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title}});
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
   vm.runInContext('const GardenModelAlias = GardenModel;', views);
   vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
   const V = vm.runInContext('GardenViews', views);
   const plants = [1, 2, 3].map(number => ({number, name:`Planta ${number}`, stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null}));
   const detail = (gardenDevice, extra = {}) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:null, lamp:null, summary:null, ...extra});
   const A = V.summary({status:'ready', gardens:[], detail:null}, 'Ana');
-  assert.ok(A.includes('Aún no tienes un huerto') && A.includes('Crear mi huerto') && !A.includes('disabled') && !A.includes('fieldset'));
+  // Sin huerto: aviso y «Crear mi huerto» operables; la vista previa (fichas y acciones rápidas) va en un <fieldset disabled>.
+  assert.ok(A.includes('Aún no tienes un huerto') && A.includes('Crear mi huerto') && A.includes('<fieldset class="garden-locked" disabled'));
+  assert.ok(A.indexOf('Crear mi huerto') < A.indexOf('<fieldset'), 'el botón para crear el huerto queda fuera del bloqueo');
+  assert.ok(!A.includes('Ver planta') && A.includes('Revisar mi equipo'), 'vista previa sin enlaces a fichas');
   const B = V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null)}, 'Ana');
-  assert.ok(B.includes('Conecta tu equipo') && B.includes('Vincular equipo') && B.includes('Ver planta') && !B.includes('Depósito de agua'));
+  // B (huerto sin vincular): se ven sus plantas, pero bloqueadas y sin «Ver planta» hasta conectar el equipo.
+  assert.ok(B.includes('Conecta tu equipo') && B.includes('Vincular equipo') && !B.includes('Ver planta') && !B.includes('Depósito de agua'));
+  assert.ok(B.includes('<fieldset class="garden-locked" disabled') && B.indexOf('Vincular equipo') < B.indexOf('<fieldset') && B.includes('Planta 1'), 'fichas visibles y bloqueadas');
   const equipo = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:null, linkedAt:null, firmware:null, lastReadingAt:null};
   const C = V.summary({status:'ready', gardens:[detail(equipo).garden], detail:detail(equipo)}, 'Ana');
   assert.ok(C.includes('Depósito de agua') && C.includes('Esperando la primera lectura de tu equipo') && C.includes('Revisar mi equipo') && C.includes('Generado con IA') === false);
@@ -448,7 +497,15 @@ suite('Mi huerto y retirada de despliegues', async () => {
   const page = V.plantPage({garden, plant:{...plants[0], name:'<i>x</i>'}, stages:[{stage:'germinacion', since:'2026-11-01'}], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
   assert.ok(page.includes('Regar esta planta') && page.includes('Línea de vida') && !page.includes('<i>x</i>'));
   assert.ok(V.plantPage({garden, plant:plants[0], stages:[], series:[], range:'24h', care:[], lastWatering:null, hasDevice:true}).includes('<h1>Planta 1</h1>'), 'el nombre de fábrica no se repite en el título');
-  assert.ok(page.includes('<h1>Planta 1 · «&lt;i&gt;x&lt;/i&gt;»</h1>'), 'un nombre propio sí se muestra, escapado');
+  // Línea de vida: con una sola etapa se explica cómo seguir llenándola; con 0 o con 2 y más, no.
+  const AVISO_LINEA = 'Cambia la etapa en Editar para ir llenando su línea de vida.';
+  const conEtapas = stages => V.plantPage({garden, plant:plants[0], stages, series:[], range:'24h', care:[], lastWatering:null, hasDevice:true});
+  const etapa = (stage, since) => ({stage, since});
+  assert.ok(conEtapas([etapa('sin_sembrar', '2026-11-01')]).includes(AVISO_LINEA), 'con 1 etapa aparece el aviso');
+  assert.ok(!conEtapas([etapa('sin_sembrar', '2026-11-01'), etapa('germinacion', '2026-11-05')]).includes(AVISO_LINEA), 'con 2 etapas no aparece');
+  assert.ok(!conEtapas([etapa('sin_sembrar', '2026-11-01'), etapa('germinacion', '2026-11-05'), etapa('plantula', '2026-11-10')]).includes(AVISO_LINEA), 'con 3 etapas no aparece');
+  assert.ok(!conEtapas([]).includes(AVISO_LINEA), 'sin etapas no aparece');
+  assert.ok(page.includes('<h1>Planta 1 · &lt;i&gt;x&lt;/i&gt;</h1>'), 'un nombre propio sí se muestra, escapado y sin comillas angulares');
   const hostil = V.plantPage({garden, plant:{...plants[0], stage:'<u>etapa</u>'}, stages:[], series:[], range:'24h', care:[], lastWatering:{origin:'<u>origen</u>', duration:3, at:'2026-11-14T10:00:00Z'}, hasDevice:true});
   assert.ok(!hostil.includes('<u>') && hostil.includes('&lt;u&gt;etapa'), 'etapa y origen del riego se escapan');
   assert.ok(V.plantDialogs(plants[0], true).water.includes('Si el depósito no tiene agua, tu equipo no regará.'));
@@ -493,13 +550,67 @@ suite('Mi huerto y retirada de despliegues', async () => {
   assert.ok(!technical.includes('Luz · BH1750'), 'sin lecturas de luz no se muestra la tarjeta');
   assert.ok(technical.includes('Sin lectura') && !technical.includes('<img src=x'), 'sin lectura es «Sin lectura» y el texto del servidor va escapado');
   assert.ok(T.screen({status:'ready', gardens:[garden], garden, data:{...data, hasLight:true, latest:{...data.latest, light:1200}}, range:'24h', log}).includes('Luz · BH1750'));
-  assert.ok(T.screen({status:'ready', gardens:[{...garden, device:null}], garden:{...garden, device:null}, data:null, range:'24h', log}).includes('Vincular equipo'));
-  assert.ok(T.screen({status:'ready', gardens:[], garden:null}).includes('Crear mi huerto'));
+  // Huerto sin vincular (aunque la cuenta tenga otro vinculado): fichas bloqueadas, selector y «Vincular equipo» fuera del bloqueo.
+  const sinVincular = {...garden, id:'2', device:null};
+  const tecnicoSinVincular = T.screen({status:'ready', gardens:[garden, sinVincular], garden:sinVincular, data:null, range:'24h', log});
+  assert.ok(tecnicoSinVincular.includes('Vincular equipo') && tecnicoSinVincular.includes('aún no está vinculado') && tecnicoSinVincular.includes('Regar una planta')
+    && tecnicoSinVincular.includes('<fieldset class="garden-locked" disabled') && tecnicoSinVincular.includes('garden-selector'), 'Panel técnico sin vincular: fichas bloqueadas');
+  const cuidadosSinVincular = Care.screen({status:'ready', gardens:[garden, sinVincular], garden:sinVincular, plants:data.plants, tank:null});
+  assert.ok(cuidadosSinVincular.includes('aún no está vinculado') && cuidadosSinVincular.includes('Registrar un cuidado') && cuidadosSinVincular.includes('data-care-list')
+    && cuidadosSinVincular.indexOf('<fieldset') < cuidadosSinVincular.indexOf('Registrar un cuidado') && cuidadosSinVincular.indexOf('data-care-guides') > cuidadosSinVincular.indexOf('</fieldset>'),
+    'Mantenimiento sin vincular: historial real visible, registro bloqueado, guías fuera');
+  assert.ok(!Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants, tank:null}).includes('garden-locked'), 'con equipo no se bloquea');
+  const soporteSinVincular = Sp.screen({status:'ready', gardens:[garden, sinVincular], garden:sinVincular, data:{hasDevice:false}, diagnostic:null});
+  assert.ok(soporteSinVincular.includes('aún no está vinculado') && soporteSinVincular.includes('Solicita una revisión técnica') && soporteSinVincular.includes('<fieldset class="garden-locked" disabled'),
+    'Soporte sin vincular: fichas bloqueadas');
+  // Controladores: la ficha de planta no se abre en un huerto sin vincular y ninguna escritura sale sin equipo.
+  const controles = read('controladores/huerto.js');
+  const fichaPlanta = controles.slice(controles.indexOf('const PlantController'), controles.indexOf('const GardenController'));
+  assert.ok(/if\(!GardenModel\.linked\(garden\)\)[^\n]*location\.hash = '#huerto'/.test(fichaPlanta), 'PlantController no abre la ficha sin vincular');
+  assert.ok((controles.match(/GardenModel\.linked\(state\.garden\)/g) || []).length >= 4, 'Panel técnico y Mantenimiento comprueban el vínculo');
+  // Sin huerto: cada sección se ve con su estructura, bloqueada en un <fieldset disabled>, con el aviso y «Crear mi huerto» fuera.
+  const locked = html => html.includes('<fieldset class="garden-locked" disabled') && html.includes('id="garden-lock-note"') && html.indexOf('Crear mi huerto') < html.indexOf('<fieldset');
+  const sinHuerto = {status:'ready', gardens:[], garden:null, plants:[], tank:null, data:null};
+  const tecnicoVacio = T.screen(sinHuerto), cuidadosVacio = Care.screen(sinHuerto), soporteVacio = Sp.screen(sinHuerto);
+  assert.ok(locked(tecnicoVacio) && tecnicoVacio.includes('Regar una planta') && tecnicoVacio.includes('Bitácora del equipo'), 'Panel técnico: estructura visible y bloqueada');
+  assert.ok(locked(cuidadosVacio) && cuidadosVacio.includes('Registrar un cuidado') && cuidadosVacio.includes('Historial de cuidados'), 'Mantenimiento: estructura visible y bloqueada');
+  assert.ok(cuidadosVacio.indexOf('data-care-guides') > cuidadosVacio.indexOf('</fieldset>'), 'las guías (lectura) quedan fuera del bloqueo');
+  assert.ok(locked(soporteVacio) && soporteVacio.includes('Revisa tu equipo') && soporteVacio.includes('Solicita una revisión técnica'), 'Soporte: estructura visible y bloqueada');
   const careList = Care.list({status:'ready', page:1, total:2, items:[
     {id:'a', type:'sustrato', plant:3, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:true, corrected:false, reason:dirty},
     {id:'b', type:'cosecha', plant:null, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:true, reason:'Se anotó mal'}]});
   assert.ok(careList.includes('<s>') && careList.includes('Anulado') && careList.includes('Corregido por soporte') && careList.includes('7 chiles') && !careList.includes('<img src=x'));
   assert.ok(Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants}).includes('¿Qué hiciste?'));
+  // Rediseño: los chips muestran el tipo, pero el <select id="care-type" name="type"> y los atajos siguen en el formulario.
+  const careScreen = Care.screen({status:'ready', gardens:[garden], garden, plants:data.plants});
+  assert.equal((careScreen.match(/data-garden-action="care-type"/g) || []).length, 4, 'un chip por tipo de cuidado (sin recarga del depósito)');
+  assert.equal((careScreen.match(/data-garden-action="care-type"[^>]*aria-pressed="true"/g) || []).length, 1, 'un solo tipo elegido al abrir');
+  assert.ok(/<select id="care-plant" name="plant"[^>]*>/.test(careScreen) && (careScreen.match(/data-garden-action="care-plant"/g) || []).length === data.plants.length + 1, 'un botón por planta más «Todo el huerto»');
+  assert.ok(careScreen.includes('data-when="now"') && careScreen.includes('data-when="yesterday"') && careScreen.includes('data-when="pick"'), 'Ahora, Ayer y Elegir día');
+  assert.ok(careScreen.includes('data-step="-1"') && careScreen.includes('data-step="1"') && /id="care-chiles" name="chiles" type="text" inputmode="numeric" maxlength="3"[^>]*data-campo="entero" data-min="0" data-max="999"/.test(careScreen)
+    && !/id="care-chiles"[^>]*readonly/.test(careScreen), 'chiles con − y +, y también se pueden escribir (solo dígitos, 0 a 999)');
+  assert.ok(careScreen.includes('id="filter-period"') && careScreen.includes('Últimos 7 días'), 'periodo en el historial');
+  assert.ok(careScreen.includes('data-type="sustrato" aria-pressed="true"'), 'el elegido es el del select');
+  assert.ok(/<select id="care-type" name="type"[^>]*>/.test(careScreen), 'el select del tipo sigue en el formulario');
+  // «Registrar un cuidado» ya no ofrece la recarga del depósito ni el atajo «Rellené el depósito»: vive en «Depósito de agua».
+  const careForm = careScreen.slice(careScreen.indexOf('care-register'), careScreen.indexOf('care-history'));
+  assert.ok(!careScreen.includes('data-garden-action="care-quick"') && !careScreen.includes('Rellené el depósito') && !careForm.includes('value="rellenar_deposito"') && !careForm.includes('data-type="rellenar_deposito"'), 'sin recarga en el formulario');
+  assert.ok(careScreen.includes('data-care-guide-link'));
+  assert.ok(careScreen.indexOf('data-care-status') < careScreen.indexOf('data-care-tank') && careScreen.indexOf('data-care-tank') < careScreen.indexOf('care-register'), 'orden: últimos cuidados, depósito, registrar');
+  assert.ok(careScreen.includes('data-care-status') && careScreen.includes('Último relleno de depósito'), 'fila de estado arriba del formulario');
+  const careStatus = Care.status({status:'ready', page:1, total:2, items:[
+    {id:'a', type:'sustrato', plant:3, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:true, corrected:false},
+    {id:'b', type:'cosecha', plant:2, chiles:7, doneAt:'2026-11-08T10:00:00Z', voided:false, corrected:false}]}, []);
+  assert.ok(careStatus.includes('Planta 2 · 7 chiles'), 'la última cosecha con planta y chiles');
+  const refillStatus = origin => Care.status({status:'ready', page:1, total:1, items:[{id:'r', type:'rellenar_deposito', plant:null, chiles:null, origin, doneAt:'2026-11-08T09:00:00Z', voided:false}]}, []);
+  assert.ok(!refillStatus('persona').includes('Todo el huerto') && !refillStatus('equipo').includes('Todo el huerto'), 'el relleno no dice «Todo el huerto»');
+  assert.ok(refillStatus('equipo').includes('Detectada por tu equipo'), 'el relleno detectado lo dice');
+  // Con «latest» del servidor las fichas no dependen de la página: aquí la página 1 no trae cosechas.
+  const fromServer = Care.status({status:'ready', page:1, total:30, items:[{id:'i', type:'inspeccion', plant:null, chiles:null, doneAt:'2026-11-08T11:00:00Z', voided:false}],
+    latest:{cosecha:{id:'c', type:'cosecha', plant:2, chiles:4, doneAt:'2026-11-04T10:00:00Z', voided:false}, inspeccion:null, sustrato:null, rellenar_deposito:null}}, []);
+  assert.ok(fromServer.includes('Planta 2 · 4 chiles') && (fromServer.match(/Sin registros/g) || []).length === 3, 'las fichas usan «latest»');
+  assert.equal((careStatus.match(/Sin registros/g) || []).length, 3, 'lo anulado no cuenta y sin registros se dice');
+  assert.ok(careList.includes('is-corrected'), 'la fila corregida trae su clase para el estilo');
   const idle = {hasDevice:true, active:null, history:[], orders:[], lastDiagnostic:null};
   const support = Sp.screen({status:'ready', gardens:[garden], garden, data:idle, diagnostic:null});
   assert.ok(support.includes('Revisar mi equipo') && support.includes('Autorizo al equipo de soporte') && support.includes('disabled') && !/token/i.test(support));
@@ -539,6 +650,225 @@ suite('Mi huerto y retirada de despliegues', async () => {
   const panelModel = bloque('modelos/comun.js', 'Panel');
   for(const gone of ['admin/gobernanza', 'admin/despliegues', 'ver_gobernanza', 'gestionar_cambios']) assert.ok(!panelModel.includes(gone), gone);
   console.log('PASS Mi huerto (A, B y C), selector, tarjeta de orden y retirada de la vinculación de 26 caracteres');
+});
+
+// ── Depósito con flotador: textos, botones de recarga, insignia y historial del depósito ─────────
+suite('depósito con flotador', async () => {
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+  // Reloj fijo (12:00 de Mérida del 18-11-2026): «Hoy», «Mañana» y «vie 20 nov» no deben depender del día en que se corre.
+  const AHORA_FIJO = Date.parse('2026-11-18T18:00:00Z');
+  const RelojFijo = class extends Date { constructor(...valores) { super(...(valores.length ? valores : [AHORA_FIJO])); } static now() { return AHORA_FIJO; } };
+  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value)}, Date:RelojFijo, Intl});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
+  const M = vm.runInContext('GardenModel', context);
+  // Hora de Mérida (UTC−6) y duraciones en días y horas.
+  const NOW = Date.parse('2026-11-18T18:00:00Z');       // 12:00 en Mérida
+  assert.equal(M.meridaWhen('2026-11-18T16:05:00Z', NOW), 'hoy a las 10:05');
+  assert.equal(M.meridaWhen('2026-11-18T03:00:00Z', NOW), 'ayer a las 21:00', 'el día lo decide Mérida, no UTC');
+  assert.equal(M.meridaWhen('2026-11-19T14:00:00Z', NOW), 'mañana a las 08:00');
+  assert.equal(M.meridaWhen('2026-11-10T16:05:00Z', NOW), 'el 10 nov a las 10:05');
+  assert.equal(M.meridaDay('2026-11-20T16:00:00Z'), 'viernes 20 de noviembre');
+  assert.deepEqual([3 * 86400 + 4 * 3600, 5 * 3600, 3600, 86400, 2 * 86400 + 3600, 1800].map(M.humanDuration),
+    ['3 días y 4 horas', '5 horas', '1 hora', '1 día', '2 días y 1 hora', 'menos de 1 hora']);
+  // Recarga manual: permitida o desactivada con el motivo.
+  const refill = (at, origin = 'equipo', byOwner = false) => ({at, origin, byOwner});
+  assert.deepEqual({...M.refillState({canRefill:true}, NOW)}, {allowed:true, reason:''});
+  assert.equal(M.refillState({canRefill:false, refillBlock:'con-agua', lastRefill:refill('2026-11-17T15:00:00Z')}, NOW).reason,
+    'Tu depósito tiene agua desde tu última recarga (ayer a las 09:00).');
+  assert.equal(M.refillState({canRefill:false, refillBlock:'espera', nextRefillAt:'2026-11-18T23:30:00Z'}, NOW).reason, 'Podrás registrar otra recarga a las 17:30.');
+  assert.equal(M.refillState({canRefill:false, refillBlock:'espera', nextRefillAt:'2026-11-19T13:00:00Z'}, NOW).reason, 'Podrás registrar otra recarga mañana a las 07:00.');
+  assert.match(M.refillState({canRefill:false, refillBlock:'repetida', lastRefill:refill('2026-11-18T17:00:00Z', 'persona', true)}, NOW).reason, /^Ya registraste esta recarga \(hoy a las 11:00\)/);
+  // Tarjeta Depósito.
+  const tank = extra => ({hasDevice:true, hasWater:true, lowSince:null, lastRefill:refill('2026-11-18T14:00:00Z'), canRefill:false, refillBlock:'con-agua',
+    nextRefillAt:null, averageSeconds:null, estimatedLowAt:null, completedLoads:0, refillEverySeconds:null, ...extra});
+  const low = M.tankSummary(tank({hasWater:false, lowSince:'2026-11-18T15:30:00Z'}), NOW);
+  assert.equal(`${low.status} desde ${low.lowSince}`, 'Nivel bajo desde hoy a las 09:30');
+  const waiting = M.tankSummary(tank(), NOW);
+  assert.deepEqual([waiting.status, ...waiting.lines], ['Con agua', 'Última recarga: hoy a las 08:00 (detectada por tu equipo)',
+    'Te diremos cuánto dura tu depósito cuando se termine esta carga.']);
+  const average = M.tankSummary(tank({averageSeconds:3 * 86400, estimatedLowAt:'2026-11-20T16:00:00Z', lastRefill:refill('2026-11-17T14:00:00Z', 'persona', true)}), NOW);
+  assert.deepEqual([...average.lines], ['Última recarga: ayer a las 08:00 (registrada por ti)', 'Tu depósito dura en promedio 3 días.',
+    'Al ritmo actual, necesitará agua alrededor del viernes 20 de noviembre.']);
+  assert.equal(M.tankSummary(tank({averageSeconds:86400}), NOW).lines.length, 2, 'sin carga abierta no hay estimación');
+  assert.ok(M.tankSummary(tank({averageSeconds:86400, estimatedLowAt:'2026-11-18T10:00:00Z'}), NOW).lines.includes('Al ritmo actual, ya podría necesitar agua.'));
+  const noDevice = M.tankSummary(tank({hasDevice:false, hasWater:null, refillEverySeconds:4 * 86400 + 3000}), NOW);
+  assert.deepEqual([noDevice.status, ...noDevice.lines], ['Sin lectura', 'Última recarga: hoy a las 08:00 (detectada por tu equipo)', 'Sueles rellenar cada 4 días.']);
+  assert.ok(!M.tankSummary(tank({hasDevice:false, hasWater:null}), NOW).lines.some(text => text.startsWith('Sueles') || text.startsWith('Te diremos')));
+  // Vistas: la ficha simple de Mi huerto (con y sin equipo) y la sección «Depósito de agua» de Mantenimiento.
+  const views = vm.createContext({Date:RelojFijo, escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
+    AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
+  vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
+  vm.runInContext("var CareGuideService = {SUBSTRATE_KEY:'sustrato-perlita'}, CareGuideViews = {slot:() => ''};", views);
+  vm.runInContext(bloque('vistas/huerto.js', 'Operacion'), views);
+  const V = vm.runInContext('GardenViews', views), Care = vm.runInContext('CareViews', views);
+  const plants = [1, 2, 3].map(number => ({number, name:`Planta ${number}`, stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null}));
+  const device = {id:'9', identifier:'CHI-1', connection:'en_linea', lastConnectionAt:null, linkedAt:null, firmware:null, lastReadingAt:'2026-11-18T17:59:00Z'};
+  const detail = (gardenDevice, tankData) => ({garden:{id:'1', name:'Mi huerto', device:gardenDevice}, plants, metrics:{tankHasWater:tankData?.hasWater ?? null}, lamp:null, summary:null, tank:tankData});
+  const DETECTION = '0b6f9a3e-2c4d-4e5f-8a7b-1c2d3e4f5a6b';
+  const mine = refill('2026-11-18T17:00:00Z', 'persona', true);
+  const lowAt = '2026-11-18T15:30:00Z';
+  const noDeviceTank = tank({hasDevice:false, hasWater:null, canRefill:false, refillBlock:'espera', nextRefillAt:'2099-01-01T12:00:00Z', refillEverySeconds:3 * 86400});
+  // Cada fase que manda el servidor (más sin lectura y sin equipo).
+  const STATES = {
+    con_agua:tank({state:'con_agua', lastRefill:mine, averageSeconds:3 * 86400, estimatedLowAt:'2026-11-20T16:00:00Z'}),
+    rellenar:tank({state:'rellenar', hasWater:false, lowSince:lowAt, lastRefill:null, canRefill:true, refillBlock:null}),
+    detectada:tank({state:'detectada', hasWater:true, canRefill:true, refillBlock:null, pendingRefill:{id:DETECTION, detectedAt:new RelojFijo().toISOString()}}),
+    sigue_bajo:tank({state:'sigue_bajo', hasWater:false, lowSince:lowAt, lastRefill:mine, canRefill:false, refillBlock:'repetida'}),
+    esperando_lectura:tank({state:'esperando_lectura', hasWater:false, lowSince:lowAt, lastRefill:mine, canRefill:false, refillBlock:'repetida'}),
+    sin_lectura:tank({state:'sin_lectura', hasWater:null, lastRefill:null}),
+    sin_equipo:noDeviceTank};
+  const home = (key, data = STATES[key]) => key === 'sin_equipo' ? V.summary({status:'ready', gardens:[detail(null).garden], detail:detail(null, data)}, 'Ana')
+    : V.summary({status:'ready', gardens:[detail(device).garden], detail:detail(device, data)}, 'Ana');
+  const tile = html => html.match(/<div class="garden-stat garden-tank[^"]*">[\s\S]*?<\/div>/)[0];
+  const BADGE = '<a class="tank-badge" href="#mantenimiento?h=1">Revisar en Mantenimiento →</a>';
+  // Mi huerto: la ficha es una cifra más. Sin botones en ningún estado, una sola línea y la insignia solo con algo pendiente.
+  for(const key of Object.keys(STATES)) {
+    const html = home(key), card = tile(html);
+    assert.ok(!/<button|data-garden-action/.test(card), `ficha sin botones (${key})`);
+    assert.ok(!/refill|Ya lo rellené|¿Ya lo rellenaste\?|Historial del depósito|Al ritmo actual|Es hora de rellenar|sigue marcando/.test(html), `Mi huerto sin acciones ni textos del depósito (${key})`);
+    assert.equal((card.match(/<p>/g) || []).length, 1, `una sola línea secundaria (${key})`);
+    assert.equal(card.includes(BADGE), ['rellenar', 'detectada'].includes(key), `insignia solo con algo pendiente (${key})`);
+  }
+  assert.ok(tile(home('con_agua')).includes('<strong>Con agua</strong><p>Dura ~3 días</p>') && home('con_agua').includes('garden-tank is-ok'), 'con agua: verde y duración');
+  assert.ok(tile(home('rellenar')).includes('<strong>Nivel bajo</strong><p>Depósito de 19 L</p>') && home('rellenar').includes('garden-tank is-low'), 'nivel bajo: ámbar y sin recargas');
+  assert.match(tile(home('sigue_bajo')), /<p>Última recarga hace [^<]+<\/p>/, 'sin promedio: última recarga');
+  assert.ok(tile(home('sin_equipo')).includes('<p>Dura ~3 días</p>'), 'sin equipo: cada cuánto se rellena');
+  assert.ok(tile(V.summary({status:'ready', gardens:[detail(device).garden], detail:{...detail(device, null), metrics:{tankHasWater:false}}}, 'Ana')).includes('<strong>Nivel bajo</strong>'), 'sin datos del depósito: la lectura del resumen');
+  const B = home('sin_equipo');
+  assert.ok(B.includes('Depósito de agua') && !/data-garden-action="refill"/.test(B));
+  // Modelo de la ficha.
+  assert.deepEqual({...M.tankBrief(STATES.con_agua, NOW)}, {status:'Con agua', tone:' is-ok', line:'Dura ~3 días'});
+  assert.equal(M.tankBrief(tank({averageSeconds:3600}), NOW).line, 'Dura ~1 día');
+  assert.equal(M.tankBrief(tank({lastRefill:refill('2026-11-18T14:00:00Z')}), NOW).line, 'Última recarga hace 4 h');
+  assert.equal(M.tankBrief(tank({lastRefill:null, hasWater:null}), NOW).line, 'Depósito de 19 L');
+  assert.equal(M.tankBrief(null, NOW).status, 'Sin lectura');
+  assert.deepEqual(Object.keys(STATES).filter(key => M.tankPending(STATES[key])), ['rellenar', 'detectada']);
+  assert.equal(M.tankPending(tank({state:'detectada', hasWater:false, pendingRefill:{id:DETECTION, detectedAt:lowAt}})), false, 'detección sin agua: no pendiente');
+  // Mantenimiento: la sección «Depósito de agua» arriba de todo, con cada estado.
+  const garden = {id:'1', name:'Patio', device};
+  const loads = [{refilledAt:'2026-11-18T14:00:00Z', origin:'equipo', lowAt:null, seconds:null},
+    {refilledAt:'2026-11-14T14:00:00Z', origin:'persona', lowAt:'2026-11-17T18:00:00Z', seconds:3 * 86400 + 4 * 3600}];
+  const care = (data, extra = {}) => Care.screen({status:'ready', gardens:[garden], garden, plants, tank:{status:'ready', tank:data, loads, ...extra}});
+  const section = html => html.match(/<section class="bento-panel tank-history tank-section[\s\S]*?<\/section>/)[0];
+  for(const key of Object.keys(STATES)) {
+    const html = care(STATES[key]);
+    assert.ok(html.indexOf('data-care-status') > 0 && html.indexOf('data-care-status') < html.indexOf('tank-section') && html.indexOf('tank-section') < html.indexOf('care-register'), `sección después de los últimos cuidados (${key})`);
+    assert.equal(html.split('Historial del depósito').length - 1, STATES[key].hasDevice ? 1 : 0, `un solo historial (${key})`);
+    assert.equal((html.match(/aria-labelledby="tank-section-title"/g) || []).length, 1, `una sola sección (${key})`);
+    const info = section(html).match(/<details class="tank-info">[\s\S]*?<\/details>/)?.[0] || '';
+    assert.ok(info.includes(STATES[key].hasDevice ? 'Depósito de 19 L · el flotador solo detecta nivel bajo' : '<p>Depósito de 19 L</p>'), `capacidad dentro del botón ⓘ (${key})`);
+    assert.ok(/<summary aria-label="Sobre el depósito" title="Sobre el depósito">/.test(info), `ⓘ con nombre accesible (${key})`);
+    assert.equal(info.includes('cambia con el calor'), STATES[key].hasDevice, `nota del calor en ⓘ solo con equipo (${key})`);
+    assert.ok(!/tank-capacity|cambia con el calor/.test(section(html).replace(info, '')), `capacidad y nota solo en ⓘ (${key})`);
+    assert.equal((section(html).match(/<li class="tank-fact/g) || []).length, 3, `tres fichas (${key})`);
+    assert.match(section(html), /<div class="tank-head"><h2 id="tank-section-title">[\s\S]*?<\/h2>\s*<span class="badge tone-(verde|ambar|gris) tank-state">/, `estado como insignia junto al título (${key})`);
+  }
+  // Insignia: «Con agua» verde, «Nivel bajo» ámbar.
+  assert.ok(section(care(STATES.con_agua)).includes('<span class="badge tone-verde tank-state">Con agua</span>'));
+  assert.ok(section(care(STATES.rellenar)).includes('<span class="badge tone-ambar tank-state">Nivel bajo</span>'));
+  // Fichas: fecha corta, promedio con sus cargas y «Necesitará agua» (hoy, mañana o el día corto); sin datos, «—».
+  const facts = (extra, now = NOW) => M.tankFacts(tank(extra), now);
+  assert.equal(facts({lastRefill:refill('2026-11-18T14:00:00Z')}).last.value, 'Hoy, 08:00');
+  assert.equal(facts({lastRefill:refill('2026-11-14T14:00:00Z')}).last.value, '14 nov');
+  assert.deepEqual([...facts({lastRefill:{...refill('2026-11-14T14:00:00Z'), confirmed:true, byOwner:true}}).last.marks.map(m => m.label)], ['Detectada por tu equipo', 'Confirmada por ti']);
+  assert.deepEqual([...facts({lastRefill:refill('2026-11-14T14:00:00Z', 'persona', true)}).last.marks.map(m => m.label)], ['Registrada por ti']);
+  assert.deepEqual({...facts({averageSeconds:3 * 86400, averageLoads:4, completedLoads:7}).average}, {label:'Dura en promedio', value:'3 días', text:'últimas 4 cargas'});
+  assert.equal(facts({averageSeconds:86400, completedLoads:1}).average.text, 'última carga', 'sin averageLoads usa las completas');
+  assert.equal(facts({averageSeconds:86400, completedLoads:9}).average.text, 'últimas 5 cargas', 'como mucho 5');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-18T22:10:00Z'}).next.value, 'Hoy, ~16:10');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-19T14:00:00Z'}).next.value, 'Mañana, ~08:00');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-20T16:00:00Z'}).next.value, 'vie 20 nov');
+  assert.equal(facts({averageSeconds:86400, estimatedLowAt:'2026-11-17T16:00:00Z'}).next.value, 'Pronto');
+  assert.equal(facts({hasWater:false}).next.value, 'Ahora');
+  const empty = facts({lastRefill:null});
+  assert.ok([empty.last, empty.average, empty.next].every(f => f.value === '—' && f.text), 'sin datos: «—» y un texto corto');
+  assert.deepEqual({...facts({hasDevice:false, hasWater:null, refillEverySeconds:3 * 86400}).average}, {label:'Sueles rellenar cada', value:'3 días', text:'entre tus recargas'});
+  const s1 = section(care(STATES.con_agua));
+  assert.ok(s1.includes('Con agua') && /Última recarga<\/span>\s*<strong class="tank-fact-value">Hoy, 11:00<span class="tank-fact-marks"><span class="tank-mark" role="img" aria-label="Registrada por ti" title="Registrada por ti">/.test(s1)
+    && /Dura en promedio<\/span>\s*<strong class="tank-fact-value">3 días<\/strong>/.test(s1) && /Necesitará agua<\/span>\s*<strong class="tank-fact-value">vie 20 nov<\/strong>/.test(s1)
+    && s1.includes('<span class="tank-load-length">3 días y 4 horas</span>') && s1.includes('<span class="tank-load-length">En curso</span>'), 'con agua: fichas e historial compacto');
+  // Historial: 3 filas visibles y «Ver todo» con el resto; los iconos llevan title y aria-label.
+  const many = Array.from({length:5}, (_, i) => ({refilledAt:`2026-11-1${i}T14:00:00Z`, origin:i % 2 ? 'persona' : 'equipo', confirmed:i === 2, byOwner:true, lowAt:'2026-11-18T10:00:00Z', seconds:86400}));
+  const s6 = section(care(STATES.con_agua, {loads:many}));
+  const visibles = s6.slice(0, s6.indexOf('<details class="tank-more">'));
+  assert.equal((visibles.match(/<li class="tank-load/g) || []).length, 3, 'solo las últimas 3 a la vista');
+  assert.match(s6, /<details class="tank-more"><summary>Ver todo <span class="tank-more-count">\(2 más\)<\/span><\/summary><ol class="tank-load-list">(\s*<li class="tank-load[\s\S]*?<\/li>){2}<\/ol><\/details>/);
+  assert.ok(s6.includes('aria-label="Detectada por tu equipo" title="Detectada por tu equipo"') && s6.includes('aria-label="Confirmada por ti" title="Confirmada por ti"'));
+  assert.ok(!section(care(STATES.con_agua)).includes('tank-more'), 'con 3 o menos, sin «Ver todo»');
+  assert.ok(!/data-garden-action="refill/.test(s1), 'con agua: sin botones');
+  const s2 = section(care(STATES.rellenar));
+  assert.ok(s2.includes('<p class="tank-since">Nivel bajo desde hoy a las 09:30</p>') && s2.includes('Es hora de rellenar tu depósito') && s2.includes('Ya lo rellené')
+    && /class="button btn-liquid-brand" data-garden-action="refill"(?![^>]*disabled)/.test(s2) && s2.includes('class="tank-actions"'), 'rellenar: llamada y «Ya lo rellené» primario');
+  const s4 = section(care(STATES.detectada));
+  assert.ok(s4.includes('Tu equipo detectó agua en el depósito. ¿Ya lo rellenaste?') && /Detectada hoy a las \d\d:\d\d\./.test(s4), 'detectada: la pregunta');
+  assert.ok(new RegExp(`class="button btn-liquid-brand" data-garden-action="refill-confirm" data-detection="${DETECTION}"`).test(s4), '«Sí, ya lo rellené» es el primario');
+  assert.ok(new RegExp(`class="button btn-liquid-light" data-garden-action="refill-discard" data-detection="${DETECTION}"`).test(s4), '«No fue una recarga» es el secundario');
+  assert.ok(!s4.includes('Confirmar recarga') && !/data-garden-action="refill"/.test(s4));
+  const s5 = section(care(STATES.sigue_bajo));
+  assert.ok(s5.includes('Registraste la recarga, pero tu equipo sigue marcando nivel bajo. Revisa que el agua cubra el flotador.') && s5.includes('aria-label="Registrada por ti"'), 'sigue bajo: el aviso');
+  assert.ok(!/data-garden-action="refill/.test(s5) && !s5.includes('Es hora de rellenar'), 'sigue bajo: sin botón');
+  const waitingSection = section(care(STATES.esperando_lectura));
+  assert.ok(waitingSection.includes("Esperamos la siguiente lectura de tu equipo.") && !/data-garden-action="refill/.test(waitingSection), 'registrada, a la espera de lectura');
+  const s0 = section(care(STATES.sin_equipo, {loads:[]}));
+  assert.ok(/Sueles rellenar cada<\/span>\s*<strong class="tank-fact-value">3 días<\/strong>/.test(s0) && s0.includes('Podrás registrar otra recarga') && /data-garden-action="refill"[^>]*disabled/.test(s0) && !s0.includes('En curso'), 'sin equipo');
+  // Lo que devuelve la API tras un solo «medir --sin-agua» (y aunque llegara una detección con nivel bajo): pide rellenar, no pregunta.
+  const onlyLow = {state:'rellenar', hasWater:false, lowSince:'2026-11-18T17:59:00Z', pendingRefill:null, lastRefill:null, canRefill:true, refillBlock:null};
+  for(const data of [onlyLow, {...onlyLow, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:00:00Z'}}, {...onlyLow, state:undefined}]) {
+    const html = section(care(tank(data)));
+    assert.ok(html.includes('Es hora de rellenar tu depósito') && html.includes('Ya lo rellené'), 'solo nivel bajo: pide rellenar');
+    assert.ok(!html.includes('¿Ya lo rellenaste?') && !/refill-confirm|refill-discard/.test(html), 'solo nivel bajo: no pregunta por una recarga');
+    assert.ok(tile(home('rellenar', tank(data))).includes(BADGE), 'solo nivel bajo: la ficha lleva a Mantenimiento');
+  }
+  // Sin el atajo «Rellené el depósito» en el formulario; sin datos del depósito no hay sección.
+  assert.ok(!care(tank({averageSeconds:3 * 86400 + 4 * 3600, completedLoads:1})).includes('care-quick'));
+  const noTank = Care.screen({status:'ready', gardens:[garden], garden, plants, tank:null});
+  assert.ok(noTank.includes('Registrar un cuidado') && !noTank.includes('tank-section"'), 'sin datos del depósito no hay sección');
+  const row = item => Care.list({status:'ready', page:1, total:1, items:[{id:'a', type:'rellenar_deposito', plant:null, chiles:null, doneAt:'2026-11-18T14:00:00Z', voided:false, corrected:false, ...item}]});
+  assert.ok(row({origin:'equipo'}).includes('Detectada por tu equipo'));
+  assert.ok(!row({origin:'persona'}).includes('Detectada por tu equipo'));
+  // Agua detectada (web.0005/0006): texto de la detección e insignias de la confirmada.
+  assert.equal(M.pendingRefill(tank({state:'detectada', pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), 'Detectada hoy a las 10:05.');
+  assert.equal(M.pendingRefill(tank({pendingRefill:null}), NOW), '');
+  assert.equal(M.pendingRefill(tank({state:'rellenar', hasWater:false, pendingRefill:{id:DETECTION, detectedAt:'2026-11-18T16:05:00Z'}}), NOW), '', 'con nivel bajo no hay pregunta');
+  const confirmed = M.tankSummary(tank({lastRefill:{...refill('2026-11-18T14:00:00Z'), confirmed:true, byOwner:true}}), NOW);
+  assert.equal(confirmed.lines[0], 'Última recarga: hoy a las 08:00 (detectada por tu equipo · confirmada por ti)');
+  assert.equal(M.detectedLabel({origin:'equipo', confirmed:true, byOwner:false}), 'Detectada por tu equipo · confirmada por soporte');
+  assert.equal(M.detectedLabel({origin:'equipo', confirmed:false}), 'Detectada por tu equipo', 'las automáticas anteriores no dicen quién confirmó');
+  const refillAsk = V.confirmations.refill;
+  assert.deepEqual([refillAsk.titulo, refillAsk.accion, Boolean(refillAsk.peligro)], ['¿Confirmas que ya rellenaste el depósito?', 'Sí, ya lo rellené', false], 'la confirmación estándar');
+  const discard = V.confirmations['refill-discard'];
+  assert.ok(discard.peligro && discard.accion === 'No fue una recarga' && discard.texto.includes('no se registrará ninguna recarga'), '«No fue una recarga» pide confirmación');
+  assert.ok(row({origin:'equipo', confirmed:true, byOwner:true}).includes('Detectada por tu equipo · confirmada por ti'), 'historial de mantenimiento');
+  assert.ok(Care.tankSection({status:'ready', tank:tank(), loads:[{...loads[0], confirmed:true, byOwner:true}]}).includes('aria-label="Confirmada por ti"'));
+  // Servicio: rutas de confirmar y descartar; un identificador inválido no llega al servidor.
+  const calls = [];
+  const http = vm.createContext({URL, URLSearchParams, ChilitoHTTP:{sessionExpired() {}, async request(path, options) { calls.push({path, method:options.method}); return {http:200, body:{status:'accepted'}}; }}});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), http);
+  const S = vm.runInContext('GardenService', http);
+  assert.equal((await S.confirmRefill('7', DETECTION)).status, 'accepted');
+  assert.equal((await S.discardRefill('7', DETECTION)).status, 'accepted');
+  assert.deepEqual(calls.map(c => `${c.method} ${c.path}`), [`POST /api/huertos/7/deposito/detecciones/${DETECTION}/confirmar`, `POST /api/huertos/7/deposito/detecciones/${DETECTION}/descartar`]);
+  assert.equal((await S.confirmRefill('7', '../x')).code, 'invalid-input');
+  assert.equal(calls.length, 2);
+  // Controladores: las acciones del depósito viven en Mantenimiento; Mi huerto ya no registra ni confirma recargas.
+  const control = bloque('controladores/huerto.js', 'Huerto'), source = read('controladores/huerto.js');
+  const careControl = source.slice(source.indexOf('const CareController'), source.indexOf('const SupportController'));
+  assert.ok(!/recordRefill|decideRefill|refill-confirm/.test(control.slice(control.indexOf('const GardenSummaryController'), control.indexOf('const GardenCreateController'))), 'Mi huerto sin acciones del depósito');
+  assert.match(careControl, /async function recordRefill\(\) \{\n\s+if\(working \|\| !await confirmar\(GardenViews\.confirmations\.refill\) \|\| working\) return;\n\s+working = true;\n\s+try \{ await register\(\{type:'rellenar_deposito'\}\); \} finally \{ working = false; \}/, '«Ya lo rellené» confirma antes de registrar y no se envía dos veces');
+  assert.match(careControl, /async function submitCare\(form\) \{\n\s+if\(working\) return;\n\s+const invalid = dates\.validate\(form\);/, 'registrar: sin doble envío y valida solo su formulario');
+  assert.match(careControl, /working = true;\n\s+try \{ if\(await register\(values\)\) CareViews\.reset\(root\); \} finally \{ working = false; \}/);
+  assert.match(careControl, /async function submitFilter\(form\) \{\n\s+const invalid = dates\.validate\(form\);/, 'el filtro valida solo su formulario');
+  assert.ok(!/care-quick|CareViews\.prepare/.test(careControl), 'sin el atajo retirado');
+  assert.match(careControl, /const id = \+\+caresSerial;[\s\S]*?id !== caresSerial\) return;/, 'el historial descarta respuestas viejas');
+  assert.match(careControl, /if\(discard && !await confirmar\(GardenViews\.confirmations\['refill-discard'\]\)\) return;/);
+  assert.match(careControl, /else if\(action === 'refill'\) await recordRefill\(\);/);
+  assert.match(careControl, /action === 'refill-confirm' \|\| action === 'refill-discard'\) && !working\) await decideRefill/);
+  // Errores de la regla y versión de los estáticos.
+  for(const code of ['deposito-con-agua', 'deposito-repetida', 'deposito-espera', 'deposito-resuelta']) assert.notEqual(V.errorText(code), V.errorText('desconocido'), code);
+  const versions = new Set(read('index.html').match(/\?v=mvc\.\d+/g));
+  assert.deepEqual([...versions], ['?v=mvc.48'], 'todos los estáticos en mvc.48');
+  console.log('PASS depósito con flotador: hora de Mérida, duración, botones con motivo, recarga por confirmar, insignia e historial del depósito');
 });
 
 // ── Guías de cuidado: modelo y separación de capas ────────────────────────────────────────────
@@ -593,6 +923,72 @@ suite('guías de cuidado', async () => {
   assert.ok(!/fetch\(|ChilitoHTTP/.test(control));
   assert.ok(!/<img|data-image|placeholder/i.test(view));
   console.log('PASS guías de cuidado');
+});
+
+// ── Correcciones de la auditoría (REGISTRO_CORRECCIONES.md) ─────────────────────────────────────
+suite('correcciones de auditoría: reautenticación, CSP, cookies __Host-, registro sin textos y superadministración', async () => {
+  let respuestas = [], pedidas = [];
+  const json = (status, body) => ({status, json:async () => body, blob:async () => ({tamaño:3})});
+  const context = vm.createContext({console, crypto:webcrypto, structuredClone, DOMException, AbortController, AbortSignal, Date, Map, Set, Object, Array, JSON, Number, String, RegExp, Error, Intl, encodeURIComponent, decodeURIComponent,
+    URLSearchParams, document:{cookie:'otra=1; __Host-csrftoken=seguro'}, window:{dispatchEvent() {}}, Event,
+    fetch:async (url, opciones) => { pedidas.push([url, opciones]); return respuestas.shift(); }});
+  cargar(context, 'modelos/cuenta.js', 'modelos/comun.js', 'modelos/administracion.js');
+  const run = code => vm.runInContext(code, context);
+  // M-2: una acción crítica que pide reautenticación se reintenta una sola vez tras confirmar la contraseña.
+  let preguntas = 0;
+  run('AdminHTTP').onReauthentication(async () => { preguntas += 1; return true; });
+  respuestas = [json(403, {code:'reauthentication-required'}), json(200, {status:'accepted', credential:'nueva'})];
+  const rotada = await run('AdminHTTP').call('/api/admin/equipos/1/rotar', {method:'POST', body:{}});
+  assert.equal(rotada.credential, 'nueva');
+  assert.equal(preguntas, 1);
+  assert.equal(pedidas.length, 2);
+  assert.notEqual(pedidas[0][1].headers['Idempotency-Key'], pedidas[1][1].headers['Idempotency-Key'], 'el reintento usa una clave de idempotencia nueva');
+  assert.equal(pedidas[0][1].headers['X-CSRFToken'], 'seguro', 'lee la cookie __Host-csrftoken del sitio publicado');
+  // Si el servidor vuelve a pedirla, no hay bucle: se devuelve el código.
+  respuestas = [json(403, {code:'reauthentication-required'}), json(403, {code:'reauthentication-required'})];
+  assert.equal((await run('AdminHTTP').call('/api/admin/equipos/1/rotar', {method:'POST', body:{}})).code, 'reauthentication-required');
+  assert.equal(preguntas, 2);
+  // Cancelar el diálogo: no se reintenta.
+  run('AdminHTTP').onReauthentication(async () => false);
+  pedidas = []; respuestas = [json(403, {code:'reauthentication-required'})];
+  assert.equal((await run('AdminHTTP').call('/api/admin/administradores/cuenta', {method:'POST', body:{}})).code, 'reauthentication-required');
+  assert.equal(pedidas.length, 1);
+  // La exportación CSV también: se descarga con fetch y vuelve como Blob.
+  run('AdminHTTP').onReauthentication(async () => true);
+  respuestas = [json(403, {code:'reauthentication-required'}), json(200, {})];
+  const csv = await run('ConsentService').download({documento:'terminos'});
+  assert.equal(csv.status, 'ready');
+  assert.ok(csv.blob);
+  assert.ok(String(pedidas.at(-1)[0]).startsWith('/api/admin/consentimientos/exportar?documento=terminos'));
+  // Padrón de cuentas: solo los parámetros de su lista blanca; los vacíos no viajan.
+  respuestas = [json(200, {status:'ready', items:[], page:1, total:0, totals:{total:0, activas:0, inactivas:0}})];
+  assert.equal((await run('ConsentService').accounts({estado:'activas', busqueda:'', desde:'', hasta:''}, 1)).status, 'ready');
+  assert.equal(String(pedidas.at(-1)[0]), '/api/admin/consentimientos/cuentas?estado=activas&page=1');
+  // Registro sin textos legales publicados: un mensaje claro en lugar del error genérico.
+  respuestas = [json(503, {status:503, code:'legal-no-publicado'})];
+  assert.equal((await run('AuthService').request('register', {email:'a@b.c', password:'x'.repeat(16), termsAccepted:true, privacyRead:true})).status, 'legal-not-published');
+  assert.ok(read('controladores/cuenta.js').includes("status === 'legal-not-published'"));
+  // Superadministración y textos legales: no quedan atrapados en «Aceptar textos».
+  const M = run('AppModel');
+  assert.equal(M.legalGateExempt({capabilities:['gestionar_administradores']}), true);
+  assert.equal(M.legalGateExempt({capabilities:['gestionar_legales']}), true);
+  assert.equal(M.legalGateExempt({capabilities:['gestionar_guias']}), false);
+  assert.equal(M.legalGateExempt({capabilities:[]}), false);
+  const enrutador = read('controladores/enrutador.js');
+  assert.ok(enrutador.includes('} else if(pendingLegal && !legalExempt) {'), 'las demás cuentas siguen pasando por «Aceptar textos»');
+  // B-6: la CSP ya no admite estilos en línea: ningún atributo style en las plantillas ni en index.html.
+  for(const nombre of [...fs.readdirSync(path.join(FRONT, 'vistas')).filter(f => f.endsWith('.js')).map(f => `vistas/${f}`), 'index.html'])
+    assert.ok(!/\sstyle\s*=\s*["'$]/.test(read(nombre)), `${nombre} no debe llevar atributos style`);
+  assert.ok(read('vistas/huerto.js').includes('data-width='), 'la barra de humedad usa data-width');
+  // El proyecto se llama YouGarden: ningún texto visible conserva el nombre anterior.
+  for(const nombre of ['index.html', ...['vistas', 'modelos', 'controladores'].flatMap(dir => fs.readdirSync(path.join(FRONT, dir)).filter(f => f.endsWith('.js')).map(f => `${dir}/${f}`))])
+    assert.ok(!/El Chilito|tu Chilito/.test(read(nombre)), `${nombre} aún dice «El Chilito»`);
+  assert.ok(read('vistas/publico.js').includes('<span class="brand-name">YouGarden</span>') && read('index.html').includes('<title>YouGarden'), 'marca y título');
+  // Acceso: el autocompletado del navegador (también al pegar, con el campo enfocado) no deja un fondo claro con texto blanco.
+  const apariencia = read('vistas/estilos/apariencia.css');
+  assert.ok(/\.auth-layout \.field input:is\(:-webkit-autofill,:autofill\):is\(:hover,:focus,:focus-visible,:active\)/.test(apariencia)
+    && /-webkit-text-fill-color:#fff!important/.test(apariencia) && /transition:background-color 600000s/.test(apariencia), 'autocompletado legible en todos los estados');
+  console.log('PASS correcciones de auditoría: reautenticación con reintento único, CSV con contraseña, __Host-csrftoken, registro sin textos y superadministración sin bloqueo');
 });
 
 // ── Guardián MVC: los controladores coordinan; escribir en el DOM es de las vistas ─
@@ -700,6 +1096,271 @@ suite('editor legal: autoguardado cada 10 s, pegado saneado en el servidor y .do
   await handlers.change({target:input([{name:'aviso.docx', size:10}])});
   assert.equal(llamadas.imported.length, 1); assert.deepEqual(llamadas.replaced, ['<h2>Doc</h2>']);
   console.log('PASS editor legal: autoguardado cada 10 s, pegado saneado en el servidor y .docx');
+});
+
+// ── Campos: reglas, filtro de teclado y pegado, mensajes en línea e inventario ───────────────
+suite('campos', async () => {
+  // DOM mínimo: lo que usa CamposVista de un campo, de su mensaje y del formulario.
+  class Elemento {
+    constructor(tag, attrs = {}) {
+      this.tagName = tag; this.attrs = {}; this.dataset = {}; this.value = attrs.value ?? ''; this.type = attrs.type || (tag === 'INPUT' ? 'text' : '');
+      this.readOnly = false; this.disabled = false; this.required = 'required' in attrs; this.eventos = []; this.siguiente = null; this.className = '';
+      for(const [k, v] of Object.entries(attrs)) if(k !== 'value') this.setAttribute(k, v);
+      this.selectionStart = this.selectionEnd = this.value.length;
+      this.classList = {contains:c => this.className.split(' ').includes(c)};
+    }
+    setAttribute(k, v) { this.attrs[k] = String(v); if(k.startsWith('data-')) this.dataset[k.slice(5).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = String(v); if(k === 'id') this.id = String(v); if(k === 'name') this.name = String(v); }
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+    removeAttribute(k) { delete this.attrs[k]; }
+    matches(selector) {
+      if(selector === 'form') return this.tagName === 'FORM';
+      if(selector.includes('textarea') && selector.includes('input[type=text]')) return this.tagName === 'TEXTAREA' || (this.tagName === 'INPUT' && ['text', 'search', 'email', 'url'].includes(this.type));
+      return ['INPUT', 'TEXTAREA', 'SELECT'].includes(this.tagName);
+    }
+    closest() { return null; }
+    get nextElementSibling() { return this.siguiente; }
+    insertAdjacentElement(_, el) { this.siguiente = el; el.dueno = this; }
+    remove() { if(this.dueno) this.dueno.siguiente = null; }
+    setRangeText(texto, inicio, fin) { this.value = this.value.slice(0, inicio) + texto + this.value.slice(fin); this.selectionStart = this.selectionEnd = inicio + texto.length; }
+    setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; }
+    dispatchEvent(evento) { this.eventos.push(evento.type); }
+    focus() { context.document.activeElement = this; }
+  }
+  const context = vm.createContext({Event:class { constructor(type, o = {}) { this.type = type; this.bubbles = o.bubbles; } }, Array, Number, String, RegExp, Object,
+    window:{addEventListener() {}}, document:{activeElement:null, createElement:tag => new Elemento(tag.toUpperCase())}});
+  vm.runInContext(bloque('modelos/comun.js', 'Campos'), context);
+  vm.runInContext(bloque('vistas/comun.js', 'Campos'), context);
+  const C = vm.runInContext('Campos', context), V = vm.runInContext('CamposVista', context);
+  const campo = (regla, attrs = {}) => new Elemento(attrs.tag || 'INPUT', {id:`c-${regla}`, name:regla, ...(regla === 'libre' ? {} : {'data-campo':regla}), ...attrs});
+  const evento = (target, extra = {}) => ({target, prevented:false, detenido:false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { this.detenido = true; }, ...extra});
+  const escribir = (el, data) => { const e = evento(el, {data, inputType:'insertText'}); V.alEscribir(e); if(!e.prevented) { el.setRangeText(data, el.selectionStart, el.selectionEnd); V.alCambiar(evento(el)); } return e; };
+  const pegar = (el, texto) => { const e = evento(el, {clipboardData:{getData:() => texto}}); V.alPegar(e); return e; };
+  const aviso = el => el.siguiente?.textContent ?? null;
+
+  // Reglas (las mismas que web/validacion.py).
+  for(const [regla, valor, limites, esperado] of [
+    ['persona', 'José María', {}, null], ['persona', "O'Connor-Peña", {}, null], ['persona', 'Zoë Müller', {}, null],
+    ['persona', 'Ana3', {}, 'Solo letras, espacios, apóstrofo y guion'], ['persona', '-Ana', {}, 'Solo letras, espacios, apóstrofo y guion'], ['persona', 'A', {}, 'Escribe entre 2 y 60 letras'],
+    ['cosa', 'Planta 1', {maximo:40}, null], ['cosa', 'Mi huerto', {maximo:60}, null], ['cosa', 'Huerto-Patio 3', {maximo:60}, null],
+    ['cosa', 'Planta #1', {maximo:40}, 'Solo letras, números, espacios y guion'], ['cosa', 'x'.repeat(41), {maximo:40}, 'Escribe como máximo 40 caracteres'],
+    ['entero', '0', {min:0, max:999}, null], ['entero', '999', {min:0, max:999}, null], ['entero', 'abc', {min:0, max:999}, 'Solo números entre 0 y 999'],
+    ['entero', '1000', {min:0, max:999}, 'Solo números entre 0 y 999'], ['entero', '7.5', {min:0, max:999}, 'Solo números entre 0 y 999'], ['entero', '0', {min:1, max:9999}, 'Solo números entre 1 y 9999'],
+    ['digitos', '12345', {}, null], ['digitos', '12a', {}, 'Solo números'],
+    ['dinero', '3500', {}, null], ['dinero', '3500.50', {}, null], ['dinero', '3500.505', {}, 'Escribe un importe como 3500 o 3500.50'], ['dinero', '-1', {}, 'Escribe un importe como 3500 o 3500.50'],
+    ['mac', 'AA:BB:CC:DD:EE:FF', {}, null], ['mac', 'AA:BB', {}, 'Escribe la MAC como AA:BB:CC:DD:EE:FF.'], ['identificador', 'ESP32-A1B2', {}, null], ['identificador', 'ES P32', {}, 'De 4 a 32 letras, números o guiones; empieza con letra o número.'],
+    ['version', '1.2', {}, null], ['version', '1.2.3', {}, null], ['version', 'v1', {}, 'Escribe la versión como 1.2 o 1.2.3.'],
+    ['libre', 'Nota <b>&</b> «ok»\nsegunda línea', {maximo:500}, null], ['libre', 'a\u0007b', {maximo:500}, 'El texto tiene caracteres no permitidos'],
+    ['persona', '', {requerido:true}, 'Este campo es obligatorio'], ['persona', '', {}, null]])
+    assert.equal(C.validar(regla, valor, limites), esperado, `${regla} «${valor}»`);
+
+  // Teclado: los números y los nombres de persona no dejan entrar caracteres no válidos, y dicen por qué.
+  const chiles = campo('entero', {id:'care-chiles', 'data-min':'0', 'data-max':'999', maxlength:'3', inputmode:'numeric'});
+  assert.ok(escribir(chiles, 'a').prevented, 'una letra no entra en chiles');
+  assert.equal(chiles.value, '');
+  assert.equal(aviso(chiles), 'Solo números entre 0 y 999');
+  assert.equal(chiles.getAttribute('aria-invalid'), 'true');
+  assert.equal(chiles.getAttribute('aria-describedby'), 'care-chiles-aviso', 'el mensaje se une al campo');
+  assert.ok(!escribir(chiles, '7').prevented && chiles.value === '7', 'un dígito sí entra');
+  assert.equal(aviso(chiles), null, 'el aviso se va al escribir algo válido');
+  assert.equal(chiles.getAttribute('aria-invalid'), null);
+  for(const tecla of ['-', '.', 'e', '+', ' ']) assert.ok(escribir(chiles, tecla).prevented, `«${tecla}» no entra en un entero`);
+  const nombre = campo('persona', {id:'sc-buyer', maxlength:'60'});
+  for(const letra of 'José Ñúñez-O\'Neil') escribir(nombre, letra);
+  assert.equal(nombre.value, "José Ñúñez-O'Neil", 'acentos, ñ, ü, apóstrofo, guion y espacio');
+  for(const tecla of ['3', '_', '@', '.', '<']) assert.ok(escribir(nombre, tecla).prevented, `«${tecla}» no entra en un nombre de persona`);
+  assert.equal(aviso(nombre), 'Solo letras');
+  const precio = campo('dinero', {id:'sc-price', maxlength:'11'});
+  for(const tecla of '3500.5') escribir(precio, tecla);
+  assert.ok(escribir(precio, '.').prevented, 'un segundo punto no entra');
+  assert.ok(!escribir(precio, '0').prevented && precio.value === '3500.50');
+  assert.ok(escribir(precio, '1').prevented, 'un tercer decimal no entra');
+  // Los demás campos no bloquean el teclado (su regla se revisa al salir y al enviar).
+  const planta = campo('cosa', {id:'plant-name', maxlength:'40'});
+  assert.ok(!escribir(planta, '#').prevented);
+
+  // Pegado: entra solo la parte válida (con aviso) y se avisa con «input» como si se hubiera escrito.
+  const comprador = campo('persona', {id:'sc-buyer-2', maxlength:'60'});
+  assert.ok(pegar(comprador, 'Ana3 López_2').prevented);
+  assert.deepEqual([comprador.value, aviso(comprador), comprador.eventos.includes('input')], ['Ana López', 'Solo letras', true]);
+  const limpio = campo('persona', {id:'c-limpio'});
+  assert.ok(!pegar(limpio, 'José').prevented, 'un pegado válido sigue su curso normal');
+  const importe = campo('dinero', {id:'sp-received', maxlength:'11'});
+  pegar(importe, '$3,500.507');
+  assert.equal(importe.value, '3500.50', 'sin signo ni comas y con 2 decimales');
+  const pocos = campo('entero', {id:'mant-chiles', 'data-min':'0', 'data-max':'999', maxlength:'3'});
+  pegar(pocos, '12a345');
+  assert.deepEqual([pocos.value, aviso(pocos)], ['123', 'Solo números entre 0 y 999'], 'respeta maxlength');
+  const nota = campo('libre', {tag:'TEXTAREA', id:'sc-note', maxlength:'500'});
+  pegar(nota, 'Hola\u0007 mundo bonito\ncon dos líneas');
+  assert.deepEqual([nota.value, aviso(nota)], ['Hola mundo bonito\ncon dos líneas', 'Se quitaron caracteres no permitidos'], 'texto libre: sin caracteres de control, el espacio duro pasa a espacio');
+  const espacio = campo('libre', {id:'mant-search', maxlength:'60'});
+  pegar(espacio, 'a b');
+  assert.deepEqual([espacio.value, aviso(espacio)], ['a b', null], 'un espacio raro se corrige sin aviso');
+  const leer = campo('entero', {id:'c-solo-lectura'}); leer.readOnly = true;
+  assert.ok(!pegar(leer, 'abc').prevented, 'un campo de solo lectura no se toca');
+
+  // Al salir del campo: rango, largo y formato completos.
+  const corto = campo('persona', {id:'c-corto'}); corto.value = 'A'; V.alSalir(evento(corto));
+  assert.equal(aviso(corto), 'Escribe entre 2 y 60 letras');
+  const fabrica = campo('cosa', {id:'c-fabrica', maxlength:'40'}); fabrica.value = 'Planta 1'; V.alSalir(evento(fabrica));
+  assert.equal(aviso(fabrica), null, '«Planta 1» es válido');
+  const mal = campo('cosa', {id:'c-mal', maxlength:'40'}); mal.value = 'Planta #1'; V.alSalir(evento(mal));
+  assert.equal(aviso(mal), 'Solo letras, números, espacios y guion');
+  const vacio = campo('entero', {id:'c-vacio', required:''}); V.alSalir(evento(vacio));
+  assert.equal(aviso(vacio), null, 'vacío no se marca al salir');
+
+  // Al enviar: un campo que no cumple detiene el envío antes del controlador y recibe el foco.
+  const mucho = campo('entero', {id:'c-mucho', name:'chiles', 'data-min':'0', 'data-max':'999'}); mucho.value = '1000';
+  const bien = campo('persona', {id:'c-bien', name:'buyer'}); bien.value = 'Ana';
+  const form = new Elemento('FORM'); form.querySelectorAll = () => [bien, mucho]; form.elements = {namedItem:n => [bien, mucho].find(el => el.name === n)};
+  const envio = evento(form); V.alEnviar(envio);
+  assert.deepEqual([envio.prevented, envio.detenido, context.document.activeElement === mucho, aviso(mucho)], [true, true, true, 'Solo números entre 0 y 999']);
+  mucho.value = '999'; const otro = evento(form); V.alEnviar(otro);
+  assert.deepEqual([otro.prevented, otro.detenido, aviso(mucho)], [false, false, null], 'con todo válido el controlador recibe el envío');
+  // El servidor rechaza un campo (400 con field y message): el mensaje va junto a ese campo del último formulario.
+  context.document.activeElement = null;
+  V.rechazo({detail:{field:'buyer', code:'solo-letras', message:'Solo letras, espacios, apóstrofo y guion.'}});
+  assert.equal(aviso(bien), 'Solo letras, espacios, apóstrofo y guion.');
+
+  // ChilitoHTTP avisa del 400 con campo para que la vista lo muestre.
+  const avisos = [];
+  const http = vm.createContext({console, crypto:webcrypto, JSON, URL, Map, Promise, CustomEvent:class { constructor(type, o) { this.type = type; this.detail = o.detail; } },
+    document:{cookie:'csrftoken=x'}, window:{dispatchEvent:e => avisos.push(e)},
+    fetch:async () => ({status:400, json:async () => ({status:400, code:'solo-numeros', field:'chiles', message:'Solo números entre 0 y 999.'})})});
+  vm.runInContext(bloque('modelos/cuenta.js', 'Acceso'), http);
+  const r = await vm.runInContext("ChilitoHTTP.request('/api/huertos/1/cuidados', {method:'POST', body:{type:'cosecha', plant:1, chiles:'abc'}})", http);
+  assert.equal(r.http, 400);
+  assert.deepEqual(avisos.map(e => [e.type, e.detail.field, e.detail.message]), [['chilito:campo', 'chiles', 'Solo números entre 0 y 999.']]);
+
+  // Inventario: cada campo de entrada declara su regla (los demás textos son libres: sin caracteres de control).
+  const tag = (archivo, id) => read(archivo).match(new RegExp(`<input[^>]*(id|name)="${id}"[^>]*>`))?.[0] || '';
+  for(const [archivo, id, regla, extra] of [
+    ['vistas/huerto.js', 'garden-name', 'cosa'], ['vistas/huerto.js', 'plant-name', 'cosa'], ['vistas/huerto.js', 'rename-name', 'cosa'],
+    ['vistas/huerto.js', 'care-chiles', 'entero', /inputmode="numeric"[^>]*data-min="0" data-max="999"/], ['vistas/huerto.js', 'mant-chiles', 'entero', /inputmode="numeric"[^>]*data-min="0" data-max="999"/],
+    ['vistas/huerto.js', 'care-order', 'entero', /inputmode="numeric"[^>]*data-min="1" data-max="9999"/], ['vistas/huerto.js', 'mant-garden', 'digitos', /inputmode="numeric"/],
+    ['vistas/huerto.js', 'mant-new-garden', 'digitos', /inputmode="numeric"/],
+    ['vistas/administracion.js', 'sc-buyer', 'persona'], ['vistas/administracion.js', 'sc-price', 'dinero', /inputmode="decimal"/], ['vistas/administracion.js', 'sc-received', 'dinero', /inputmode="decimal"/],
+    ['vistas/administracion.js', 'sp-received', 'dinero', /inputmode="decimal"/], ['vistas/administracion.js', 'lg-version', 'version'], ['vistas/administracion.js', 'cs-version', 'version'],
+    ['vistas/equipos.js', 'eq-identifier', 'identificador'], ['vistas/equipos.js', 'eq-mac', 'mac'], ['vistas/equipos.js', 'eq-firmware', 'firmware'],
+    ['vistas/cuenta.js', 'firstName', 'persona'], ['vistas/cuenta.js', 'lastName', 'persona'], ['vistas/cuenta.js', 'alias', 'cosa'], ['vistas/cuenta.js', 'key-name', 'cosa'],
+    ['vistas/publico.js', 'name', 'persona', /autocomplete="name"/]]) {
+    const html = tag(archivo, id);
+    assert.ok(html.includes(`data-campo="${regla}"`), `${archivo} #${id}: data-campo="${regla}"`);
+    if(extra) assert.match(html, extra, `${archivo} #${id}`);
+  }
+  assert.ok(!/type="number"[^>]*name="chiles"|name="chiles"[^>]*type="number"/.test(read('vistas/huerto.js')), 'chiles no usa type=number (admite e, + y -)');
+  assert.match(read('controladores/enrutador.js'), /CamposVista\.instalar\(document\);/, 'el filtro se instala una vez para toda la aplicación');
+  console.log('PASS campos: reglas, teclado y pegado filtrados, mensajes en línea, envío detenido, rechazo del servidor e inventario');
+});
+
+// ── Ciclos de planta: ciclo actual, «Terminar ciclo» y «Ciclos anteriores» ───────────────────
+suite('ciclos de planta', async () => {
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+  const context = vm.createContext({AppModel:{date:value => `fecha:${value}`, number:value => String(value)}, Date, Intl});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), context);
+  const M = vm.runInContext('GardenModel', context);
+  // Modelo: motivos y fechas del ciclo en hora de Mérida.
+  assert.deepEqual(Object.keys(M.CYCLE_REASONS), ['cosecha_terminada', 'planta_murio', 'no_germino', 'pudricion_plaga', 'otro'], 'los 5 motivos de la base');
+  const pasado = {number:1, startedAt:'2026-11-01T18:00:00Z', endedAt:'2026-11-18T18:00:00Z', reason:'no_germino', note:'<b>Nunca</b> brotó', stages:[{stage:'sin_sembrar', since:'2026-11-01'}, {stage:'germinacion', since:'2026-11-03'}],
+    care:[{type:'germinacion', doneAt:'2026-11-03T15:00:00Z'}]};
+  assert.equal(M.cycleTitle(pasado), 'Ciclo 1 · 1 nov 2026 – 18 nov 2026 · No germinó');
+  assert.equal(M.cycleRange({number:2, startedAt:'2026-11-18T18:00:00Z', endedAt:null}), 'desde el 18 nov 2026');
+  assert.equal(M.cycleTitle({number:3, startedAt:'2026-12-01T03:00:00Z', endedAt:'2026-12-02T05:59:00Z', reason:'otro'}), 'Ciclo 3 · 30 nov 2026 – 1 dic 2026 · Otro motivo', 'el día lo decide Mérida');
+
+  // Vista de la ficha: el ciclo actual, el botón de peligro y los ciclos anteriores plegables y de solo lectura.
+  const views = vm.createContext({escaparHTML:escape, icon:() => '', plantDrawing:() => '', GardenModel:M, MaintenanceDates:{format:() => '2026-11-18', today:() => 0, shift:() => 0},
+    AppModel:{gardenGreeting:() => ({phrase:'Frase.'}), number:value => String(value)},
+    AppViews:{date:value => `fecha:${value}`, heading:title => `<h1>${escape(title)}</h1>`, accountTabs:() => '', state:title => title, empty:title => title}});
+  vm.runInContext(bloque('vistas/huerto.js', 'Huerto'), views);
+  const V = vm.runInContext('GardenViews', views);
+  const plant = {number:1, name:'Chile <bravo>', stage:'sin_sembrar', stageSince:null, sowingDate:null, daysSown:null, moisture:null, measuredAt:null};
+  const ficha = extra => V.plantPage({garden:{id:'7'}, plant, stages:[{stage:'sin_sembrar', since:'2026-11-18'}], series:{points:[]}, range:'24h', care:[], lastWatering:null, hasDevice:false,
+    cycle:{number:2, startedAt:'2026-11-18T18:00:00Z', endedAt:null, reason:null}, pastCycles:[pasado], ...extra});
+  const html = ficha();
+  assert.ok(html.includes('<p class="plant-cycle-current">Ciclo 2 · desde el 18 nov 2026</p>'), 'el ciclo actual bajo el título');
+  assert.match(html, /<button type="button" class="button btn-liquid-light" data-garden-action="end-cycle" data-danger="true">Terminar ciclo<\/button>/);
+  const linea = html.slice(html.indexOf('<h2>Línea de vida</h2>'), html.indexOf('<h2>Cuidados de esta planta</h2>'));
+  assert.equal((linea.match(/<li>/g) || []).length, 1, 'la línea de vida muestra solo el ciclo actual');
+  assert.ok(html.includes('No hay cuidados registrados en este ciclo.'), 'cuidados: solo el ciclo actual');
+  const anteriores = html.slice(html.indexOf('<section class="bento-panel plant-cycles">'));
+  assert.match(anteriores, /^<section class="bento-panel plant-cycles"><details class="plant-cycles-toggle"><summary><h2>Ciclos anteriores<\/h2><span class="plant-cycles-count">1<\/span><\/summary>/, 'plegable, cerrado por omisión');
+  assert.ok(anteriores.includes('<details class="plant-cycle"><summary>Ciclo 1 · 1 nov 2026 – 18 nov 2026 · No germinó</summary>'));
+  assert.ok(anteriores.includes('&lt;b&gt;Nunca&lt;/b&gt; brotó') && !anteriores.includes('<b>Nunca'), 'la nota va escapada');
+  assert.ok(anteriores.includes('Germinación') && anteriores.includes('fecha:2026-11-03'), 'su línea de vida y sus cuidados');
+  const soloLectura = anteriores.slice(0, anteriores.indexOf('</section>'));
+  assert.ok(!/<button|<form|<input|<select|<textarea|data-garden-action/.test(soloLectura), 'los ciclos anteriores son de solo lectura');
+  assert.ok(!ficha({pastCycles:[]}).includes('plant-cycles'), 'sin ciclos anteriores no hay sección');
+  assert.ok(html.includes('Chile &lt;bravo&gt;') && !html.includes('Chile <bravo>'));
+
+  // Diálogo y confirmación: motivo obligatorio, nota opcional y «No se puede deshacer».
+  const dialogo = V.plantDialogs(plant, false, {number:2}).endCycle;
+  assert.ok(dialogo.includes('Terminar el ciclo 2') && dialogo.includes('<select id="cycle-reason" name="reason" required><option value="">Elige un motivo</option>'));
+  for(const [valor, texto] of Object.entries(M.CYCLE_REASONS)) assert.ok(dialogo.includes(`<option value="${valor}">${texto}</option>`), valor);
+  assert.match(dialogo, /<textarea id="cycle-note" name="note" rows="3" maxlength="500"><\/textarea>/);
+  assert.ok(dialogo.includes('conserva su nombre') && dialogo.includes('No se puede deshacer.') && dialogo.includes('data-danger="true">Terminar ciclo</button>'));
+  const pregunta = V.confirmations.endCycle(2, 'Chile bravo', 'planta_murio');
+  assert.deepEqual([pregunta.titulo, pregunta.accion, pregunta.peligro], ['¿Terminar el ciclo 2 de Chile bravo?', 'Terminar ciclo', true]);
+  assert.ok(pregunta.texto.includes('Motivo: La planta murió') && pregunta.texto.includes('No se puede deshacer.'));
+  assert.notEqual(V.errorText('cuidado-ciclo-anterior'), V.errorText('desconocido'), 'cuidado fechado en un ciclo terminado');
+
+  // Servicio: la ruta y que un número de planta no válido no llega al servidor como texto.
+  const calls = [];
+  const http = vm.createContext({URL, URLSearchParams, ChilitoHTTP:{sessionExpired() {}, async request(path, options) { calls.push([options.method, path, JSON.stringify(options.body)]); return {http:200, body:{status:'accepted'}}; }}});
+  vm.runInContext(bloque('modelos/huerto.js', 'Huerto'), http);
+  const S = vm.runInContext('GardenService', http);
+  assert.equal((await S.endCycle('7', '2', {reason:'otro', note:''})).status, 'accepted');
+  assert.deepEqual(calls, [['POST', '/api/huertos/7/plantas/2/terminar-ciclo', '{"reason":"otro","note":""}']]);
+
+  // Controlador: confirma antes de enviar, no envía dos veces y vuelve a cargar la ficha.
+  const source = read('controladores/huerto.js');
+  const control = source.slice(source.indexOf('const PlantController'), source.indexOf('const GardenController'));
+  assert.match(control, /if\(!reason\) \{ GardenViews\.missing\(form\.elements\.reason, 'Elige un motivo'\); return; \}/, 'sin motivo no se envía');
+  assert.match(control, /if\(!await confirmar\(GardenViews\.confirmations\.endCycle\([^)]*\)\)\) return;\n\s+ending = true;\n\s+try \{\n\s+const result = await service\.endCycle\(/, 'confirmación antes de enviar');
+  assert.match(control, /else if\(action === 'end-cycle'\) GardenViews\.openDialog\(root, dialogs\.endCycle\);/);
+  assert.match(control, /else if\(kind === 'end-cycle'\) endCycle\(event\.target\);/);
+  console.log('PASS ciclos de planta: ciclo actual, «Terminar ciclo» con confirmación y «Ciclos anteriores» de solo lectura');
+});
+
+// ── Aviso de cookies: solo con política publicada ─────────────────────────────────────────────
+suite('aviso de cookies', async () => {
+  const visible = [], configurable = [];
+  let respuesta;
+  const context = vm.createContext({console, Set, Object, Promise, document:{addEventListener() {}}, window:{addEventListener() {}},
+    PrivacyData:{cookies:async () => respuesta}, PrivacyModel:{sectionOf:() => null},
+    CookieViews:{screen:() => ({form:{addEventListener() {}}, reserveSpace() {}, closePreferences() {}, banner:on => visible.push(on), settings:on => configurable.push(on)})}});
+  cargar(context, 'controladores/publico.js');
+  const run = code => vm.runInContext(code, context);
+  const pendiente = {status:'ready', decided:false, statistics:false, privacyVersion:'1.0', cookiesVersion:null};
+  respuesta = pendiente;
+  await run('CookieController.start()');
+  assert.equal(visible.at(-1), false, 'sin política de cookies publicada no hay aviso');
+  assert.equal(configurable.at(-1), false, 'ni «Configurar cookies»');
+  respuesta = {...pendiente, cookiesVersion:'1.0'};
+  await run('CookieController.refresh()');
+  assert.equal(visible.at(-1), true, 'en cuanto se publica, aparece');
+  assert.equal(configurable.at(-1), true, 'y vuelve «Configurar cookies»');
+  respuesta = {...pendiente, cookiesVersion:'1.0', decided:true};
+  await run('CookieController.refresh()');
+  assert.equal(visible.at(-1), false, 'con la elección vigente no se vuelve a pedir');
+  assert.equal(configurable.at(-1), true, 'pero se puede cambiar desde «Configurar cookies»');
+  const antes = configurable.length;
+  respuesta = {status:'unavailable'};
+  await run('CookieController.refresh()');
+  assert.equal(visible.at(-1), true, 'sin respuesta del servidor se pregunta, nunca se presume');
+  assert.equal(configurable.length, antes, 'sin respuesta no cambia la disponibilidad de «Configurar cookies»');
+  // La vista marca la raíz del documento y la hoja de estilos oculta los botones y su elemento de lista.
+  const raiz = {atributos:new Set(), toggleAttribute(nombre, on) { if(on) this.atributos.add(nombre); else this.atributos.delete(nombre); }};
+  const vista = vm.createContext({document:{documentElement:raiz, createElement:() => ({querySelector:() => ({}), set innerHTML(_) {}}), body:{append() {}}}});
+  cargar(vista, 'vistas/comun.js', 'vistas/publico.js');
+  vm.runInContext('CookieViews.screen().settings(false)', vista);
+  assert.ok(raiz.atributos.has('data-cookies-sin-politica'));
+  vm.runInContext('CookieViews.screen().settings(true)', vista);
+  assert.ok(!raiz.atributos.has('data-cookies-sin-politica'));
+  assert.match(read('vistas/estilos/cookies.css'), /\[data-cookies-sin-politica\] \[data-cookie-settings\],\n\[data-cookies-sin-politica\] li:has\(> \[data-cookie-settings\]\) \{ display:none; \}/);
+  // Quien publica la política de cookies ve el aviso sin recargar la página.
+  const legal = read('controladores/administracion.js');
+  assert.equal((legal.match(/mostrarAviso\('exito', `Versión \$\{version\} publicada[^\n]*\n\s+if\(type === 'politica_cookies'\) CookieController\.refresh\(\);/g) || []).length, 2);
+  console.log('PASS aviso de cookies: aviso y «Configurar cookies» ocultos sin política publicada, aparecen al publicarla y no se repite tras decidir');
 });
 
 // ── Ejecución: una suite tras otra ────────────────────────────────────────────────────────────

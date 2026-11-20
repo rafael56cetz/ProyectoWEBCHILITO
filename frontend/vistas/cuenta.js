@@ -32,7 +32,7 @@ const AuthViews = (() => {
     } else if (screen === 'registro') {
       fields = email(context.email) + newPassword('Contraseña') + confirmation();
       fields += `<div class="terms-field">
-        <label class="terms-label" for="termsAccepted"><input id="termsAccepted" name="termsAccepted" type="checkbox" required aria-describedby="termsAccepted-error terms-required"><span>Acepto los Términos y condiciones de El Chilito</span></label>
+        <label class="terms-label" for="termsAccepted"><input id="termsAccepted" name="termsAccepted" type="checkbox" required aria-describedby="termsAccepted-error terms-required"><span>Acepto los Términos y condiciones de YouGarden</span></label>
         <span class="terms-required" id="terms-required">Obligatorio</span>
         <span class="field-error" id="termsAccepted-error" hidden></span>
         <p><a href="#terminos" target="_blank" rel="noopener">Leer Términos y condiciones<span class="sr-only"> (se abre en otra pestaña)</span></a></p>
@@ -56,7 +56,7 @@ const AuthViews = (() => {
     return `<form id="access-form" class="login-form" data-auth-screen="${screen}" novalidate>${fields}${['registro', 'restablecer', 'cambiar'].includes(screen) ? '<p id="password-help-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>' : ''}${feedback()}<button class="button btn-liquid-brand full" type="submit" data-submit-label="${label}">${label}</button>${screen === 'verificar' ? '<button class="button btn-liquid-light full auth-resend" type="button" data-auth-action="resend">Reenviar código</button>' : ''}</form>${links(screen)}`;
   }
   function layout(title, intro, content, assets = '') {
-    return `<div class="auth-layout auth-flow">${brand('#inicio', 'El Chilito, inicio', 'auth-brand')}<aside class="auth-visual"><img src="${assets}vistas/imagenes/habanero-fondo.webp" alt="Hojas y frutos de habanero en una ambientación conceptual de interior." width="1896" height="830"><div class="auth-visual-shade"></div><div class="auth-quote"><h2><span>Tu huerto,</span><span>más cerca de ti.</span></h2><p>Tres plantas de habanero para cultivar en interiores.</p></div></aside><main class="auth-main" id="contenido" tabindex="-1"><div class="auth-form-wrap auth-bento"><h1 id="auth-title">${escaparHTML(title)}</h1><p class="auth-intro">${escaparHTML(intro)}</p><div id="auth-content">${content}</div></div></main></div>`;
+    return `<div class="auth-layout auth-flow">${brand('#inicio', 'YouGarden, inicio', 'auth-brand')}<aside class="auth-visual"><img src="${assets}vistas/imagenes/habanero-fondo.webp" alt="Hojas y frutos de habanero en una ambientación conceptual de interior." width="1896" height="830"><div class="auth-visual-shade"></div><div class="auth-quote"><h2><span>Tu huerto,</span><span>más cerca de ti.</span></h2><p>Tres plantas de habanero para cultivar en interiores.</p></div></aside><main class="auth-main" id="contenido" tabindex="-1"><div class="auth-form-wrap auth-bento"><h1 id="auth-title">${escaparHTML(title)}</h1><p class="auth-intro">${escaparHTML(intro)}</p><div id="auth-content">${content}</div></div></main></div>`;
   }
   return {
     layout,
@@ -184,7 +184,7 @@ const AuthViews = (() => {
           find('.auth-intro').hidden = true;
           find('.auth-result h2').hidden = true;
           find('.auth-result').focus();
-          document.title = title + ' · El Chilito';
+          document.title = title + ' · YouGarden';
         },
         showResetForm(screenName, config, context) { content().innerHTML = AuthViews.form(screenName, config, context); },
         resetUnavailable() { content().innerHTML = AuthViews.resetUnavailable(); find('[role="alert"]')?.focus(); },
@@ -221,7 +221,7 @@ const MfaViews = Object.freeze({
   step(kind) {
     const byMail = kind === 'login_by_code';
     return `<form data-step class="login-form" novalidate><div class="field"><label for="code">${byMail?'Código de 6 dígitos':'Código de tu app o de recuperación'}</label>
-      <input id="code" name="code" autocomplete="one-time-code" required ${byMail?'inputmode="numeric" maxlength="6"':'maxlength="64"'}></div>
+      <input id="code" name="code" autocomplete="one-time-code" required ${byMail?'inputmode="numeric" maxlength="6" data-campo="digitos"':'maxlength="64"'}></div>
       <p class="auth-help">${byMail?'Te lo enviamos por correo. Vence en 5 minutos.':'Si perdiste tu app, usa uno de tus códigos de recuperación.'}</p>
       ${byMail?'':'<a class="auth-text-link" href="#sin-acceso">No tengo mi app ni mis códigos</a>'}
       <div data-step-feedback class="auth-feedback is-error" role="alert" hidden></div>
@@ -241,9 +241,9 @@ const MfaViews = Object.freeze({
         <div class="app-actions"><button class="button btn-liquid-brand" type="button" data-mfa="totp-start" hidden>Activar</button>
         <button class="button btn-liquid-light" type="button" data-mfa="totp-disable" hidden>Desactivar</button></div>
         <form data-totp-form class="maint-form" hidden><img data-totp-image alt="Código QR para tu app autenticadora" width="200" height="200"><p>Clave manual: <code data-totp-secret></code></p>
-        <label>Código de la app<input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label><button class="button btn-liquid-brand" type="submit">Confirmar</button></form></section>
+        <label>Código de la app<input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required data-campo="digitos"></label><button class="button btn-liquid-brand" type="submit">Confirmar</button></form></section>
       <section class="bento-panel security-card"><h2>Llaves de acceso</h2><p>Usa la huella, el rostro o el PIN de tu dispositivo. Tu PIN y tu biometría nunca salen de él.</p><ul class="security-keys" data-keys aria-label="Llaves registradas"></ul>
-        <form data-key-form class="key-form"><label for="key-name">Nombre de la llave</label><div class="key-form-row"><span class="key-form-icon">${icon('key')}</span><input id="key-name" name="name" maxlength="100" required placeholder="Ej. Teléfono personal" autocomplete="off"><button class="button btn-liquid-brand" type="submit">${icon('plus')}<span>Agregar llave</span></button></div></form></section>
+        <form data-key-form class="key-form"><label for="key-name">Nombre de la llave</label><div class="key-form-row"><span class="key-form-icon">${icon('key')}</span><input id="key-name" name="name" maxlength="100" required placeholder="Ej. Teléfono personal" autocomplete="off" data-campo="cosa"><button class="button btn-liquid-brand" type="submit">${icon('plus')}<span>Agregar llave</span></button></div></form></section>
       <section class="bento-panel security-card"><h2>Códigos de recuperación</h2><p data-recovery-state></p>
         <div class="app-actions"><button class="button btn-liquid-light" type="button" data-mfa="recovery-regenerate" hidden>Generar códigos nuevos</button></div>
         <div data-recovery-new hidden><p>Guárdalos ahora: no se volverán a mostrar. Cada uno sirve una sola vez.</p><ol data-recovery-list></ol></div></section>
@@ -330,9 +330,9 @@ const MfaViews = Object.freeze({
 
 // ── Perfil ──
 const ProfileViews = (() => {
-  const fields = `<label>Nombre<input name="firstName" maxlength="150" autocomplete="given-name"></label>
-    <label>Apellido<input name="lastName" maxlength="150" autocomplete="family-name"></label>
-    <label>Alias<input name="alias" maxlength="64" autocomplete="nickname" aria-describedby="alias-ayuda"><small id="alias-ayuda">Lo usaremos para dirigirnos a ti.</small></label>`;
+  const fields = `<label>Nombre<input name="firstName" maxlength="60" autocomplete="given-name" data-campo="persona"></label>
+    <label>Apellido<input name="lastName" maxlength="60" autocomplete="family-name" data-campo="persona"></label>
+    <label>Alias<input name="alias" maxlength="64" autocomplete="nickname" data-campo="cosa" aria-describedby="alias-ayuda"><small id="alias-ayuda">Lo usaremos para dirigirnos a ti.</small></label>`;
   const labels = Object.freeze({firstName:'Nombre',lastName:'Apellido',alias:'Alias'});
   return Object.freeze({
     form: `<section class="bento-panel account-profile" aria-labelledby="perfil-titulo"><h2 id="perfil-titulo">Datos personales</h2>
@@ -470,7 +470,7 @@ const LegalAcceptViews = (() => {
       <div data-legal-feedback class="auth-feedback is-error" role="alert" hidden>No pudimos guardar tu aceptación. Inténtalo de nuevo.</div>
       <div class="step-actions"><button class="button btn-liquid-brand" type="submit" disabled>Aceptar y continuar</button>
       <button class="button btn-liquid-light" type="button" data-legal-logout>Cerrar sesión</button></div></form>`;
-    root.innerHTML = AuthViews.layout('Actualizamos nuestros documentos', 'Para seguir usando El Chilito, revisa y acepta la versión nueva.', form, assets);
+    root.innerHTML = AuthViews.layout('Actualizamos nuestros documentos', 'Para seguir usando YouGarden, revisa y acepta la versión nueva.', form, assets);
     const host = root.querySelector('[data-legal-form]'), submit = host.querySelector('[type=submit]'), feedback = host.querySelector('[data-legal-feedback]');
     const boxes = () => [...host.querySelectorAll('input[name=document]')];
     return {form:host, logout:host.querySelector('[data-legal-logout]'),
@@ -488,30 +488,29 @@ const LegalAcceptViews = (() => {
 const AccountDataViews = (() => {
   const TYPES = {terminos:'Términos y condiciones', aviso_privacidad:'Aviso de privacidad'};
   const WRONG = {'wrong-password':'La contraseña no es correcta.', limited:'Demasiados intentos. Espera un momento.', unauthenticated:'Tu sesión venció. Inicia sesión de nuevo.',
-    unavailable:'No se pudo completar. Inténtalo de nuevo.'};
+    unavailable:'No se pudo completar. Inténtalo de nuevo.', 'admin-account':'Tu cuenta tiene capacidades de administración. Pide que te las retiren antes de eliminarla.',
+    'admin-history':'Tu cuenta atendió registros de otras personas y no puede eliminarse desde aquí. Escribe a soporte.'};
   const accepted = state => {
     if(state.status === 'error') return '<p role="alert">No se pudieron consultar tus documentos.</p>';
     if(state.status === 'loading') return '<p role="status">Consultando…</p>';
     if(!state.items.length) return '<p>Aún no hay documentos aceptados.</p>';
     return `<ul class="user-history-list">${state.items.map(item => `<li><span>${icon('check')}</span><div><h3>${escaparHTML(TYPES[item.type] || item.type)}</h3><p>Versión ${escaparHTML(item.version)} · ${AppViews.date(item.at)}</p></div></li>`).join('')}</ul>`;
   };
-  const deletionPanel = date => date
-    ? `<h2 id="delete-title">Eliminación de tu cuenta solicitada</h2><p>Tu cuenta se eliminará el ${AppViews.date(date)}. Hasta entonces puedes cancelarlo.</p><button class="button btn-liquid-light" type="button" data-delete-cancel>Cancelar eliminación</button>`
-    : '<h2 id="delete-title">Eliminar mi cuenta</h2><p>Borraremos tus datos personales 15 días después de pedirlo. Tus equipos quedarán libres y tus huertos se archivarán. Puedes cancelarlo antes de que pase el plazo.</p><button class="button btn-liquid-light" type="button" data-danger="true" data-delete-open>Eliminar mi cuenta</button>';
+  const deletionPanel = '<h2 id="delete-title">Eliminar mi cuenta</h2><p>Borraremos de inmediato y para siempre tu cuenta y todos sus datos: huertos, historial, avisos y consentimientos. Tus equipos quedarán libres. No hay periodo de espera ni forma de cancelarlo.</p><button class="button btn-liquid-light" type="button" data-danger="true" data-delete-open>Eliminar mi cuenta</button>';
 
   function mount(host) {
     host.innerHTML = `<section class="bento-panel privacy-panel" aria-labelledby="accepted-title"><h2 id="accepted-title">Documentos que aceptaste</h2><div data-accepted-list></div></section>
       <section class="bento-panel privacy-panel deletion-panel" aria-labelledby="delete-title" data-deletion-panel></section>
       <dialog class="bento-panel app-dialog" aria-labelledby="delete-dialog-title" data-delete-dialog><form data-delete-form novalidate>
-        <h2 id="delete-dialog-title">¿Eliminar tu cuenta?</h2><p>Borraremos tus datos personales 15 días después de confirmar. Escribe tu contraseña para continuar.</p>
+        <h2 id="delete-dialog-title">¿Eliminar tu cuenta?</h2><p>Se borrarán tu cuenta, tu historial y tus consentimientos en este momento. No hay periodo de espera ni forma de recuperarla. Escribe tu contraseña para confirmar.</p>
         <label for="delete-password">Contraseña</label><input id="delete-password" name="password" type="password" autocomplete="current-password" required>
         <p class="auth-feedback is-error" role="alert" data-delete-error hidden></p>
-        <div class="app-dialog-actions"><button class="button btn-liquid-light" type="button" data-delete-close>Cancelar</button><button class="button" type="submit" data-danger="true">Eliminar mi cuenta</button></div></form></dialog>`;
+        <div class="app-dialog-actions"><button class="button btn-liquid-light" type="button" data-delete-close>Cancelar</button><button class="button" type="submit" data-danger="true">Eliminar definitivamente</button></div></form></dialog>`;
     const list = host.querySelector('[data-accepted-list]'), panel = host.querySelector('[data-deletion-panel]');
     const dialog = host.querySelector('[data-delete-dialog]'), form = host.querySelector('[data-delete-form]'), error = form.querySelector('[data-delete-error]');
     return {panel, dialog, form,
       accepted(state) { list.innerHTML = accepted(state); },
-      deletion(date) { panel.innerHTML = deletionPanel(date); },
+      deletion() { panel.innerHTML = deletionPanel; },
       password: () => form.elements.password.value,
       openDialog() { form.reset(); error.hidden = true; dialog.showModal(); form.elements.password.focus(); },
       closeDialog() { form.reset(); if(dialog.open) dialog.close(); },

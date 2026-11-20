@@ -249,11 +249,28 @@ class Cuidado(Base):
     tipo = models.CharField(max_length=18)
     chiles_cosechados = models.SmallIntegerField(null=True)
     realizado_en = models.DateTimeField(db_default=AHORA)
-    registrado_por = fk(USUARIO)
+    registrado_por = fk(USUARIO, null=True)     # vacío solo en las recargas que detecta el equipo
     registrado_en = models.DateTimeField(db_default=AHORA)
+    origen = models.CharField(max_length=7, db_default="persona")     # persona | equipo
 
     class Meta(Base.Meta):
         db_table = "cuidado"
+
+
+class DepositoDeteccion(Base):
+    """El flotador pasó de nivel bajo a con agua: la recarga espera a que el dueño la confirme (web.0005).
+
+    estado: pendiente | confirmada | descartada | sin_confirmar. Solo la confirmada tiene cuidado."""
+    id = uuid_pk()
+    huerto = fk(Huerto)
+    detectada_en = models.DateTimeField()
+    estado = models.CharField(max_length=13, db_default="pendiente")
+    cuidado = fk(Cuidado, null=True)
+    decidida_por = fk(USUARIO, null=True)    # vacío si sigue pendiente o quedó sin confirmar
+    decidida_en = models.DateTimeField(null=True)
+
+    class Meta(Base.Meta):
+        db_table = "deposito_deteccion"
 
 
 class CuidadoRevision(Base):
