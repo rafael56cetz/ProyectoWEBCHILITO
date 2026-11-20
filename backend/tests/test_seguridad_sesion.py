@@ -25,16 +25,16 @@ class VencimientoTests(SimpleTestCase):
     def test_vida_absoluta_no_se_renueva_con_actividad(self):
         self.assertTrue(self.vencida(HORA8, 0))
 
-    def test_inactividad_de_usuario(self):
-        self.assertFalse(self.vencida(3600, 1799))
-        self.assertTrue(self.vencida(3600, 1800))
+    def test_inactividad_de_usuario_15_minutos(self):
+        self.assertFalse(self.vencida(3600, 899))
+        self.assertTrue(self.vencida(3600, 900))
 
-    def test_inactividad_de_administrador(self):
-        self.assertFalse(self.vencida(3600, 899, admin=True))
-        self.assertTrue(self.vencida(3600, 900, admin=True))
+    def test_inactividad_de_administrador_10_minutos(self):
+        self.assertFalse(self.vencida(3600, 599, admin=True))
+        self.assertTrue(self.vencida(3600, 600, admin=True))
 
-    def test_usuario_no_cae_a_los_15_minutos(self):
-        self.assertFalse(self.vencida(3600, 900, admin=False))
+    def test_usuario_no_cae_a_los_10_minutos(self):
+        self.assertFalse(self.vencida(3600, 600, admin=False))
 
     def test_sin_marcas_validas_vence(self):
         for inicio, visto in [(None, None), (AHORA, None), ('1', AHORA)]:
@@ -48,7 +48,7 @@ class VencimientoTests(SimpleTestCase):
     def test_valores_acordados(self):
         self.assertEqual((settings.CHILITO_SESION_ABSOLUTA, settings.CHILITO_INACTIVIDAD_USUARIO,
                           settings.CHILITO_INACTIVIDAD_ADMIN, settings.PASSWORD_RESET_TIMEOUT),
-                         (28800, 1800, 900, 600))
+                         (28800, 900, 600, 600))
 
 
 class MiddlewareTests(SimpleTestCase):
@@ -84,6 +84,37 @@ class MiddlewareTests(SimpleTestCase):
             servicios.is_admin.return_value = False
             self.atender(request)
         salir.assert_called_once_with(request)
+
+    def cierra(self, edad_visto, admin, **extra):
+        """Atiende una petición con `edad_visto` segundos de inactividad y dice si cerró la sesión."""
+        request = self.peticion(edad_visto=edad_visto, **extra)
+        with patch('web.sesion.services') as servicios, patch('web.sesion.logout') as salir:
+            servicios.is_admin.return_value = admin
+            self.atender(request)
+        return salir.called
+
+    def test_usuario_sigue_antes_de_15_minutos_y_cae_al_cumplirlos(self):
+        self.assertFalse(self.cierra(899, admin=False))
+        self.assertTrue(self.cierra(900, admin=False))
+
+    def test_administrador_sigue_antes_de_10_minutos_y_cae_al_cumplirlos(self):
+        self.assertFalse(self.cierra(599, admin=True))
+        self.assertTrue(self.cierra(600, admin=True))
+
+    def test_sondeo_no_alarga_la_inactividad(self):
+        # Un sondeo a los 899 s no mueve la marca: la siguiente petición, a los 900 s, ya cierra la sesión.
+        for ruta, extra in [('/api/cuenta', {'HTTP_X_CHILITO_SONDEO': '1'}), (sesion.CONSULTA_DE_SESION, {})]:
+            with self.subTest(ruta=ruta):
+                request = self.peticion(ruta, edad_visto=899, **extra)
+                with patch('web.sesion.services') as servicios, patch('web.sesion.logout') as salir:
+                    servicios.is_admin.return_value = False
+                    self.assertEqual(self.atender(request), 10_000_000 - 899)
+                salir.assert_not_called()
+                with patch('web.sesion.time.time', return_value=10_000_001), \
+                        patch('web.sesion.services') as servicios, patch('web.sesion.logout') as salir:
+                    servicios.is_admin.return_value = False
+                    sesion.SesionAcotada(lambda r: 'respuesta')(request)
+                salir.assert_called_once_with(request)
 
 
 class ContrasenaTests(SimpleTestCase):

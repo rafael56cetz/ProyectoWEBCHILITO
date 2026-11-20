@@ -30,7 +30,7 @@ class PerfilDeDespliegue(SimpleTestCase):
         r = cargar()
         self.assertEqual(r.returncode, 0, r.stderr[-300:])
         self.assertEqual(json.loads(r.stdout), {'debug': False, 'sesion': True, 'csrf': True, 'redir': True, 'hsts': 31536000, 'origenes': ['https://chilito.example.test'],
-                                                'webauthn': False, 'samesite': 'Lax', 'httponly': True, 'inactividad': [1800, 900], 'absoluta': 28800})
+                                                'webauthn': False, 'samesite': 'Lax', 'httponly': True, 'inactividad': [900, 600], 'absoluta': 28800})
 
     def test_valores_inseguros_detienen_el_arranque(self):
         for nombre, cambios in {'debug': {'CHILITO_DEBUG': '1'}, 'sin hosts': {'CHILITO_ALLOWED_HOSTS': None}, 'comodin': {'CHILITO_ALLOWED_HOSTS': '*'},
